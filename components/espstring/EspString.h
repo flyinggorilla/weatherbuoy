@@ -116,6 +116,12 @@ public:
     // is left unchanged).  reserve(0), if successful, will validate an
     // invalid string (i.e., "if (s)" will be true afterwards)
     unsigned char reserve(unsigned int size);
+
+    // prepares the buffer for receiving data via memcopy or the like.
+    // first, the internal buffer/capacity is guaranteed to have size+1; buffer is resized if too small
+    // finally, the buffer is zeroed.
+    unsigned char receive(unsigned int size);
+
     inline unsigned int length(void) const
     {
         if(buffer) {

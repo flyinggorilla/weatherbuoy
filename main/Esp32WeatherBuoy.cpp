@@ -15,6 +15,8 @@
 #include "Serial.h"
 #include "Config.h"
 #include "SendData.h"
+#include "Wifi.h"
+#include "nvs_flash.h"
 
 #define SERIAL_BUFFER_SIZE (1024)
 #define SERIAL_BAUD_RATE (19200)
@@ -23,6 +25,8 @@ static const char tag[] = "WeatherBuoy";
 
 Config config;
 Esp32WeatherBuoy esp32WeatherBuoy;
+Wifi wifi;
+
 
 Esp32WeatherBuoy::Esp32WeatherBuoy() {
 
@@ -36,8 +40,7 @@ void app_main();
 }
 
 void app_main() {
-	//ESP_ERROR_CHECK(nvs_flash_init()); this should be done by config!!
-	//ESP_ERROR_CHECK(esp_netif_init());
+	ESP_ERROR_CHECK(esp_netif_init()); 
 	esp32WeatherBuoy.Start();
 }
 
@@ -46,11 +49,39 @@ void app_main() {
 
 
 
+////////////// TODO
+// send yaml style \r\n line feeds
+// maximet: <data>\r\n
+// date: <date>
+// system: <mem>,<internaltemp>,<voltage>
+// config: <...>, .... <...>
 
 void Esp32WeatherBuoy::Start() {
 
-    ESP_LOGI(tag, "Atterwind WeatherBuoy starting!");
+    Config config;
 
+    ESP_LOGI(tag, "Atterwind WeatherBuoy starting!");
+    if (!config.Load()) {
+        ESP_LOGE(tag, "Error, could not load configuration.");
+    }
+
+    //TODO esp_read_mac() as unique ID
+    ESP_LOGI(tag, "Hostname: %s", config.msHostname.c_str());
+
+    config.msAPSsid = "atterwind";
+    config.msHostname = "testWeatherbuoy";
+    config.msTargetUrl = "http://studio2.linz.local:9100/data";
+    //config.msAPPass = "************";
+    //config.msSTAPass = "************";
+    //config.msSTASsid = "*********";
+    if (!config.Save()) {
+        ESP_LOGE(tag, "Error, could not save configuration.");
+    }
+
+    //ESP_LOGI(tag, "sssi %s pass %s host %s", config.msAPSsid.c_str(), config.msAPPass.c_str(), config.msHostname.c_str());
+    //wifi.StartAPMode(config.msAPSsid, config.msAPPass, config.msHostname);
+    ESP_LOGI(tag, "sssi %s pass %s host %s", config.msSTASsid.c_str(), config.msSTAPass.c_str(), config.msHostname.c_str());
+    wifi.StartSTAMode(config.msSTASsid, config.msSTAPass, config.msHostname);
 
     Serial serial(UART_NUM_1, GPIO_NUM_16, SERIAL_BAUD_RATE, SERIAL_BUFFER_SIZE);
     SendData sendData(2);
@@ -80,7 +111,7 @@ void Esp32WeatherBuoy::Start() {
             }
         }
 
-    }
+    } 
 }
 
 

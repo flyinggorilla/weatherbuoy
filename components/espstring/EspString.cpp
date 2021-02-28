@@ -52,6 +52,17 @@ int String::printf(const char* format, ...) {
     return addLen; 
 }
 
+unsigned char String::receive(unsigned int size)
+{
+    if(buffer && capacity >= size) {
+		memset(buffer, 0, capacity+1);
+        len = size;
+        return 1;
+    }
+    return resize(size);
+}
+
+
 
 //ADDITION TO ORIGINAL LIBRARY
 unsigned char String::resize(unsigned int size) {
@@ -210,7 +221,7 @@ void String::invalidate(void)
 
 unsigned char String::reserve(unsigned int size)
 {
-    if(buffer && capacity >= size) {
+    if(buffer && capacity > size) { // capazity must be larger than max size to fit trailing 0
         return 1;
     }
     if(changeBuffer(size)) {

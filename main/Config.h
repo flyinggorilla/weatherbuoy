@@ -9,8 +9,8 @@ public:
 	Config();
 	virtual ~Config();
 
-	bool Read();
-	bool Write();
+	bool Load();
+	bool Save();
 
 	void ToggleAPMode() { mbAPMode = !mbAPMode; };
 
@@ -39,6 +39,7 @@ public:
 	String msOrganization;
 	String msDepartment;
 	String msLocation;
+	String msTargetUrl;
 
 	bool mbWebServerUseSsl;
 	__uint16_t muWebServerPort;

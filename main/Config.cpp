@@ -9,6 +9,7 @@ Config::Config() {
 	mbAPMode = true;
 	msAPSsid = "atterwind";
 	msHostname = "weatherbuoy";
+	msTargetUrl = "";
 
 	msSTASsid = "";
 	msSTAPass = "";
@@ -23,13 +24,10 @@ Config::~Config() {
 }
 
 
-bool Config::Read(){
+bool Config::Load(){
 	nvs_handle h;
 
-	if (nvs_flash_init() != ESP_OK) {
-		ESP_ERROR_CHECK(nvs_flash_init());
-	}
-
+	if (nvs_flash_init() != ESP_OK) 
 		return false;
 	if (nvs_open(NVS_NAME, NVS_READONLY, &h) != ESP_OK)
 		return false;
@@ -48,19 +46,19 @@ bool Config::Read(){
 	ReadString(h, "Organization", msOrganization);
 	ReadString(h, "Department", msDepartment);
 	ReadString(h, "Location", msLocation);
+	ReadString(h, "targetUrl", msTargetUrl);
 
 	nvs_close(h);
 	return true;
 }
 
 
-bool Config::Write()
+bool Config::Save()
 {
 	nvs_handle h;
 
-	if (nvs_flash_init() != ESP_OK) {
-		ESP_ERROR_CHECK(nvs_flash_init());
-	}
+	if (nvs_flash_init() != ESP_OK) 
+		return false;
 
 	if (nvs_open(NVS_NAME, NVS_READWRITE, &h) != ESP_OK)
 		return false;
@@ -95,6 +93,8 @@ bool Config::Write()
 	if (!WriteString(h, "Department", msDepartment))
 		return nvs_close(h), false;
 	if (!WriteString(h, "Location", msLocation))
+		return nvs_close(h), false;
+	if (!WriteString(h, "targetUrl", msTargetUrl))
 		return nvs_close(h), false;
 
 	nvs_commit(h);

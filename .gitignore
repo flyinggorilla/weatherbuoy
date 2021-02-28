@@ -9,6 +9,9 @@ sdkconfig.old
 parked
 main/index.html.gzip
 
+#node
+node_modules
+
 #certificates
 certificates/**
 **/*.pem

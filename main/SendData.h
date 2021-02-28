@@ -3,6 +3,7 @@
 
 #include "esp_event.h"
 #include "EspString.h"
+#include "esp_http_client.h"
 
 class SendData {
 public:
@@ -18,6 +19,13 @@ public:
 
 private:
     esp_event_loop_handle_t mhLoopHandle;
+
+private: // esp http client
+    esp_http_client_handle_t mhEspHttpClient = nullptr;
+    esp_http_client_config_t mEspHttpClientConfig = {0};
+
+    String mPostData;
+    String mResponseData;
 
 
 };
