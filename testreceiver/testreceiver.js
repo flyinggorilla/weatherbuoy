@@ -151,6 +151,7 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
             resMsg += "example: https://atterwind.info/weatherbuoy?to=test.weatherbuoy&config&apssid=test.weatherbuoy&appass=secret\r\n";
             resMsg += "example: https://atterwind.info/weatherbuoy?to=test.weatherbuoy&firmwarepath=esp32weatherbuoy202101010.bin&update\r\n";
             resMsg += "usage: curl [--insecure] \"<url>\"\r\n";
+            resMsg += "       curl --insecure \"https://localhost:9100/weatherbuoy?to=testWeatherbuoy&restart\"\r\n";
             resMsg += "receipient: [to=<all | <hostname>]\r\n";
             resMsg += "commands: [restart | diagnose | config | update]\r\n";
             resMsg += "configs: apssid=<*>, appass=<*>, stassid=<*>,d stapass=<*>, hostname=<*>, firmwarepath=<[/?&=*]*.bin>\r\n";
@@ -194,7 +195,10 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
             sendmsg.forEach((m)=>{ kv = m.split(": "); if (kv[0] == "to") sendToHostname = kv[1];});
 
             let connectedHostname = null;
-            req.body.forEach((m)=>{ kv = m.split(": "); if (kv[0] == "hostname") connectedHostname = kv[1];});
+            req.body.split("\r\n").forEach((m)=>{ kv = m.split(": "); if (kv[0] == "hostname") connectedHostname = kv[1];});
+
+            console.log("connectedHostname: " + connectedHostname);
+            console.log("sendToHostname: " + sendToHostname);
 
             // if there is a hostname match, we will forward the message to the weatherbuy
             if (sendToHostname && connectedHostname && (sendToHostname == connectedHostname)) {
