@@ -6,6 +6,7 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_http_client.h"
+#include "esp_ota_ops.h"
 
 static const char tag[] = "SendData";
 static const char SENDDATA_QUEUE_SIZE = 16; 
@@ -32,32 +33,38 @@ void SendData::EventHandler(int32_t id, void* event_data) {
         ESP_LOGI(tag, "POST: %s", (const char*)event_data);
     }
     
-    mEspHttpClientConfig.url = "https://10.10.29.104:9100/weatherbuoy";
-    mEspHttpClientConfig.host = "10.10.29.104";
-    mEspHttpClientConfig.path = "/weatherbuoy";
-    mEspHttpClientConfig.port = 9100;
-    mEspHttpClientConfig.transport_type = HTTP_TRANSPORT_OVER_SSL;
+    mEspHttpClientConfig.url = mrConfig.msTargetUrl.c_str();
+    //mEspHttpClientConfig.host = "10.10.29.104";
+    //mEspHttpClientConfig.path = "/weatherbuoy";
+    //mEspHttpClientConfig.port = 9100;
+    //mEspHttpClientConfig.transport_type = HTTP_TRANSPORT_OVER_SSL;
     mEspHttpClientConfig.method = HTTP_METHOD_POST;
     //mEspHttpClientConfig.user_data = csResponseBuffer;
     //mEspHttpClientConfig.buffer_size = HTTPRESPBUFSIZE-1;
     if (!mhEspHttpClient) {
         mhEspHttpClient = esp_http_client_init(&mEspHttpClientConfig);
-        ESP_LOGI("tag", "esp_http_client_init()");
+        ESP_LOGI(tag, "esp_http_client_init()");
     }
 
-    mPostData = "maximet: \"";
-    mPostData += (char*)event_data;
-    mPostData += "\"\r\n";
 
-    mPostData += "weatherbuoy: ";
+    /*
+ call esp_reset_reason() function. See description of esp_reset_reason_t 
+ esp_chip_info() function fills esp_chip_info_t
+ esp_get_idf_version()
+*/
+//    int cpu_freq = esp_clk_cpu_freq();
+
+    mPostData = "maximet: ";
+    mPostData += (char*)event_data;
+    mPostData += "\r\nhostname: ";
     mPostData += mrConfig.msHostname; 
-    mPostData += ",";
-    mPostData += "***versionINFO****"; // 
-    mPostData += ",";
-    mPostData += "**TODO* MAC ADDRESS"; // or return in diagnostics request
-    mPostData += ",";
+    mPostData += "\r\nversion: ";
+    mPostData += esp_ota_get_app_description()->version;
+    mPostData += "\r\nesp-idf: ";
+    mPostData += esp_ota_get_app_description()->idf_ver;  
+    mPostData += "\r\nuptime: ";
     mPostData += (unsigned int) esp_timer_get_time()/1000000; // seconds since start
-    mPostData += ",";
+    mPostData += "\r\nfreeheap: ";
     mPostData += esp_get_free_heap_size();
     mPostData += ",";
     mPostData += esp_get_minimum_free_heap_size();

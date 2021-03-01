@@ -17,6 +17,7 @@
 #include "SendData.h"
 #include "Wifi.h"
 #include "nvs_flash.h"
+#include "esp_ota_ops.h"
 
 #define SERIAL_BUFFER_SIZE (1024)
 #define SERIAL_BAUD_RATE (19200)
@@ -65,12 +66,30 @@ void Esp32WeatherBuoy::Start() {
         ESP_LOGE(tag, "Error, could not load configuration.");
     }
 
-    //TODO esp_read_mac() as unique ID
-    ESP_LOGI(tag, "Hostname: %s", config.msHostname.c_str());
+    if (!config.msAPSsid.length()) {
+        config.msAPSsid = "atterwind.weatherbuoy";
+    }
 
-    config.msAPSsid = "atterwind";
-    config.msHostname = "testWeatherbuoy";
-    config.msTargetUrl = "http://studio2.linz.local:9100/data";
+    if (!config.msHostname.length()) {
+        config.msHostname = "atterwind.weatherbuoy";
+    }
+
+    if (!config.msHostname.length()) {
+        config.msHostname = "atterwind.weatherbuoy";
+    }
+
+    if (!config.msTargetUrl.startsWith("https://")) {
+        config.msTargetUrl = "https://10.10.29.104:9100/weatherbuoy";
+    }
+
+    ESP_LOGI(tag, "Hostname: %s", config.msHostname.c_str());
+    ESP_LOGI(tag, "Target URL: %s", config.msTargetUrl.c_str());
+    ESP_LOGI(tag, "Last known good target URL: %s", config.msLastGoodTargetUrl.c_str());
+    ESP_LOGI(tag, "App Version: %s", esp_ota_get_app_description()->version);
+
+
+
+
     //config.msAPPass = "************";
     //config.msSTAPass = "************";
     //config.msSTASsid = "*********";

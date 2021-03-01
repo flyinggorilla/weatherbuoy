@@ -36,10 +36,9 @@ public:
 	String msSTAENTUser;
 	String msSTAENTCA;
 	String msHostname;
-	String msOrganization;
-	String msDepartment;
 	String msLocation;
 	String msTargetUrl;
+	String msLastGoodTargetUrl;
 
 	bool mbWebServerUseSsl;
 	__uint16_t muWebServerPort;

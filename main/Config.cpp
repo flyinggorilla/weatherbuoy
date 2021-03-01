@@ -2,7 +2,6 @@
 #include "Config.h"
 #include <nvs_flash.h>
 
-
 #define NVS_NAME "Config"
 
 Config::Config() {
@@ -18,11 +17,11 @@ Config::Config() {
 	muWebServerPort = 0;
 
 	muLastSTAIpAddress = 0;
+
 }
 
 Config::~Config() {
 }
-
 
 bool Config::Load(){
 	nvs_handle h;
@@ -39,14 +38,13 @@ bool Config::Load(){
 	ReadString(h, "STAPass", msSTAPass);
 	ReadString(h, "STAENTUser", msSTAENTUser);
 	ReadString(h, "STAENTCA", msSTAENTCA);
-	ReadString(h, "hostname", msHostname);
+	ReadString(h, "Hostname", msHostname);
 	ReadBool(h, "SrvSSLEnabled", mbWebServerUseSsl);
 	ReadShortUInt(h, "SrvListenPort", muWebServerPort);
 	ReadString(h, "SrvCert", msWebServerCert);
-	ReadString(h, "Organization", msOrganization);
-	ReadString(h, "Department", msDepartment);
 	ReadString(h, "Location", msLocation);
-	ReadString(h, "targetUrl", msTargetUrl);
+	ReadString(h, "TargetUrl", msTargetUrl);
+	ReadString(h, "LastGoodTargetUrl", msLastGoodTargetUrl);
 
 	nvs_close(h);
 	return true;
@@ -74,7 +72,7 @@ bool Config::Save()
 		return nvs_close(h), false;
 	if (!WriteString(h, "STAPass", msSTAPass))
 		return nvs_close(h), false;
-	if (!WriteString(h, "hostname", msHostname))
+	if (!WriteString(h, "Hostname", msHostname))
 		return nvs_close(h), false;
 	if (!WriteString(h, "STAENTUser", msSTAENTUser))
 		return nvs_close(h), false;
@@ -88,13 +86,11 @@ bool Config::Save()
 		return nvs_close(h), false;
 	if (!WriteString(h, "SrvCert", msWebServerCert))
 		return nvs_close(h), false;
-	if (!WriteString(h, "Organization", msOrganization))
-		return nvs_close(h), false;
-	if (!WriteString(h, "Department", msDepartment))
-		return nvs_close(h), false;
 	if (!WriteString(h, "Location", msLocation))
 		return nvs_close(h), false;
-	if (!WriteString(h, "targetUrl", msTargetUrl))
+	if (!WriteString(h, "TargetUrl", msTargetUrl))
+		return nvs_close(h), false;
+	if (!WriteString(h, "LastGoodTargetUrl", msLastGoodTargetUrl))
 		return nvs_close(h), false;
 
 	nvs_commit(h);

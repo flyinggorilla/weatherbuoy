@@ -3,4 +3,7 @@
 cmake_minimum_required(VERSION 3.5)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+
+string(TIMESTAMP version UTC)
+set(PROJECT_VER ${version}) 
 project(esp32weatherbuoy)
