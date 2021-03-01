@@ -6,7 +6,7 @@ const express = require('express');
 // npm install pem
 // npm install zlib
 
-
+const KEEP_ALIVE_TIMEOUT = 20; // seconds
 const mode = process.env.NODE_ENV; // set to "production" when in prod
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
 var listenPort = 9100;
@@ -24,6 +24,8 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
     if (err) {
         throw err
     }
+
+    app.keepAliveTimeout = KEEP_ALIVE_TIMEOUT*1000; // 20 seconds
     app.use(express.text()); // express.raw() is another option;
 
 /*    app.get('/', function (req, res) {
@@ -56,18 +58,27 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
         console.log("headers", req.rawHeaders);
         console.log("query: ", req.query);
         console.log("body: ", req.body);
-        responseBody  = "otaurl: https://10.10.29.104:9100/firmware.bin\r\n";
-        responseBody += "reboot: 0\r\n";
-        responseBody += "diagnose: all\r\n";
+        responseBody  = "to-hostname: testweatherbuoy\r\n";
+        responseBody  = "to-mac: 30:AE:A4:19:3C:88\r\n";
+        responseBody  = "ota: https://10.10.29.104:9100/firmware.bin\r\n";
+        responseBody += "do-reboot:\r\n";
+        responseBody += "set-hostname: testweatherbuoy\r\n";
+        responseBody += "set-apssid: atterwind\r\n";
+        responseBody += "set-appass: ************\r\n";
+        responseBody += "set-stassid: *********\r\n";
+        responseBody += "set-stapass: *********\r\n";
+        responseBody += "do-diagnose:\r\n";
         res.set('Content-Type', 'text/plain');
+        res.set('Keep-Alive', "timeout=" + KEEP_ALIVE_TIMEOUT);
         res.set("Content-Length", responseBody.length);
         res.status(200);        
         res.send(responseBody);
     });
     
-    https.createServer({ key: keys.serviceKey, cert: keys.certificate }, 
+    server = https.createServer({ rejectUnauthorized: false, requestCert: false, key: keys.serviceKey, cert: keys.certificate }, 
                         app).listen(listenPort, 
                             () => console.log(`Example app listening on port ${listenPort}!`));
+
 })
 
 

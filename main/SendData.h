@@ -4,10 +4,11 @@
 #include "esp_event.h"
 #include "EspString.h"
 #include "esp_http_client.h"
+#include "Config.h"
 
 class SendData {
 public:
-	SendData(int queueSize);
+	SendData(Config &config);
 	virtual ~SendData();
 	void EventHandler(int32_t id, void* event_data);
 
@@ -19,6 +20,7 @@ public:
 
 private:
     esp_event_loop_handle_t mhLoopHandle;
+    Config &mrConfig;
 
 private: // esp http client
     esp_http_client_handle_t mhEspHttpClient = nullptr;

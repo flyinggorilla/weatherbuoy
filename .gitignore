@@ -11,6 +11,7 @@ main/index.html.gzip
 
 #node
 node_modules
+**/package-lock.json
 
 #certificates
 certificates/**

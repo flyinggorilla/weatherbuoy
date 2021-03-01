@@ -8,6 +8,7 @@
 #include "esp_http_client.h"
 
 static const char tag[] = "SendData";
+static const char SENDDATA_QUEUE_SIZE = 16; 
 
 //ESP_EVENT_DECLARE_BASE(SENDDATA_EVENT_BASE);
 ESP_EVENT_DEFINE_BASE(SENDDATA_EVENT_BASE);
@@ -49,6 +50,12 @@ void SendData::EventHandler(int32_t id, void* event_data) {
     mPostData += "\"\r\n";
 
     mPostData += "weatherbuoy: ";
+    mPostData += mrConfig.msHostname; 
+    mPostData += ",";
+    mPostData += "***versionINFO****"; // 
+    mPostData += ",";
+    mPostData += "**TODO* MAC ADDRESS"; // or return in diagnostics request
+    mPostData += ",";
     mPostData += (unsigned int) esp_timer_get_time()/1000000; // seconds since start
     mPostData += ",";
     mPostData += esp_get_free_heap_size();
@@ -82,7 +89,7 @@ void SendData::EventHandler(int32_t id, void* event_data) {
             mResponseData.receive(iContentLength);
             int len = esp_http_client_read_response(mhEspHttpClient, (char*)mResponseData.c_str(), iContentLength);
             if (len == iContentLength) {
-                ESP_LOGI(tag, "HTTP POST Response %s", mResponseData.c_str());
+                ESP_LOGI(tag, "HTTP POST Response \r\n--->\r\n%s<---", mResponseData.c_str());
             } else {
                 ESP_LOGE(tag, "Error reading response %s", esp_err_to_name(err));
                 mResponseData.reserve(0);
@@ -103,9 +110,9 @@ void SendData::EventHandler(int32_t id, void* event_data) {
 
 }
 
-SendData::SendData(int queueSize) {
+SendData::SendData(Config &config) : mrConfig(config) {
     esp_event_loop_args_t loop_args = {
-        .queue_size = queueSize,
+        .queue_size = SENDDATA_QUEUE_SIZE,
         .task_name = "SendData",
         .task_priority = ESP_TASK_MAIN_PRIO,
         .task_stack_size = 8192,

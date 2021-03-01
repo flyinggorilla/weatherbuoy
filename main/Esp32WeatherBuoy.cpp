@@ -74,9 +74,9 @@ void Esp32WeatherBuoy::Start() {
     //config.msAPPass = "************";
     //config.msSTAPass = "************";
     //config.msSTASsid = "*********";
-    if (!config.Save()) {
-        ESP_LOGE(tag, "Error, could not save configuration.");
-    }
+    //if (!config.Save()) {
+    //    ESP_LOGE(tag, "Error, could not save configuration.");
+    //}
 
     //ESP_LOGI(tag, "sssi %s pass %s host %s", config.msAPSsid.c_str(), config.msAPPass.c_str(), config.msHostname.c_str());
     //wifi.StartAPMode(config.msAPSsid, config.msAPPass, config.msHostname);
@@ -84,18 +84,22 @@ void Esp32WeatherBuoy::Start() {
     wifi.StartSTAMode(config.msSTASsid, config.msSTAPass, config.msHostname);
 
     Serial serial(UART_NUM_1, GPIO_NUM_16, SERIAL_BAUD_RATE, SERIAL_BUFFER_SIZE);
-    SendData sendData(2);
+    SendData sendData(config);
 
     String line;
     while (true) {
-        serial.ReadLine(line);
+        if (!serial.ReadLine(line)) {
+            ESP_LOGE(tag, "Could not read line from serial");
+        }
         
         int dataStart = line.indexOf(STX);
         int dataEnd = line.lastIndexOf(ETX);
 
         if (dataStart >= 0 && dataEnd > 0) {
             ESP_LOGI(tag, "Measurement data'%s'", line.c_str());
-            sendData.Post(line);
+            if (!sendData.Post(line)) {
+                ESP_LOGE(tag, "Could not post data, likely due to a full queue");
+            }
         } else {
             bool ok = true;
             for (int i = 0; i < line.length(); i++) {
