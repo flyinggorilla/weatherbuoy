@@ -24,10 +24,16 @@ private:
 
 private: // esp http client
     esp_http_client_handle_t mhEspHttpClient = nullptr;
+    #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
     esp_http_client_config_t mEspHttpClientConfig = {0};
 
     String mPostData;
     String mResponseData;
+    String ReadMessageValue(const char* key);
+
+    bool mbSendDiagnostics = false;
+    bool mbOtaAppValidated = false;
+
 
 
 };

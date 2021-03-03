@@ -1,3 +1,4 @@
-idf_component_register(SRCS "CriticalSection.cpp" "" 
+idf_component_register(SRCS "CriticalSection.cpp"  
                        INCLUDE_DIRS "."
-                       REQUIRES )
+                       REQUIRES esp_system
+                        )

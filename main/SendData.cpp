@@ -7,9 +7,12 @@
 #include "esp_log.h"
 #include "esp_http_client.h"
 #include "esp_ota_ops.h"
+#include "esp_https_ota.h"
+#include "esputil.h"
 
 static const char tag[] = "SendData";
 static const char SENDDATA_QUEUE_SIZE = 16; 
+static const unsigned int MAX_ACCEPTABLE_RESPONSE_BODY_LENGTH = 16*1024;
 
 //ESP_EVENT_DECLARE_BASE(SENDDATA_EVENT_BASE);
 ESP_EVENT_DEFINE_BASE(SENDDATA_EVENT_BASE);
@@ -28,58 +31,57 @@ void eventHandler(void* handler_arg, esp_event_base_t base, int32_t id, void* ev
     }
 }
 
+String SendData::ReadMessageValue(const char* key) {
+    int posKey = mResponseData.indexOf(key);
+    if (posKey >= 0) {
+        int posCrlf = mResponseData.indexOf("\r\n", posKey);
+        if (posCrlf >= 0) {
+            const String &value = mResponseData.substring(posKey + strlen(key) + 1, posCrlf);
+            ESP_LOGI(tag, "Message body param '%s %s'", key, value.c_str());
+            return value;
+        }
+        ESP_LOGE(tag, "Message body param error, no value for key '%s'", key);
+    }
+    return String();
+}
+
 void SendData::EventHandler(int32_t id, void* event_data) {
     if (id == SENDDATA_EVENT_POSTDATA) {
         ESP_LOGI(tag, "POST: %s", (const char*)event_data);
     }
     
     mEspHttpClientConfig.url = mrConfig.msTargetUrl.c_str();
-    //mEspHttpClientConfig.host = "10.10.29.104";
-    //mEspHttpClientConfig.path = "/weatherbuoy";
-    //mEspHttpClientConfig.port = 9100;
-    //mEspHttpClientConfig.transport_type = HTTP_TRANSPORT_OVER_SSL;
     mEspHttpClientConfig.method = HTTP_METHOD_POST;
-    //mEspHttpClientConfig.user_data = csResponseBuffer;
-    //mEspHttpClientConfig.buffer_size = HTTPRESPBUFSIZE-1;
     if (!mhEspHttpClient) {
         mhEspHttpClient = esp_http_client_init(&mEspHttpClientConfig);
-        ESP_LOGI(tag, "esp_http_client_init()");
+        ESP_LOGD(tag, "Initializing new connection (keep-alive might have failed)");
     }
 
-
-    /*
- call esp_reset_reason() function. See description of esp_reset_reason_t 
- esp_chip_info() function fills esp_chip_info_t
- esp_get_idf_version()
-*/
-//    int cpu_freq = esp_clk_cpu_freq();
-
+    unsigned int uptime = (unsigned int) esp_timer_get_time()/1000000; // seconds since start
     mPostData = "maximet: ";
     mPostData += (char*)event_data;
-    mPostData += "\r\nhostname: ";
-    mPostData += mrConfig.msHostname; 
-    mPostData += "\r\nversion: ";
+    mPostData += "\r\nsystem: ";
     mPostData += esp_ota_get_app_description()->version;
-    mPostData += "\r\nesp-idf: ";
-    mPostData += esp_ota_get_app_description()->idf_ver;  
-    mPostData += "\r\nuptime: ";
-    mPostData += (unsigned int) esp_timer_get_time()/1000000; // seconds since start
-    mPostData += "\r\nfreeheap: ";
+    mPostData += ",";
+    mPostData += mrConfig.msHostname; 
+    mPostData += ",";
+    mPostData += uptime;
+    mPostData += ",";
     mPostData += esp_get_free_heap_size();
     mPostData += ",";
     mPostData += esp_get_minimum_free_heap_size();
     mPostData += "\r\n";
+    if (mbSendDiagnostics) {
+        mPostData += "esp-idf-version: ";
+        mPostData += esp_ota_get_app_description()->idf_ver;  
+        mPostData += "\r\nreset-reason: ";
+        mPostData += esp32_getresetreasontext(esp_reset_reason());
+        mPostData += "\r\n";
+        mbSendDiagnostics = false;
+    }
 
     esp_err_t err;
-
-    //esp_http_client_set_method(mhEspHttpClient, HTTP_METHOD_GET);
-    //esp_http_client_set_url(mhEspHttpClient, "https://10.10.29.104:9100");
-    //esp_http_client_set_header(mhEspHttpClient, "Content-Type", "application/yaml");
     esp_http_client_set_header(mhEspHttpClient, "Content-Type", "text/plain");
-    //esp_http_client_set_header(mhEspHttpClient, "Accept", "text/plain");
-    //esp_http_client (mhEspHttpClient, "Content-Length", "application/yaml'");
-    //esp_http_client_set_header(mhEspHttpClient, "Content-Length", "application/yaml'");
-    //esp_http_client_set_header(mhEspHttpClient, "Content-Type", "application/octet-stream'");
     err = esp_http_client_set_post_field(mhEspHttpClient, mPostData.c_str(), mPostData.length());
     if (err != ESP_OK) {
         ESP_LOGE(tag, "cannot set POST data of size %d bytes %s", mPostData.length(), esp_err_to_name(err));
@@ -92,25 +94,90 @@ void SendData::EventHandler(int32_t id, void* event_data) {
         iContentLength = esp_http_client_get_content_length(mhEspHttpClient);
         ESP_LOGI(tag, "HTTP POST Status %d, Content-Length %d", iHttpStatusCode , iContentLength);
 
-        if (iContentLength < 8192) {
+        if (iContentLength < MAX_ACCEPTABLE_RESPONSE_BODY_LENGTH) {
             mResponseData.receive(iContentLength);
             int len = esp_http_client_read_response(mhEspHttpClient, (char*)mResponseData.c_str(), iContentLength);
-            if (len == iContentLength) {
+            if ((len == iContentLength) && len) {
                 ESP_LOGI(tag, "HTTP POST Response \r\n--->\r\n%s<---", mResponseData.c_str());
-            } else {
+                String command = ReadMessageValue("command:");
+                if (command.length()) {
+                    bool updateConfig = false;
+                    String value;
+                    value = ReadMessageValue("set-apssid:");
+                    if (value.length()) { mrConfig.msAPSsid = value; updateConfig = true; };
+                    value = ReadMessageValue("set-appass:");
+                    if (value.length()) { mrConfig.msAPPass = value; updateConfig = true; };
+                    value = ReadMessageValue("set-stassid:");
+                    if (value.length()) { mrConfig.msSTASsid = value; updateConfig = true; };
+                    value = ReadMessageValue("set-stapass:");
+                    if (value.length()) { mrConfig.msSTAPass = value; updateConfig = true; };
+                    value = ReadMessageValue("set-hostname:");
+                    if (value.length()) { mrConfig.msHostname = value; updateConfig = true; };
+                    value = ReadMessageValue("set-targeturl:");
+                    if (value.length()) { mrConfig.msTargetUrl = value; updateConfig = true; };
+                    value = ReadMessageValue("set-apssid:");
+                    if (value.length()) { mrConfig.msAPSsid = value; updateConfig = true; };
+
+                    bool restart = false;
+                    if (command.equals("restart") || command.equals("config") || command.equals("udpate")) {
+                        if (updateConfig) {
+                            updateConfig = mrConfig.Save();
+                            ESP_LOGI(tag, "New configuration received and SAVED.");
+                        }
+                        restart = true;
+                    } else if (command.equals("diagnose")) {
+                        mbSendDiagnostics = true;
+                    }
+
+                    if (command.equals("update")) {
+                        value = ReadMessageValue("set-firmwarepath:");
+                        const String &pem = ReadMessageValue("set-cert-pem:");
+                        if (value.length()) {
+                            ESP_LOGI(tag, "***** Setting up OTA update '%s' *****", value.c_str());
+                            mEspHttpClientConfig.path = value.c_str();
+                            mEspHttpClientConfig.skip_cert_common_name_check = true;
+                            mEspHttpClientConfig.cert_pem = pem.c_str();
+                            // mEspHttpClientConfig.use_global_ca_store = false;
+                            err = esp_https_ota(&mEspHttpClientConfig);
+                            if (err == ESP_OK) {
+                                ESP_LOGI(tag, "**** Successful OTA update *****");
+                            } else {
+                                ESP_LOGE(tag, "Error reading response %s", esp_err_to_name(err));
+                            }
+                        } else {
+                            ESP_LOGE(tag, "OTA update path missing!");
+                        }
+                    }
+
+                    if (restart) {
+                        ESP_LOGI(tag, "***** RESTARTING in 1 Second *****.");
+                        vTaskDelay(1000 / portTICK_PERIOD_MS);
+                        esp_restart();
+                    } 
+
+                }
+
+            } 
+            
+            if (len < 0) {
                 ESP_LOGE(tag, "Error reading response %s", esp_err_to_name(err));
                 mResponseData.reserve(0);
             }
 
         }
 
-        //ESP_LOGI(tag, "HTTP POST Response %s strlen(%d)", csResponseBuffer, strlen(csResponseBuffer));
     } else {
         ESP_LOGE(tag, "Error performing HTTP POST request %s", esp_err_to_name(err));
     }
 
-    //ESP_LOGI(tag, "response is chunked %s", esp_http_client_is_chunked_response(mhEspHttpClient) ? "true" : "false");
+    if ((iHttpStatusCode >= 200) && (iHttpStatusCode < 400)) {
+        if (!mbOtaAppValidated) {
+            esp_ota_mark_app_valid_cancel_rollback(); // 
+            mbOtaAppValidated = true;
+        } 
+    }
 
+    //ESP_LOGI(tag, "response is chunked %s", esp_http_client_is_chunked_response(mhEspHttpClient) ? "true" : "false");
 
     esp_http_client_cleanup(mhEspHttpClient);    
     mhEspHttpClient = nullptr;

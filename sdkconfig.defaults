@@ -1,0 +1,29 @@
+###################
+# Mandatory overrides for default sdkconfig (idf.py menuconfig)
+# This list will be used when creating a new sdkconfig from scratch
+#
+
+
+#
+# Flash
+#
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="4MB"
+
+#
+# Partition Table
+#
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
+
+
+# ESP HTTP client
+#
+CONFIG_ESP_HTTP_CLIENT_ENABLE_HTTPS=y
+
+
+#
+# Bootloader config
+#
+CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y

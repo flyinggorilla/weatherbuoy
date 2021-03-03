@@ -7,6 +7,7 @@
 static const char tag[] = "Serial";
 
 Serial::Serial(unsigned int uartNo, unsigned int gpioNum, int baudRate, unsigned int bufferSize) {
+    #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
     uart_config_t uart_config = {
         .baud_rate = baudRate,
         .data_bits = UART_DATA_8_BITS,

@@ -44,7 +44,7 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
         let errMsg = "";
 
         let simpleStringRegex = "^[A-Z,a-z,0-9,_.=!]{3," + MAX_SSID_HOSTNAME_LENGTH + "}$"; // 3 to 32 characters!!!  https://regex101.com/
-        //let urlValidatorRegex = "^(http|https):\/\/(\d*)\/?(.*)$"; // simple, so it can handle also IP addresses
+        let urlValidatorRegex = "^(http|https):\/\/(\d*)\/?(.*)$"; // simple, so it can handle also IP addresses
 
         // check which weatherbuoy to message <all> or by <hostname>
         if (typeof req.query.to != 'undefined') {
@@ -59,7 +59,7 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
         // scan for config
         if (typeof req.query.hostname != 'undefined') {
             if (req.query.hostname.match(simpleStringRegex)) {
-                message += "hostname: " + req.query.hostname + "\r\n";
+                message += "set-hostname: " + req.query.hostname + "\r\n";
             } else {
                 errMsg += "ERROR: invalid hostname '" + req.query.hostname + "'\r\n";
             }
@@ -100,31 +100,38 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
         if (typeof req.query.firmwarepath != 'undefined') {
             if (req.query.firmwarepath.endsWith(".bin")) {
                 message += "set-firmwarepath: " + req.query.firmwarepath + "\r\n";
+                message += "set-cert-pem: " + keys.certificate + "\r\n";
             } else {
                 errMsg += "ERROR: invalid ota URL '" + req.query.firmwarepath + "'\r\n";
             }
         }
 
-        let command = null;
-        // scan for commands
-        if (typeof req.query.restart != 'undefined') {
-            command = "restart";
-        } else if (typeof req.query.diagnose != 'undefined') {
-            command = "diagnose";
-        } else if (typeof req.query.config != 'undefined') {
-            command = "config";
-        } else if (typeof req.query.update != 'undefined') {
-            if (message.indexOf("set-firmwarepath:") >= 0) {
-                command = "update";
+        if (typeof req.query.targeturl != 'undefined') {
+            if (req.query.targeturl.match(urlValidatorRegex)) {
+                message += "set-targeturl: " + req.query.targeturl + "\r\n";
             } else {
-                console.log("ERROR: cannot perform OTA update, because firmwarepath is missing.'");
-                res.status(400).send('Error: OTA firmare filename missing!')
-                return;
+                errMsg += "ERROR: invalid target URL '" + req.query.firmwatargeturlrepath + "'\r\n";
             }
         }
 
+        let command = null;
+        // scan for commands
+        if (typeof req.query.command != 'undefined') {
+            if (req.query.command == "restart" || req.query.command == "diagnose" || req.query.command == "update" || req.query.command == "config") {
+                command = req.query.command;
+                if (command == "update") {
+                    if (message.indexOf("set-firmwarepath:") < 0) {
+                        console.log("ERROR: cannot perform OTA update, because firmwarepath is missing.'");
+                        res.status(400).send('Error: OTA firmare filename missing!')
+                        return;
+                    }
+                }
+            }
+        } 
+        
+
         if (command) {
-            message += command + "\r\n";
+            message += "command: " + command + "\r\n";
         }
 
         let resMsg = null;
@@ -152,9 +159,9 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
             resMsg += "example: https://atterwind.info/weatherbuoy?to=test.weatherbuoy&firmwarepath=esp32weatherbuoy202101010.bin&update\r\n";
             resMsg += "usage: curl [--insecure] \"<url>\"\r\n";
             resMsg += "       curl --insecure \"https://localhost:9100/weatherbuoy?to=testWeatherbuoy&restart\"\r\n";
-            resMsg += "receipient: [to=<all | <hostname>]\r\n";
-            resMsg += "commands: [restart | diagnose | config | update]\r\n";
-            resMsg += "configs: apssid=<*>, appass=<*>, stassid=<*>,d stapass=<*>, hostname=<*>, firmwarepath=<[/?&=*]*.bin>\r\n";
+            resMsg += "receipient: to=<hostname>\r\n";
+            resMsg += "commands: command=[restart|diagnose|config|update]\r\n";
+            resMsg += "configs: apssid=<*>, appass=<*>, stassid=<*>,d stapass=<*>, hostname=<*>, targeturl=<url>, firmwarepath=<[/?&=*]*.bin>\r\n";
             resMsg += "special commands: [status | clear] - to view the status of message delivery or clear the message\r\n";
             res.status(200);
         }
@@ -166,26 +173,23 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
     })
 
 
-    /*if (mode != 'production') {
-        var path = require('path');
-    
-        app.get('/firmware.bin', function (rootreq, rootres) {
-            rootres.sendFile(path.join(__dirname + '/firmware.bin'));
-        });
-    }
-    
-    var queryResponse = ""; */
+    //**************** TODO ERROR
+    // esp_https_ota: Server certificate not found in esp_http_client config
+
 
     app.use(express.text({ defaultCharset: "ascii", type: "text/*" })); // express.raw() is another option;
     app.post('/weatherbuoy', (req, res, next) => {
-        let responseBody = "noop";
+        let responseBody = "";
+        if (false) {
+            console.log(req.body);
+            console.log(req.method, " request to weatherbouy ", req.query)
+            console.log("STORE host: " + req.hostname)
+            console.log("subdomains: " + req.subdomains)
+            console.log("headers", req.rawHeaders);
+            console.log("query: ", req.query);
+            console.log("body: --->\r\n" + req.body + "<---");
+        }
         console.log(req.body);
-        console.log(req.method, " request to weatherbouy ", req.query)
-        console.log("STORE host: " + req.hostname)
-        console.log("subdomains: " + req.subdomains)
-        console.log("headers", req.rawHeaders);
-        console.log("query: ", req.query);
-        console.log("body: --->\r\n", req.body, "<---");
         if (global.weatherbuoyMessage != undefined) {
             console.log("*---------weatherbuoymessage-------------");
             console.log(global.weatherbuoyMessage);
@@ -195,7 +199,10 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
             sendmsg.forEach((m)=>{ kv = m.split(": "); if (kv[0] == "to") sendToHostname = kv[1];});
 
             let connectedHostname = null;
-            req.body.split("\r\n").forEach((m)=>{ kv = m.split(": "); if (kv[0] == "hostname") connectedHostname = kv[1];});
+            let system = null;
+            req.body.split("\r\n").forEach((m)=>{ kv = m.split(": "); if (kv[0] == "system") system = kv[1];});
+            system = system.split(",");
+            connectedHostname = system[1];
 
             console.log("connectedHostname: " + connectedHostname);
             console.log("sendToHostname: " + sendToHostname);
@@ -212,6 +219,7 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
         res.set("Content-Length", responseBody.length);
         res.status(200);
         res.send(responseBody);
+        global.weatherbuoyMessage = undefined;
     });
 
     server = https.createServer({ rejectUnauthorized: false, requestCert: false, key: keys.serviceKey, cert: keys.certificate },
