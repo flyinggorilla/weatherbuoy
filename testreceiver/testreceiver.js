@@ -100,7 +100,7 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
         if (typeof req.query.firmwarepath != 'undefined') {
             if (req.query.firmwarepath.endsWith(".bin")) {
                 message += "set-firmwarepath: " + req.query.firmwarepath + "\r\n";
-                message += "set-cert-pem: " + keys.certificate + "\r\n";
+                //message += "set-cert-pem: " + Buffer.from(keys.certificate) + "\r\n";
             } else {
                 errMsg += "ERROR: invalid ota URL '" + req.query.firmwarepath + "'\r\n";
             }

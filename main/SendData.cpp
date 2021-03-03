@@ -45,6 +45,23 @@ String SendData::ReadMessageValue(const char* key) {
     return String();
 }
 
+
+int test_http_client_read_response(esp_http_client_handle_t client, char *buffer, int len)
+{
+    int read_len = 0;
+    while (read_len < len) {
+        int data_read = esp_http_client_read(client, buffer + read_len, len - read_len);
+        if (data_read <= 0) {
+            return read_len;
+        }
+        printf("****TESTREADRESPONSE ---%d\r\n%s\r\n-------****XXX TESTREADRESPONSE-----\r\n", data_read, buffer);
+        ESP_LOGI(tag, "TESTREADRESPONSE ---%d\r\n%s\r\n-------XXX TESTREADRESPONSE-----\r\n", data_read, buffer);
+        ESP_LOG_BUFFER_HEX(tag, buffer, data_read);
+        read_len += data_read;
+    }
+    return read_len;
+}
+
 void SendData::EventHandler(int32_t id, void* event_data) {
     if (id == SENDDATA_EVENT_POSTDATA) {
         ESP_LOGI(tag, "POST: %s", (const char*)event_data);
@@ -96,9 +113,24 @@ void SendData::EventHandler(int32_t id, void* event_data) {
 
         if (iContentLength < MAX_ACCEPTABLE_RESPONSE_BODY_LENGTH) {
             mResponseData.receive(iContentLength);
-            int len = esp_http_client_read_response(mhEspHttpClient, (char*)mResponseData.c_str(), iContentLength);
+
+            char sBuf[2048] = {0};
+            int len = test_http_client_read_response(mhEspHttpClient, sBuf, 2048-1);
+            mResponseData = sBuf;
+            if ((len == iContentLength) && len) {
+                ESP_LOGI(tag, "HTTP POST Response \r\n--->\r\n%s<---", sBuf);
+                printf("--------A-----------\r\n");
+                printf("response STRLEN = %d\r\n", strlen(sBuf));
+                printf(mResponseData.c_str());
+                printf("========B===========");
+
+            /*int len = esp_http_client_read_response(mhEspHttpClient, (char*)mResponseData.c_str(), iContentLength);
             if ((len == iContentLength) && len) {
                 ESP_LOGI(tag, "HTTP POST Response \r\n--->\r\n%s<---", mResponseData.c_str());
+                printf("-------------------\r\n");
+                printf("response STRLEN = %d\r\n", strlen(mResponseData.c_str()));
+                printf(mResponseData.c_str());
+                printf("===================");*/
                 String command = ReadMessageValue("command:");
                 if (command.length()) {
                     bool updateConfig = false;
@@ -172,9 +204,13 @@ void SendData::EventHandler(int32_t id, void* event_data) {
 
     if ((iHttpStatusCode >= 200) && (iHttpStatusCode < 400)) {
         if (!mbOtaAppValidated) {
-            esp_ota_mark_app_valid_cancel_rollback(); // 
+            if (esp_ota_mark_app_valid_cancel_rollback() != ESP_OK) {
+                ESP_LOGE(tag, "Error: Could not validate firmware app image. %s", esp_err_to_name(err));
+            } 
             mbOtaAppValidated = true;
         } 
+    } else {
+        ESP_LOGE(tag, "HTTP POST response was not OK with status  %d", iHttpStatusCode);
     }
 
     //ESP_LOGI(tag, "response is chunked %s", esp_http_client_is_chunked_response(mhEspHttpClient) ? "true" : "false");
