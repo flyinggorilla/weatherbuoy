@@ -36,10 +36,10 @@ void HttpRequestParser::Init(std::list<UploadHandler>* pUploadHandlerList){
 }
 
 void HttpRequestParser::Clear(){
-	mUrl.clear();
+	mUrl.reset();
 	mParams.clear();
-	mBody.clear();
-	mBoundary.clear();
+	mBody.reset();
+	mBoundary.reset();
 }
 
 bool HttpRequestParser::ParseRequest(char* sBuffer, __uint16_t uLen){
@@ -134,7 +134,7 @@ bool HttpRequestParser::ParseRequest(char* sBuffer, __uint16_t uLen){
 								muParseState = STATE_ProcessMultipartBodyHeaders;
 								mStringParser.Init();
 								mStringParser.AddStringToParse("filename=\"");
-								mFilename.clear();
+								mFilename.reset();
 							}
 							else if (mbParseFormBody){
 								muParseState = STATE_ParseFormBody;
@@ -245,7 +245,7 @@ bool HttpRequestParser::ParseRequest(char* sBuffer, __uint16_t uLen){
 					__uint8_t u;
 					mStringParser.ConsumeCharSimple(c);
 					if (mStringParser.Found(u)){
-						mBoundary.clear();
+						mBoundary.reset();
 						muParseState = STATE_ParseBoundary;
 					}
 				}

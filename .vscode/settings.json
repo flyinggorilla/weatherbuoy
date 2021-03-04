@@ -2,6 +2,24 @@
     "idf.portWin": "COM5",
     "idf.flashType": "UART",
     "files.associations": {
-        "esp_system.h": "c"
+        "esp_system.h": "c",
+        "*.tcc": "cpp",
+        "string": "cpp",
+        "fstream": "cpp",
+        "*.ipp": "cpp",
+        "deque": "cpp",
+        "list": "cpp",
+        "vector": "cpp",
+        "string_view": "cpp",
+        "functional": "cpp",
+        "atomic": "cpp",
+        "unordered_map": "cpp",
+        "limits": "cpp",
+        "sstream": "cpp",
+        "system_error": "cpp",
+        "memory": "cpp",
+        "random": "cpp",
+        "future": "cpp",
+        "optional": "cpp"
     }
 }

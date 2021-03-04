@@ -50,7 +50,6 @@ class String
     }
 
 public:
-    //TODO!!!
     /* @brief  just  frees allocated memory and initializes String object.
     */
     //void clean() to empty the string but keep the allocated memory as is
@@ -61,13 +60,13 @@ public:
 
     //ADDED!!!
     /* @brief   frees allocated memory and initializes String object.
-     * TODO: SHOULD BE RENEAMED TO free() or reset(), as clear() would better fit the truncate to 0 length
+     * TODO: SHOULD BE RENEAMED TO free() or reset(), as reset() would better fit the truncate to 0 length
     */
-    void clear() { invalidate(); };
+    void reset() { invalidate(); };
 
     //ADDED!!!
     /* @brief stream-like printf method that appends the "printf" formatted output to the String data
-     * use clear() if you dont want to append but simply reuse an existing String object 
+     * use reset() if you dont want to append but simply reuse an existing String object 
      *             and make sure we dont allocate more memory then necessary
      * @param   format     normal printf style format strings
      * @return  the number of characters that have been written, not counting the terminating null character.
@@ -87,6 +86,29 @@ public:
      * @return  true (1) if memory allocation was successful, false (0) otherwise
      */
     unsigned char resize(unsigned int size);
+
+    // memory management
+    // return true on success, false on failure (in which case, the string
+    // is left unchanged).  reserve(0), if successful, will validate an
+    // invalid string (i.e., "if (s)" will be true afterwards)
+    unsigned char reserve(unsigned int size);
+
+    // prepares the buffer for receiving data via memcopy or the like. 
+    // first, the internal buffer is guaranteed to have size+1; 
+    // buffer is resized if too small, but will never shrink!
+    // capacity will be set to size, so that the buffer will always have an additional terminating zero
+    // finally, the buffer is always zeroed. 
+    // call setlength(actuallength) after copying data to a c_str() buffer access.
+    unsigned char prepare(unsigned int size);
+
+    // useful when copying data into buffer via c_str() access, to then update the string/data length 
+    // if length is larger than the capacity, then length is set to capacity
+    // a terminating 0 is written at buffer[length]
+    unsigned char setlength(unsigned int length);
+
+    // returns the allocated capacity writable to the c_str() accessible internal buffer
+    // capacity + 1 == internal buffer size. , so that there is always room for the terminating 0
+    unsigned int capacity(void);
 
 
     // constructors
@@ -111,16 +133,6 @@ public:
     explicit String(double, unsigned char decimalPlaces = 2);
     ~String(void);
 
-    // memory management
-    // return true on success, false on failure (in which case, the string
-    // is left unchanged).  reserve(0), if successful, will validate an
-    // invalid string (i.e., "if (s)" will be true afterwards)
-    unsigned char reserve(unsigned int size);
-
-    // prepares the buffer for receiving data via memcopy or the like.
-    // first, the internal buffer/capacity is guaranteed to have size+1; buffer is resized if too small
-    // finally, the buffer is zeroed.
-    unsigned char receive(unsigned int size);
 
     inline unsigned int length(void) const
     {
@@ -272,6 +284,7 @@ public:
     {
         getBytes((unsigned char *) buf, bufsize, index);
     }
+    
     const char * c_str() const
     {
         return buffer ? buffer : "";  //CHANGED!!!! DONT RETURN NULL
@@ -310,7 +323,7 @@ public:
 
 protected:
     char *buffer;	        // the actual char array
-    unsigned int capacity;  // the array length minus one (for the '\0')
+    unsigned int mCapacity;  // the array length minus one (for the '\0')
     unsigned int len;       // the String length (not counting the '\0')
 protected:
     void init(void);

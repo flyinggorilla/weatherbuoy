@@ -28,14 +28,18 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
         throw err
     }
 
+
     app.keepAliveTimeout = KEEP_ALIVE_TIMEOUT * 1000; // 20 seconds
+
+    app.get('/weatherbuoy/firmware.bin', function (req, res) {
+        console.log("Request to weatherbuoy firmware!", req.query);
+        var path = require('path');
+        // "C:\Users\bernd\Documents\weatherbuoy\build\esp32weatherbuoy.bin"
+        res.sendFile(path.join(__dirname + '/../build/esp32weatherbuoy.bin'));
+    });
+    
+
     app.use(express.text()); // express.raw() is another option;
-
-    /*app.get('/', function (req, res) {
-        console.log("request to home", req.query)
-        res.send('server running!')
-    }) */
-
     app.get('/weatherbuoy', function (req, res) {
         console.log("Request to weatherbuoy", req.query)
 
@@ -100,7 +104,7 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
         if (typeof req.query.firmwarepath != 'undefined') {
             if (req.query.firmwarepath.endsWith(".bin")) {
                 message += "set-firmwarepath: " + req.query.firmwarepath + "\r\n";
-                //message += "set-cert-pem: " + Buffer.from(keys.certificate) + "\r\n";
+                message += "set-cert-pem: " + Buffer.from(keys.certificate) + "\r\n";
             } else {
                 errMsg += "ERROR: invalid ota URL '" + req.query.firmwarepath + "'\r\n";
             }
@@ -129,7 +133,6 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
             }
         } 
         
-
         if (command) {
             message += "command: " + command + "\r\n";
         }
@@ -153,10 +156,10 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
             }
         } else {
             resMsg = "Welcome to Weatherbuoy command center:\r\n";
-            resMsg += "example: https://atterwind.info/weatherbuoy?to=all&diagnose\r\n";
-            resMsg += "example: https://atterwind.info/weatherbuoy?to=test.weatherbuoy&restart\r\n";
-            resMsg += "example: https://atterwind.info/weatherbuoy?to=test.weatherbuoy&config&apssid=test.weatherbuoy&appass=secret\r\n";
-            resMsg += "example: https://atterwind.info/weatherbuoy?to=test.weatherbuoy&firmwarepath=esp32weatherbuoy202101010.bin&update\r\n";
+            resMsg += "example: https://atterwind.info/weatherbuoy?command=diagnose&to=test.weatherbuoy\r\n";
+            resMsg += "example: https://atterwind.info/weatherbuoy?command=restart&to=test.weatherbuoy\r\n";
+            resMsg += "example: https://atterwind.info/weatherbuoy?command=config&to=test.weatherbuoy&apssid=test.weatherbuoy&appass=secret\r\n";
+            resMsg += "example: https://atterwind.info/weatherbuoy?command=update&to=test.weatherbuoy&firmwarepath=esp32weatherbuoy202101010.bin\r\n";
             resMsg += "usage: curl [--insecure] \"<url>\"\r\n";
             resMsg += "       curl --insecure \"https://localhost:9100/weatherbuoy?to=testWeatherbuoy&restart\"\r\n";
             resMsg += "receipient: to=<hostname>\r\n";
@@ -180,14 +183,14 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
     app.use(express.text({ defaultCharset: "ascii", type: "text/*" })); // express.raw() is another option;
     app.post('/weatherbuoy', (req, res, next) => {
         let responseBody = "";
-        if (false) {
-            console.log(req.body);
+        if (true) {
+            //console.log(req.body);
             console.log(req.method, " request to weatherbouy ", req.query)
             console.log("STORE host: " + req.hostname)
             console.log("subdomains: " + req.subdomains)
             console.log("headers", req.rawHeaders);
             console.log("query: ", req.query);
-            console.log("body: --->\r\n" + req.body + "<---");
+            //console.log("body: --->\r\n" + req.body + "<---");
         }
         console.log(req.body);
         if (global.weatherbuoyMessage != undefined) {

@@ -47,11 +47,11 @@ Url::~Url() {
 void Url::Clear() {
 	muPort = 0;
 	mbSecure = false;
-	msUrl.clear();
-	msHost.clear();
-	msPath.clear();
-	msFragment.clear();
-	msQuery.clear();
+	msUrl.reset();
+	msHost.reset();
+	msPath.reset();
+	msFragment.reset();
+	msQuery.reset();
 	mlQueryParams.clear();
 }
 
@@ -64,7 +64,7 @@ String& Url::GetPortAsString() {
 }
 
 String& Url::GetUrl() {
-	msUrl.clear();
+	msUrl.reset();
 	if (msHost.length()) {
 		msUrl += mbSecure ? "https://" : "http://";
 		msUrl += msHost;
@@ -111,7 +111,7 @@ void Url::AddQueryParam(const char* name, const char* value) {
 }
 
 String& Url::GetQuery() {
-	msQuery.clear();
+	msQuery.reset();
 	for (std::list<TQueryParam>::iterator it = mlQueryParams.begin(); it != mlQueryParams.end(); ++it) {
 		msQuery += UrlEncode((*it).paramName);
 		msQuery += "=";
@@ -393,8 +393,8 @@ std::list<TQueryParam>& Url::ParseQuery(String& u) {
 				mlQueryParams.emplace_back();
 				mlQueryParams.back().paramName = UrlDecode(name);
 				mlQueryParams.back().paramValue = UrlDecode(value);
-				name.clear();
-				value.clear();
+				name.reset();
+				value.reset();
 				break;
 			}
 			name += c;
@@ -406,8 +406,8 @@ std::list<TQueryParam>& Url::ParseQuery(String& u) {
 				mlQueryParams.emplace_back();
 				mlQueryParams.back().paramName = UrlDecode(name);
 				mlQueryParams.back().paramValue = UrlDecode(value);
-				name.clear();
-				value.clear();
+				name.reset();
+				value.reset();
 				break;
 			}
 			value += c;

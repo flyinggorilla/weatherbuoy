@@ -58,7 +58,7 @@ void Wifi::GetNetmask(char *sBuf)
 
 void Wifi::GetMac(__uint8_t uMac[6])
 {
-	esp_wifi_get_mac(ESP_IF_WIFI_STA, uMac);
+	esp_wifi_get_mac(WIFI_IF_STA, uMac);
 }
 
 void Wifi::GetApInfo(int8_t& riRssi, uint8_t& ruChannel)

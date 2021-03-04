@@ -50,7 +50,7 @@ public:
 	 * executes HTTP(S) GET request
 	 * it stores response in internal dynamic memory in case no DownloadHandler is set
 	 * optionally call SetMaxResponseDataSize() in case the default memory allocation limit of 16kB is too small
-	 * optionally call Clear() to clear the buffer
+	 * optionally call Clear() to reset the buffer
 	 * @return
 	 * 		- HTTP response status code
 	 * 		- 0 on error
@@ -62,7 +62,7 @@ public:
 	 * executes HTTP(S) POST request
 	 * it stores response in internal dynamic memory in case no DownloadHandler is set
 	 * optionally call SetMaxResponseDataSize() in case the default memory allocation limit of 16kB is too small
-	 * optionally call Clear() to clear the buffer
+	 * optionally call Clear() to reset the buffer
 	 * @param POST data and size
 	 * @return
 	 * 		- HTTP response status code
@@ -75,7 +75,7 @@ public:
 	 * executes HTTP(S) POST request
 	 * it stores response in internal dynamic memory in case no DownloadHandler is set
 	 * optionally call SetMaxResponseDataSize() in case the default memory allocation limit of 16kB is too small
-	 * optionally call Clear() to clear the buffer
+	 * optionally call Clear() to reset the buffer
 	 * @param POST data (can be binary too)
 	 * @return
 	 * 		- HTTP response status code

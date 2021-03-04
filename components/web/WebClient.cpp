@@ -188,7 +188,7 @@ unsigned short WebClient::HttpExecute() {
 		close(clientSocket);
 		return 1006;
 	}
-	sRequest.clear(); // free memory
+	sRequest.reset(); // free memory
 
 
 	if (mpPostData) {
@@ -364,7 +364,7 @@ unsigned short WebClient::HttpExecuteSecure() {
 	//ESP_LOGI(LOGTAG, "%d bytes written", ret);
 	ESP_LOGD(LOGTAG, "Reading HTTP response...");
 
-	sRequest.clear(); // free memory
+	sRequest.reset(); // free memory
 
 	//ESP_LOGI(LOGTAG, "... socket send success");
 

@@ -45,8 +45,8 @@ HttpResponseParser::~HttpResponseParser() {
 
 void HttpResponseParser::Init(DownAndUploadHandler* pDownloadHandler, unsigned int maxBodyBufferSize) {
 	mpDownloadHandler = pDownloadHandler;
-	mBody.clear();
-	msLocation.clear();
+	mBody.reset();
+	msLocation.reset();
 	muContentLength = 0;
 	muActualContentLength = 0;
 	muMaxBodyBufferSize = maxBodyBufferSize;
@@ -56,7 +56,7 @@ void HttpResponseParser::Init(DownAndUploadHandler* pDownloadHandler, unsigned i
 	mbContentLength = false;
 	mbFinished = false;
 	mbConClose = true;
-	msContentType.clear();
+	msContentType.reset();
 	muCrlfCount = 0;
 	muError = 0;
 	muParseState = STATE_HttpType;
@@ -67,9 +67,9 @@ void HttpResponseParser::Init(DownAndUploadHandler* pDownloadHandler, unsigned i
 }
 
 void HttpResponseParser::Clear(){
-	mBody.clear();
-	msLocation.clear();
-	msContentType.clear();
+	mBody.reset();
+	msLocation.reset();
+	msContentType.reset();
 }
 
 bool HttpResponseParser::ParseResponse(char* sBuffer, unsigned int uLen) {
@@ -181,10 +181,10 @@ bool HttpResponseParser::ParseResponse(char* sBuffer, unsigned int uLen) {
 						mbContentLength = true;
 					} else if (uFound == 2) {
 						muParseState = STATE_ReadContentType;
-						msContentType.clear();
+						msContentType.reset();
 					} else if (uFound == 3) {
 						muParseState = STATE_ReadLocation;
-						msLocation.clear();
+						msLocation.reset();
 					}
 				} else
 					muParseState = STATE_SkipHeader;

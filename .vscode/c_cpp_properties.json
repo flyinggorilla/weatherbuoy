@@ -12,7 +12,7 @@
             ],
             "cStandard": "c17",
             "cppStandard": "c++17",
-            "compileCommands": "${workspaceFolder}/build/compile_commands.json",
+            "compileCommands": "${workspaceFolder}/build/compile_commands.json", 
             "configurationProvider": "ms-vscode.cmake-tools"
         }
     ],

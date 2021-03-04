@@ -52,22 +52,39 @@ int String::printf(const char* format, ...) {
     return addLen; 
 }
 
-unsigned char String::receive(unsigned int size)
+unsigned char String::prepare(unsigned int size)
 {
-    if(buffer && capacity >= size) {
-		memset(buffer, 0, capacity+1);
+    if(buffer && mCapacity >= size) {
+		memset(buffer, 0, mCapacity+1);
         len = size;
         return 1;
     }
     return resize(size);
 }
 
+unsigned char String::setlength(unsigned int length)
+{
+    if (length <= mCapacity) {
+        len = length;
+        buffer[len] = 0;
+    } else {
+        len = mCapacity;
+        buffer[len] = 0;
+        return 0;
+    }
 
+    return 1;
+}
+
+unsigned int String::capacity(void)
+{
+    return buffer ? mCapacity : 0;
+}
 
 //ADDITION TO ORIGINAL LIBRARY
 unsigned char String::resize(unsigned int size) {
  	size_t newSize = (size + 16) & (~0xf);
-    //ESP_LOGI(LOGTAG, "before: c=%d, l=%d, target=%d, new=%d", capacity, len, size, newSize);
+    //ESP_LOGI(LOGTAG, "before: c=%d, l=%d, target=%d, new=%d", mCapacity, len, size, newSize);
 	char *newbuffer = (char *) malloc(newSize);
 	if(newbuffer) {
 		memset(newbuffer, 0, newSize);
@@ -76,10 +93,10 @@ unsigned char String::resize(unsigned int size) {
 		if (buffer) {
 			free(buffer);
 		}
-		capacity = newSize - 1;
+		mCapacity = newSize - 1;
 		len = size;
 		buffer = newbuffer;
-	    //ESP_LOGI(LOGTAG, "after: c=%d, l=%d, target=%d, new=%d, ptr=%p", capacity, len, size, newSize, newbuffer);
+	    //ESP_LOGI(LOGTAG, "after: c=%d, l=%d, target=%d, new=%d, ptr=%p", mCapacity, len, size, newSize, newbuffer);
 		return 1;
 	}
 	return 0;
@@ -90,7 +107,7 @@ unsigned char String::resize(unsigned int size) {
 /*
 // debugging method
 void String::dump() {
-    ESP_LOGI(LOGTAG, "dump: c=%d, l=%d, ptr=%p", capacity, len, buffer);
+    ESP_LOGI(LOGTAG, "dump: c=%d, l=%d, ptr=%p", mCapacity, len, buffer);
 }*/
 
 
@@ -207,7 +224,7 @@ String::~String()
 inline void String::init(void)
 {
     buffer = NULL;
-    capacity = 0;
+    mCapacity = 0;
     len = 0;
 }
 
@@ -221,7 +238,7 @@ void String::invalidate(void)
 
 unsigned char String::reserve(unsigned int size)
 {
-    if(buffer && capacity > size) { // capazity must be larger than max size to fit trailing 0
+    if(buffer && mCapacity > size) { // capazity must be larger than max size to fit trailing 0
         return 1;
     }
     if(changeBuffer(size)) {
@@ -243,7 +260,7 @@ unsigned char String::changeBuffer(unsigned int maxStrLen)
         if (buffer) {
             free(buffer);
         }
-        capacity = newSize - 1;
+        mCapacity = newSize - 1;
         buffer = newbuffer;
         return 1;
     }
@@ -278,7 +295,7 @@ String & String::copy(const __FlashStringHelper *pstr, unsigned int length)
 void String::move(String &rhs)
 {
     if(buffer) {
-        if(capacity >= rhs.len) {
+        if(mCapacity >= rhs.len) {
             strcpy(buffer, rhs.buffer);
             len = rhs.len;
             rhs.len = 0;
@@ -288,10 +305,10 @@ void String::move(String &rhs)
         }
     }
     buffer = rhs.buffer;
-    capacity = rhs.capacity;
+    mCapacity = rhs.mCapacity;
     len = rhs.len;
     rhs.buffer = NULL;
-    rhs.capacity = 0;
+    rhs.mCapacity = 0;
     rhs.len = 0;
 }
 #endif
@@ -854,7 +871,7 @@ void String::replace(const String& find, const String& replace)
         if(size == len) {
             return;
         }
-        if(size > capacity && !changeBuffer(size)) {
+        if(size > mCapacity && !changeBuffer(size)) {
             return;    // XXX: tell user!
         }
         int index = len - 1;
