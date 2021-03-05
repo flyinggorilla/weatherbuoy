@@ -1,0 +1,1 @@
+curl -k "https://localhost:9100/weatherbuoy?command=update&to=test.weatherbuoy&firmwarepath=firmware.bin"

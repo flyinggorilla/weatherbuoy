@@ -10,13 +10,6 @@ class Wifi {
 
 public:
 	Wifi();
-
-	// needed?
-	void setLastStationIPAddress(unsigned int uiIP4) { muLastSTAIpAddress = uiIP4; }
-
-	//void SetConfig(Config* pConfig)						{ mpConfig = pConfig; };
-	//void SetStateDisplay(StateDisplay* pStateDisplay)  	{ mpStateDisplay = pStateDisplay; };
-
 	String GetLocalAddress();
 	void GetLocalAddress(char *sBuf);
 	void GetGWAddress(char *sBuf);
@@ -53,8 +46,6 @@ private:
 	String msUser;
 	String msCA;
 	String msHostname;
-	unsigned int muLastSTAIpAddress;
-
 
 	__uint8_t muConnectedClients;
 	bool mbConnected;

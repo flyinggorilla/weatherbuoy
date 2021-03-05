@@ -1,0 +1,35 @@
+menu "Weatherbuoy"
+
+    config WEATHERBUOY_WIFI_STA_SSID
+        string "Default WiFi Station SSID"
+
+    config WEATHERBUOY_WIFI_STA_PASS
+        string "Default WiFi Station Password"
+
+    config WEATHERBUOY_HOSTNAME
+        string "Default Hostname and AP SSID. Max 32 char."
+        default "test.weatherbuoy"
+        help
+            Default Hostname. Will be also used for Wifi AP SSID. Max 32 char.
+
+    config WEATHERBUOY_WIFI_AP_PASS
+        string "Default WiFi AP Password"
+        default ""
+
+    config WEATHERBUOY_TARGET_URL
+        string "Default target URL to send data and retrieve configuration."
+
+    config WEATHERBUOY_SENDDATA_INTERVAL_DAYTIME
+        int "Default interval in seconds to send weatherdata at daytime"
+        default 10
+        
+    config WEATHERBUOY_SENDDATA_INTERVAL_NIGHTTIME
+        int "Default interval in seconds to send weatherdata at daytime"
+        default 60
+
+    config WEATHERBUOY_SENDDATA_INTERVAL_HEALTH
+        int "Default interval in seconds to send health and diagnostics information"
+        default 300
+            
+
+endmenu

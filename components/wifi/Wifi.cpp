@@ -18,7 +18,6 @@ static char tag[] = "Wifi";
 
 Wifi::Wifi()
 {
-	muLastSTAIpAddress = 0;
 	muConnectedClients = 0;
 	mbConnected = false;
 }
@@ -313,7 +312,6 @@ void Wifi::OnEvent(esp_event_base_t base, int32_t id, void* event_data)
 
 			tcpip_adapter_ip_info_t ip;
 			tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip);
-			muLastSTAIpAddress = ip.ip.addr;
 			break;
 		default:
 			break;

@@ -28,23 +28,16 @@ private:
 
 public:
 	bool mbAPMode;
-
 	String msAPSsid;
 	String msAPPass;
 	String msSTASsid;
 	String msSTAPass;
-	String msSTAENTUser;
-	String msSTAENTCA;
 	String msHostname;
-	String msLocation;
 	String msTargetUrl;
-	String msLastGoodTargetUrl;
-
-	bool mbWebServerUseSsl;
-	__uint16_t muWebServerPort;
-	String msWebServerCert;
-
-	__uint32_t muLastSTAIpAddress;
+	//String msLastGoodTargetUrl;
+	int miSendDataIntervalDaytime; // seconds
+	int miSendDataIntervalNighttime; // seconds
+	int miSendDataIntervalHealth; // seconds
 };
 
 #endif /* MAIN_CONFIG_H_ */

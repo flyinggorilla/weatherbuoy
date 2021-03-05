@@ -13,7 +13,8 @@ public:
 	void EventHandler(int32_t id, void* event_data);
 
     // post string data to a message queue for sending. Data is copied into queue
-    bool Post(String &data);
+    bool PostData(String &data);
+    bool PostHealth();
 private:
     esp_event_loop_handle_t mhLoopHandle;
     Config &mrConfig;

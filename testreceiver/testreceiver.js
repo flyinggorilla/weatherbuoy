@@ -101,12 +101,12 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
             }
         }
 
-        if (typeof req.query.firmwarepath != 'undefined') {
-            if (req.query.firmwarepath.endsWith(".bin")) {
-                message += "set-firmwarepath: " + req.query.firmwarepath + "\r\n";
+        if (typeof req.query.firmware != 'undefined') {
+            if (req.query.firmware.endsWith(".bin")) {
+                message += "set-firmware: " + req.query.firmware + "\r\n";
                 message += "set-cert-pem: " + Buffer.from(keys.certificate) + "\r\n";
             } else {
-                errMsg += "ERROR: invalid ota URL '" + req.query.firmwarepath + "'\r\n";
+                errMsg += "ERROR: invalid ota URL '" + req.query.firmware + "'\r\n";
             }
         }
 
@@ -124,8 +124,8 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
             if (req.query.command == "restart" || req.query.command == "diagnose" || req.query.command == "update" || req.query.command == "config") {
                 command = req.query.command;
                 if (command == "update") {
-                    if (message.indexOf("set-firmwarepath:") < 0) {
-                        console.log("ERROR: cannot perform OTA update, because firmwarepath is missing.'");
+                    if (message.indexOf("set-firmware:") < 0) {
+                        console.log("ERROR: cannot perform OTA update, because firmware is missing.'");
                         res.status(400).send('Error: OTA firmare filename missing!')
                         return;
                     }
@@ -159,12 +159,12 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
             resMsg += "example: https://atterwind.info/weatherbuoy?command=diagnose&to=test.weatherbuoy\r\n";
             resMsg += "example: https://atterwind.info/weatherbuoy?command=restart&to=test.weatherbuoy\r\n";
             resMsg += "example: https://atterwind.info/weatherbuoy?command=config&to=test.weatherbuoy&apssid=test.weatherbuoy&appass=secret\r\n";
-            resMsg += "example: https://atterwind.info/weatherbuoy?command=update&to=test.weatherbuoy&firmwarepath=esp32weatherbuoy202101010.bin\r\n";
+            resMsg += "example: https://atterwind.info/weatherbuoy?command=update&to=test.weatherbuoy&firmware=esp32weatherbuoy202101010.bin\r\n";
             resMsg += "usage: curl [--insecure] \"<url>\"\r\n";
             resMsg += "       curl --insecure \"https://localhost:9100/weatherbuoy?to=testWeatherbuoy&restart\"\r\n";
             resMsg += "receipient: to=<hostname>\r\n";
             resMsg += "commands: command=[restart|diagnose|config|update]\r\n";
-            resMsg += "configs: apssid=<*>, appass=<*>, stassid=<*>,d stapass=<*>, hostname=<*>, targeturl=<url>, firmwarepath=<[/?&=*]*.bin>\r\n";
+            resMsg += "configs: apssid=<*>, appass=<*>, stassid=<*>,d stapass=<*>, hostname=<*>, targeturl=<url>, firmware=<[/?&=*]*.bin>\r\n";
             resMsg += "special commands: [status | clear] - to view the status of message delivery or clear the message\r\n";
             res.status(200);
         }

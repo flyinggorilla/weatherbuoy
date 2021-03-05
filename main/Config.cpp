@@ -1,23 +1,21 @@
 #include <freertos/FreeRTOS.h>
 #include "Config.h"
 #include <nvs_flash.h>
+#include "sdkconfig.h"
 
 #define NVS_NAME "Config"
 
 Config::Config() {
 	mbAPMode = true;
-	msAPSsid = "atterwind";
-	msHostname = "weatherbuoy";
-	msTargetUrl = "";
-
-	msSTASsid = "";
-	msSTAPass = "";
-
-	mbWebServerUseSsl = false;
-	muWebServerPort = 0;
-
-	muLastSTAIpAddress = 0;
-
+	msAPSsid = CONFIG_WEATHERBUOY_HOSTNAME;
+	msAPPass = CONFIG_WEATHERBUOY_WIFI_AP_PASS;
+	msHostname = CONFIG_WEATHERBUOY_HOSTNAME;
+	msTargetUrl = CONFIG_WEATHERBUOY_TARGET_URL;
+	msSTASsid = CONFIG_WEATHERBUOY_WIFI_STA_SSID;
+	msSTAPass = CONFIG_WEATHERBUOY_WIFI_STA_PASS;
+	miSendDataIntervalDaytime = CONFIG_WEATHERBUOY_SENDDATA_INTERVAL_DAYTIME;
+	miSendDataIntervalNighttime = CONFIG_WEATHERBUOY_SENDDATA_INTERVAL_NIGHTTIME;
+	miSendDataIntervalHealth = CONFIG_WEATHERBUOY_SENDDATA_INTERVAL_HEALTH;	
 }
 
 Config::~Config() {
@@ -33,18 +31,14 @@ bool Config::Load(){
 	ReadBool(h, "APMode", mbAPMode);
 	ReadString(h, "APSsid", msAPSsid);
 	ReadString(h, "APPass", msAPPass);
-	ReadUInt(h, "STAIpAddress", muLastSTAIpAddress);
 	ReadString(h, "STASsid", msSTASsid);
 	ReadString(h, "STAPass", msSTAPass);
-	ReadString(h, "STAENTUser", msSTAENTUser);
-	ReadString(h, "STAENTCA", msSTAENTCA);
 	ReadString(h, "Hostname", msHostname);
-	ReadBool(h, "SrvSSLEnabled", mbWebServerUseSsl);
-	ReadShortUInt(h, "SrvListenPort", muWebServerPort);
-	ReadString(h, "SrvCert", msWebServerCert);
-	ReadString(h, "Location", msLocation);
+	ReadInt(h, "SendDataIntervalDaytime", miSendDataIntervalDaytime);
+	ReadInt(h, "SendDataIntervalNighttime", miSendDataIntervalNighttime);
+	ReadInt(h, "SendDataIntervalHealth", miSendDataIntervalHealth);
 	ReadString(h, "TargetUrl", msTargetUrl);
-	ReadString(h, "LastGoodTargetUrl", msLastGoodTargetUrl);
+	//ReadString(h, "LastGoodTargetUrl", msLastGoodTargetUrl);
 
 	nvs_close(h);
 	return true;
@@ -74,23 +68,13 @@ bool Config::Save()
 		return nvs_close(h), false;
 	if (!WriteString(h, "Hostname", msHostname))
 		return nvs_close(h), false;
-	if (!WriteString(h, "STAENTUser", msSTAENTUser))
-		return nvs_close(h), false;
-	if (!WriteString(h, "STAENTCA", msSTAENTCA))
-		return nvs_close(h), false;
-	if (!WriteUInt(h, "STAIpAddress", muLastSTAIpAddress))
-		return nvs_close(h), false;
-	if (!WriteBool(h, "SrvSSLEnabled", mbWebServerUseSsl))	
-		return nvs_close(h), false;
-	if (!WriteUInt(h, "SrvListenPort", muWebServerPort))
-		return nvs_close(h), false;
-	if (!WriteString(h, "SrvCert", msWebServerCert))
-		return nvs_close(h), false;
-	if (!WriteString(h, "Location", msLocation))
-		return nvs_close(h), false;
 	if (!WriteString(h, "TargetUrl", msTargetUrl))
 		return nvs_close(h), false;
-	if (!WriteString(h, "LastGoodTargetUrl", msLastGoodTargetUrl))
+	if (!WriteInt(h, "SendDataIntervalDaytime", miSendDataIntervalDaytime))
+		return nvs_close(h), false;
+	if (!WriteInt(h, "SendDataIntervalNighttime", miSendDataIntervalNighttime))
+		return nvs_close(h), false;
+	if (!WriteInt(h, "SendDataIntervalHealth", miSendDataIntervalHealth))
 		return nvs_close(h), false;
 
 	nvs_commit(h);

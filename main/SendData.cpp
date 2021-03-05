@@ -11,14 +11,16 @@
 #include "esputil.h"
 
 static const char tag[] = "SendData";
-static const char SENDDATA_QUEUE_SIZE = 16; 
+static const char SENDDATA_QUEUE_SIZE = 5; 
 static const unsigned int MAX_ACCEPTABLE_RESPONSE_BODY_LENGTH = 16*1024;
+static const bool HTTP_KEEP_ALIVE_ENABLED = false;  // enabling doesnt work on local test system, SSL connections abort
 
 //ESP_EVENT_DECLARE_BASE(SENDDATA_EVENT_BASE);
 ESP_EVENT_DEFINE_BASE(SENDDATA_EVENT_BASE);
 
 enum {
-    SENDDATA_EVENT_POSTDATA
+    SENDDATA_EVENT_POSTDATA,
+    SENDDATA_EVENT_POSTHEALTH
 };
 
 
@@ -72,14 +74,23 @@ void SendData::PerformHttpPost(const char *postData) {
         memset(&mEspHttpClientConfig, 0, sizeof(mEspHttpClientConfig));
         mEspHttpClientConfig.url = mrConfig.msTargetUrl.c_str();
         mEspHttpClientConfig.method = HTTP_METHOD_POST; 
+        /* TCP only !!
+        mEspHttpClientConfig.keep_alive_enable = true;
+        mEspHttpClientConfig.keep_alive_idle = 15;
+        mEspHttpClientConfig.keep_alive_interval = 15; */
         mhEspHttpClient = esp_http_client_init(&mEspHttpClientConfig);
         //ESP_LOGD(tag, "Initializing new connection (keep-alive might have failed)");
     }
 
     // POST message
     unsigned int uptime = (unsigned int) esp_timer_get_time()/1000000; // seconds since start
-    mPostData = "maximet: ";
-    mPostData += postData;
+    if(postData) {
+        mPostData = "maximet: ";
+        mPostData += postData;
+    } else {
+        mPostData = "health: ";
+        mbSendDiagnostics = true;
+    }
     mPostData += "\r\nsystem: ";
     mPostData += esp_ota_get_app_description()->version;
     mPostData += ",";
@@ -156,7 +167,7 @@ void SendData::PerformHttpPost(const char *postData) {
     // read the HTTP response body and process it
     int len = esp_http_client_read_response(mhEspHttpClient, (char*)mResponseData.c_str(), iContentLength);
     if ((len == iContentLength) && len) {
-        ESP_LOGI(tag, "HTTP POST Response \r\n--->\r\n%s<---", mResponseData.c_str());
+        ESP_LOGD(tag, "HTTP POST Response \r\n--->\r\n%s<---", mResponseData.c_str());
 
         // Interpret the Weatherbuoy messages
         String command = ReadMessageValue("command:");
@@ -191,13 +202,16 @@ void SendData::PerformHttpPost(const char *postData) {
 
             // Optionally Execute OTA Update command
             if (command.equals("update")) {
-                value = ReadMessageValue("set-firmwarepath:");
+                value = ReadMessageValue("set-firmware:");
                 const String &pem = ReadMessagePemValue("set-cert-pem:");
                 if (value.length()) {
-                    ESP_LOGI(tag, "***** Setting up OTA update '%s'\r\n%s\r\n *****", value.c_str(), pem.c_str());
-                    //mEspHttpClientConfig.path = value.c_str();
+                    ESP_LOGD(tag, "***** Setting up OTA update '%s'\r\n%s\r\n *****", value.c_str(), pem.c_str());
                     mEspHttpClientConfig.method = HTTP_METHOD_GET; 
-                    mEspHttpClientConfig.url = "https://10.10.29.104:9100/weatherbuoy/firmware.bin";
+                    if (!mrConfig.msTargetUrl.endsWith("/") && !(value.startsWith("/"))) {
+                        mrConfig.msTargetUrl += "/";
+                    } 
+                    mrConfig.msTargetUrl += value; // e.g. add "firmware.bin"
+                    mEspHttpClientConfig.url = mrConfig.msTargetUrl.c_str();
                     mEspHttpClientConfig.skip_cert_common_name_check = true;
                     mEspHttpClientConfig.cert_pem = pem.c_str();
                     err = esp_https_ota(&mEspHttpClientConfig);
@@ -229,7 +243,8 @@ void SendData::PerformHttpPost(const char *postData) {
         mbOtaAppValidated = true;
     } 
 
-    //ESP_LOGI(tag, "response is chunked %s", esp_http_client_is_chunked_response(mhEspHttpClient) ? "true" : "false");
+    if (HTTP_KEEP_ALIVE_ENABLED)
+        return;
 
     Cleanup();
 }
@@ -237,10 +252,13 @@ void SendData::PerformHttpPost(const char *postData) {
 
 void SendData::EventHandler(int32_t id, void* event_data) {
     if (id == SENDDATA_EVENT_POSTDATA) {
-        ESP_LOGI(tag, "POST: %s", (const char*)event_data);
+        ESP_LOGI(tag, "PostData: %s", (const char*)event_data);
+        PerformHttpPost((const char*)event_data);
+    } else if (id == SENDDATA_EVENT_POSTHEALTH) {
+        ESP_LOGI(tag, "PostHealth");
+        PerformHttpPost(nullptr);
     }
 
-    PerformHttpPost((const char*)event_data);
 
 }
 
@@ -261,12 +279,20 @@ SendData::SendData(Config &config) : mrConfig(config) {
 
 }
 
-bool SendData::Post(String &data) {
+bool SendData::PostData(String &data) {
     if (ESP_OK == esp_event_post_to(mhLoopHandle, SENDDATA_EVENT_BASE, SENDDATA_EVENT_POSTDATA, (void*)data.c_str(), data.length()+1, 1000 / portTICK_PERIOD_MS))
         return true;
   
     return false;
 }
+
+bool SendData::PostHealth() {
+    if (ESP_OK == esp_event_post_to(mhLoopHandle, SENDDATA_EVENT_BASE, SENDDATA_EVENT_POSTHEALTH, (void*)"", 0, 1000 / portTICK_PERIOD_MS))
+        return true;
+  
+    return false;
+}
+
 
 
 SendData::~SendData() {
