@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Weatherbuoy Management Console</title>
+</head>
+<body>
+    <style>
+        h1 {
+            font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+            /*margin-top: 0px;
+            margin-left: 0px;
+            margin-right: 0px;*/
+        }
+        h2 {
+            font-size: 20px;
+        }
+        body {
+            font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+            /* margin: 3px; */
+            font-size: 12px;
+        }
+        body {
+            background-image: linear-gradient(120deg, #fdfbfb 0%, #ebedee 100%);
+        }
+        .system {
+            background-color: white;
+            font-size: 12px;
+        }
+        .rawdata {
+            font-family: monospace;            
+            font-size: 10px;
+            margin-top: 20px;
+            background-color: lightgray;
+        }
+    </style>
+
+   <script>
+        //'use strict'
+        var isLocal = false;
+        console.log("window.location.hostname: " + window.location.hostname);
+        if (window.location.hostname == "localhost") {
+            isLocal = true;
+        }
+    </script>
+
+    <h1>Weatherbuoy Management Console</h1>
+    <div><button id="refresh" onclick="fetchStatus()">refresh</button></div>
+    <div class="weatherChart" id="rawjson"></div>
+    <div id="systems">systems</div>
+
+    <script>
+        let weatherBuoySystems = {};
+        let fetchStatus = async function() {
+            // https://medium.com/codingurukul/fetch-api-a-modern-replacement-for-xmlhttprequest-c24ced9ff8d3
+            let response = await fetch("/weatherbuoy/status");
+            weatherBuoySystems = await response.json();
+            //document.getElementById("rawjson").innerText = JSON.stringify(weatherBuoySystems);
+
+            //console.log(weatherBuoySystems.systems);
+            for (const [systemName, system] of Object.entries(weatherBuoySystems.systems)) {
+                console.log("--- system: " + systemName + " ---");
+                console.log(system);
+                let systemDiv = document.getElementById(systemName);
+                if(!systemDiv) {
+                    systemDiv = document.createElement("div");
+                    systemDiv.id = systemName;
+                    document.getElementById("systems").appendChild(systemDiv);
+                    console.log("creating new div")
+                }
+
+                let systemHtml = "<h2>" + systemName + "</h2>";
+                /*systemHtml += "<table>";
+
+                let addHtmlTableRow = (key, value) => {
+                    systemHtml += "<tr><td>" + key +"</td><td>" + value + "</td></tr>";
+                }
+
+                for (const [key, val] of Object.entries(system)) {
+                    addHtmlTableRow(key, val);
+                }
+
+                systemHtml += "</table"; */
+
+                systemHtml += "Application version: " + system["systemAppVersion"] + "<br>";
+                systemHtml += "Uptime: " + system["systemUptime"] + " seconds<br>";
+                systemHtml += "<div class='rawdata'>" + system["maximet"] + "</div>";
+
+                systemDiv.innerHTML = systemHtml;
+            }            
+        }
+        setInterval(fetchStatus, 10000);
+
+    </script>
+
+
+</body>
+
+</html>

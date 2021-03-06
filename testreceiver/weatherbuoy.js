@@ -1,29 +1,15 @@
-const https = require('https');
-const zlib = require('zlib');
 const express = require('express');
-// install openssl for the dynamic SSL generation
-// npm install pem
-// npm install zlib
-
-/*const KEEP_ALIVE_TIMEOUT = 20; // seconds
-const MAX_SSID_HOSTNAME_LENGTH = 32;
-
-const mode = process.env.NODE_ENV; // set to "production" when in prod
-process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
-var listenPort = 9100;
-var isProduction = (mode == 'production');
-if (isProduction)
-    listenPort = process.env.PORT;
-
-console.log("mode: ", mode);
-console.log("port: " + listenPort);
-*/
+const path = require('path');
 
 exports.weatherBuoyApp = function(app) {
+    const KEEP_ALIVE_TIMEOUT = 20; // seconds
+    const MAX_SSID_HOSTNAME_LENGTH = 32;
+    
     global.weatherBuoy = {
-        sendMessage: undefined,
+        sendMessage: "",
         systems: {}
     }
+
 
     app.keepAliveTimeout = KEEP_ALIVE_TIMEOUT * 1000; // 20 seconds
 
@@ -34,6 +20,12 @@ exports.weatherBuoyApp = function(app) {
         res.sendFile(path.join(__dirname + '/../build/esp32weatherbuoy.bin'));
     });
     
+    app.get('/weatherbuoy/status', function (req, res) {
+        console.log("Request to weatherbuoy status data!");
+        res.setHeader("Content-Type", "application/json");
+        res.send(JSON.stringify(global.weatherBuoy));
+        res.status(200);
+    })
 
     app.use(express.text()); // express.raw() is another option;
     app.get('/weatherbuoy', function (req, res) {
@@ -43,12 +35,18 @@ exports.weatherBuoyApp = function(app) {
 
         // detect web browser to return HTML
         let bBrowser = false;
-        if (req.headers["accept"]) {
-            req.headers.accept.toLowerCase.includes("text/html");
+        if (req.headers["accept"] && req.headers.accept.toLowerCase().includes("text/html")) {
             bBrowser = true;
-        } 
+            res.setHeader("Content-Type", "text/html");
+            res.sendFile(path.join(__dirname + '/weatherbuoy.html'));
+            return;
+        } else  {
+            res.setHeader("Content-Type", "text/plain");
+        }
 
-        res.setHeader("Content-Type", "text/plain");
+
+
+
         let message = "";
         let errMsg = "";
 
@@ -56,96 +54,34 @@ exports.weatherBuoyApp = function(app) {
         let simpleStringRegex = "^[A-Z,a-z,0-9,_.=!]{3," + MAX_SSID_HOSTNAME_LENGTH + "}$"; // 3 to 32 characters!!!  https://regex101.com/
         let urlValidatorRegex = "^(http|https):\/\/(\d*)\/?(.*)$"; // simple, so it can handle also IP addresses
 
-        // check which weatherbuoy to message <all> or by <hostname>
-        if (typeof req.query.to != 'undefined') {
-            let to = req.query.to;
-            if (to == "all" || to.match(simpleStringRegex)) {
-                message += "to: " + to + "\r\n";
-            } else {
-                errMsg += "ERROR: invalid receipient to: <all>|<hostname> '" + to + "'\r\n";
+        let messageAddConfigParam = function(prefix, param, validationRegex) {
+            let v = req.query[param];
+            if (v) {
+                if (v.match(validationRegex)) {
+                    message += prefix + param + ": " + v + "\r\n";
+                } else {
+                    errMsg += "ERROR: invalid " + param + "'" + v + "'\r\n";
+                }
             }
         }
 
-        // scan for config
-        if (typeof req.query.hostname != 'undefined') {
-            if (req.query.hostname.match(simpleStringRegex)) {
-                message += "set-hostname: " + req.query.hostname + "\r\n";
-            } else {
-                errMsg += "ERROR: invalid hostname '" + req.query.hostname + "'\r\n";
-            }
-        }
+        messageAddConfigParam("", "to", simpleStringRegex);
+        messageAddConfigParam("set-", "hostname", simpleStringRegex);
+        messageAddConfigParam("set-", "apssid", simpleStringRegex);
+        messageAddConfigParam("set-", "stassid", simpleStringRegex);
+        messageAddConfigParam("set-", "appass", simpleStringRegex);
+        messageAddConfigParam("set-", "stapass", simpleStringRegex);
+        messageAddConfigParam("set-", "intervaldaytime", simpleNumberRegex);
+        messageAddConfigParam("set-", "intervalnighttime", simpleNumberRegex);
+        messageAddConfigParam("set-", "intervalhealth", simpleNumberRegex);
+        messageAddConfigParam("set-", "targeturl", urlValidatorRegex);
 
-        if (typeof req.query.apssid != 'undefined') {
-            if (req.query.apssid.match(simpleStringRegex)) {
-                message += "set-apssid: " + req.query.apssid + "\r\n";
-            } else {
-                errMsg += "ERROR: invalid AP-SSID '" + req.query.apssid + "'\r\n";
-            }
-        }
-
-        if (typeof req.query.stassid != 'undefined') {
-            if (req.query.stassid.match(simpleStringRegex)) {
-                message += "set-stassid: " + req.query.stassid + "\r\n";
-            } else {
-                errMsg += "ERROR: invalid STA-SSID '" + req.query.apSsid + "'\r\n";
-            }
-        }
-
-        if (typeof req.query.appass != 'undefined') {
-            if (req.query.appass.match(simpleStringRegex)) {
-                message += "set-appass: " + req.query.appass + "\r\n";
-            } else {
-                errMsg += "ERROR: invalid AP password '" + req.query.appass + "'\r\n";
-            }
-        }
-
-        if (typeof req.query.stapass != 'undefined') {
-            if (req.query.stapass.match(simpleStringRegex)) {
-                message += "set-stapass: " + req.query.stapass + "\r\n";
-            } else {
-                errMsg += "ERROR: invalid STA password '" + req.query.stapass + "'\r\n";
-            }
-        }
-
-
-        if (typeof req.query.intervaldaytime != 'undefined') {
-            if (req.query.stapass.match(simpleNumberRegex)) {
-                message += "set-intervaldaytime: " + req.query.intervaldaytime + "\r\n";
-            } else {
-                errMsg += "ERROR: invalid data/health sending interval in seconds, '" + req.query.intervaldaytime + "'\r\n";
-            }
-        }
-
-        if (typeof req.query.intervalnighttime != 'undefined') {
-            if (req.query.stapass.match(simpleNumberRegex)) {
-                message += "set-intervalnighttime: " + req.query.intervalnighttime + "\r\n";
-            } else {
-                errMsg += "ERROR: invalid data/health sending interval in seconds, '" + req.query.intervalnighttime + "'\r\n";
-            }
-        }
-
-        if (typeof req.query.intervalhealth != 'undefined') {
-            if (req.query.stapass.match(simpleNumberRegex)) {
-                message += "set-intervalhealth: " + req.query.intervalhealth + "\r\n";
-            } else {
-                errMsg += "ERROR: invalid data/health sending interval in seconds, '" + req.query.intervalhealth + "'\r\n";
-            }
-        }
-
-        if (typeof req.query.firmware != 'undefined') {
+        if (req.query["firmware"]) {
             if (req.query.firmware.endsWith(".bin")) {
                 message += "set-firmware: " + req.query.firmware + "\r\n";
                 message += "set-cert-pem: " + Buffer.from(keys.certificate) + "\r\n";
             } else {
                 errMsg += "ERROR: invalid ota URL '" + req.query.firmware + "'\r\n";
-            }
-        }
-
-        if (typeof req.query.targeturl != 'undefined') {
-            if (req.query.targeturl.match(urlValidatorRegex)) {
-                message += "set-targeturl: " + req.query.targeturl + "\r\n";
-            } else {
-                errMsg += "ERROR: invalid target URL '" + req.query.firmwatargeturlrepath + "'\r\n";
             }
         }
 
@@ -179,7 +115,7 @@ exports.weatherBuoyApp = function(app) {
         if (command || message.length) {
             message += "timestamp: " + new Date().toISOString() + "\r\n";
             if (command) {
-                global.weatherbuoyMessage = message;
+                global.weatherBuoy.sendMessage = message;
                 resMsg = "Command '" + command + "' to Weatherbuoy stations POSTED!: \r\n--->\r\n" + message + "<---";
                 res.status(200);
             } else {
@@ -202,7 +138,7 @@ exports.weatherBuoyApp = function(app) {
             resMsg += "special commands: [status | clear] - to view the status of message delivery or clear the message\r\n";
             res.status(200);
         }
-        if (global.weatherbuoyMessage != undefined) {
+        if (global.weatherBuoy.sendMessage) {
             resMsg +="\r\nStatus: ===>\r\n" + global.weatherbuoyMessage + "<===\r\n"; 
         }
         console.log(resMsg);
@@ -262,11 +198,10 @@ exports.weatherBuoyApp = function(app) {
             });
 
             //console.log(global.weatherBuoy);
-            global.weatherBuoy.sendMessage = "";
+            //global.weatherBuoy.sendMessage = "";
             console.log(JSON.stringify(global.weatherBuoy, null, 4));
-            global.weatherBuoy.sendMessage = undefined;
 
-            if (global.weatherBuoy.sendMessage != undefined) {
+            if (global.weatherBuoy.sendMessage) {
                 console.log("*---------weatherbuoymessage-------------");
                 console.log(global.weatherBuoy.sendMessage);
                 console.log("----------weatherbuoymessage------------*");
@@ -280,10 +215,8 @@ exports.weatherBuoyApp = function(app) {
                     responseToWeatherbuoyBody = global.weatherBuoy.sendMessage; 
                     console.log("Weatherbuoy " + systemHostname + " did FETCH the message: \r\n--->\r\n" + responseToWeatherbuoyBody + "<---");
                 }
+
             }
-    
-
-
         }
 
         res.set('Content-Type', 'text/plain');
@@ -291,7 +224,7 @@ exports.weatherBuoyApp = function(app) {
         res.set("Content-Length", responseToWeatherbuoyBody.length);
         res.status(200);
         res.send(responseToWeatherbuoyBody);
-        global.weatherBuoy.sendMessage = undefined;
+        global.weatherBuoy.sendMessage = "";
     });
 }
 
