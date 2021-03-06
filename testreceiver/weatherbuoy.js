@@ -1,13 +1,11 @@
 const https = require('https');
 const zlib = require('zlib');
-const pem = require('pem');
 const express = require('express');
 // install openssl for the dynamic SSL generation
 // npm install pem
 // npm install zlib
 
-const KEEP_ALIVE_TIMEOUT = 20; // seconds
-
+/*const KEEP_ALIVE_TIMEOUT = 20; // seconds
 const MAX_SSID_HOSTNAME_LENGTH = 32;
 
 const mode = process.env.NODE_ENV; // set to "production" when in prod
@@ -19,20 +17,13 @@ if (isProduction)
 
 console.log("mode: ", mode);
 console.log("port: " + listenPort);
+*/
 
-var app = express()
-
-global.weatherBuoy = {
-    sendMessage: undefined,
-    systems: {}
-}
-
-
-pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
-    if (err) {
-        throw err
+exports.weatherBuoyApp = function(app) {
+    global.weatherBuoy = {
+        sendMessage: undefined,
+        systems: {}
     }
-
 
     app.keepAliveTimeout = KEEP_ALIVE_TIMEOUT * 1000; // 20 seconds
 
@@ -302,12 +293,7 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
         res.send(responseToWeatherbuoyBody);
         global.weatherBuoy.sendMessage = undefined;
     });
-
-    server = https.createServer({ rejectUnauthorized: false, requestCert: false, key: keys.serviceKey, cert: keys.certificate },
-        app).listen(listenPort,
-            () => console.log(`Example app listening on port ${listenPort}!`));
-
-})
+}
 
 
 /*

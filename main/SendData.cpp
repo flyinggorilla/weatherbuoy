@@ -90,6 +90,8 @@ void SendData::PerformHttpPost(const char *postData) {
     } else {
         mPostData = "health: ";
         mbSendDiagnostics = true;
+        mPostData += "\r\nresetreason: ";
+        mPostData += esp32_getresetreasontext(esp_reset_reason());
     }
     mPostData += "\r\nsystem: ";
     mPostData += esp_ota_get_app_description()->version;
@@ -105,8 +107,20 @@ void SendData::PerformHttpPost(const char *postData) {
     if (mbSendDiagnostics) {
         mPostData += "esp-idf-version: ";
         mPostData += esp_ota_get_app_description()->idf_ver;  
-        mPostData += "\r\nreset-reason: ";
-        mPostData += esp32_getresetreasontext(esp_reset_reason());
+        mPostData += "\r\n";
+        mPostData += "targeturl: " + mrConfig.msTargetUrl + "\r\n";
+        mPostData += "apssid: " + mrConfig.msAPSsid + "\r\n";
+        mPostData += "appass: " + mrConfig.msAPPass.length() ? "*****\r\n" : "\r\n";
+        mPostData += "stassid: " + mrConfig.msAPSsid + "\r\n";
+        mPostData += "stapass: " + mrConfig.msSTAPass.length() ? "*****\r\n" : "\r\n";
+        mPostData += "intervaldaytime: ";
+        mPostData += mrConfig.miSendDataIntervalDaytime;
+        mPostData += "\r\n";
+        mPostData += "intervalnighttime: ";
+        mPostData += mrConfig.miSendDataIntervalNighttime;
+        mPostData += "\r\n";
+        mPostData += "intervalhealth: ";
+        mPostData += mrConfig.miSendDataIntervalHealth;
         mPostData += "\r\n";
         mbSendDiagnostics = false;
     }
@@ -188,6 +202,12 @@ void SendData::PerformHttpPost(const char *postData) {
             if (value.length()) { mrConfig.msTargetUrl = value; updateConfig = true; };
             value = ReadMessageValue("set-apssid:");
             if (value.length()) { mrConfig.msAPSsid = value; updateConfig = true; };
+            value = ReadMessageValue("set-intervaldaytime:");
+            if (value.length() && ((value.toInt() >= 1) && (value.toInt() < 60*60*24))) { mrConfig.miSendDataIntervalDaytime = value.toInt(); updateConfig = true; };
+            value = ReadMessageValue("set-intervalnighttime:");
+            if (value.length() && ((value.toInt() >= 1) && (value.toInt() < 60*60*24))) { mrConfig.miSendDataIntervalNighttime = value.toInt(); updateConfig = true; };
+            value = ReadMessageValue("set-intervalhealth:");
+            if (value.length() && ((value.toInt() >= 1) && (value.toInt() < 60*60*24*7))) { mrConfig.miSendDataIntervalHealth = value.toInt(); updateConfig = true; };
 
             bool restart = false;
             if (command.equals("restart") || command.equals("config") || command.equals("udpate")) {

@@ -34,9 +34,9 @@ bool Config::Load(){
 	ReadString(h, "STASsid", msSTASsid);
 	ReadString(h, "STAPass", msSTAPass);
 	ReadString(h, "Hostname", msHostname);
-	ReadInt(h, "SendDataIntervalDaytime", miSendDataIntervalDaytime);
-	ReadInt(h, "SendDataIntervalNighttime", miSendDataIntervalNighttime);
-	ReadInt(h, "SendDataIntervalHealth", miSendDataIntervalHealth);
+	ReadInt(h, "IntervalDaytime", miSendDataIntervalDaytime);
+	ReadInt(h, "IntervalNighttime", miSendDataIntervalNighttime);
+	ReadInt(h, "IntervalHealth", miSendDataIntervalHealth);
 	ReadString(h, "TargetUrl", msTargetUrl);
 	//ReadString(h, "LastGoodTargetUrl", msLastGoodTargetUrl);
 
@@ -70,11 +70,11 @@ bool Config::Save()
 		return nvs_close(h), false;
 	if (!WriteString(h, "TargetUrl", msTargetUrl))
 		return nvs_close(h), false;
-	if (!WriteInt(h, "SendDataIntervalDaytime", miSendDataIntervalDaytime))
+	if (!WriteInt(h, "IntervalDaytime", miSendDataIntervalDaytime))
 		return nvs_close(h), false;
-	if (!WriteInt(h, "SendDataIntervalNighttime", miSendDataIntervalNighttime))
+	if (!WriteInt(h, "IntervalNighttime", miSendDataIntervalNighttime))
 		return nvs_close(h), false;
-	if (!WriteInt(h, "SendDataIntervalHealth", miSendDataIntervalHealth))
+	if (!WriteInt(h, "IntervalHealth", miSendDataIntervalHealth))
 		return nvs_close(h), false;
 
 	nvs_commit(h);
