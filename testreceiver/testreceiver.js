@@ -23,7 +23,7 @@ pem.createCertificate({ days: 1, selfSigned: true }, function (err, keys) {
         throw err
     }
 
-    weatherBuoyApp(app);
+    weatherBuoyApp(app, keys.certificate);
 
     server = https.createServer({ rejectUnauthorized: false, requestCert: false, key: keys.serviceKey, cert: keys.certificate },
         app).listen(listenPort,

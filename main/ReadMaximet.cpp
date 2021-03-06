@@ -49,7 +49,7 @@ bool bDayTime = true; /////////////////////////////// TODO *********************
             } else {
                 intervalMs = mrConfig.miSendDataIntervalNighttime * 1000; //ms;
             }
-            uptimeMs = (unsigned int) esp_timer_get_time()/1000; // milliseconds since start
+            uptimeMs = (unsigned int)(esp_timer_get_time()/1000); // milliseconds since start
             if (intervalMs > uptimeMs - lastSendMs) {
                 ESP_LOGI(tag, "Skipping measurement data'%s' as %d ms < %d ms", line.c_str(), uptimeMs - lastSendMs, intervalMs);
             } else {

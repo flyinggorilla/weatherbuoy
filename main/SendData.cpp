@@ -83,11 +83,12 @@ void SendData::PerformHttpPost(const char *postData) {
     }
 
     // POST message
-    unsigned int uptime = (unsigned int) esp_timer_get_time()/1000000; // seconds since start
+    unsigned int uptime = (unsigned int) (esp_timer_get_time()/1000000); // seconds since start
     if(postData) {
         mPostData = "maximet: ";
         mPostData += postData;
-    } else {
+    } 
+    if(!postData || mbSendDiagnostics) {
         mPostData = "health: ";
         mbSendDiagnostics = true;
         mPostData += "\r\nresetreason: ";

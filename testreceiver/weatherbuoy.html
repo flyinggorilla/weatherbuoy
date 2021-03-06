@@ -7,31 +7,61 @@
 <body>
     <style>
         h1 {
-            font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             /*margin-top: 0px;
             margin-left: 0px;
             margin-right: 0px;*/
         }
         h2 {
             font-size: 20px;
+            margin-top: 0px;
+            margin-bottom: 0px;
+            padding-top: 2px;
+            padding-left: 10px;
+            padding-right: 10px;
+            padding-bottom: 5px;
+            background-color: rgb(112, 107, 150);
+            color: white;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
         }
         body {
-            font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
-            /* margin: 3px; */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             font-size: 12px;
+            background-image: linear-gradient(120deg, #eaf0f3 0%, #d4e0e6 100%);
         }
-        body {
-            background-image: linear-gradient(120deg, #fdfbfb 0%, #ebedee 100%);
+        .refresh {
+            float: right;
+        }
+        .systeminfo {
+            padding: 10px;            
         }
         .system {
+            border-radius: 10px;
+            border-color: rgb(62, 129, 184, 50%);
             background-color: white;
             font-size: 12px;
+            padding: 0px;
         }
-        .rawdata {
+        #rawjson, .rawdata {
             font-family: monospace;            
             font-size: 10px;
+            overflow-x: scroll;
+        }
+        .rawdata::-webkit-scrollbar, #rawjson::-webkit-scrollbar {
+             display: none;
+        }
+
+        .rawdata {
             margin-top: 20px;
-            background-color: lightgray;
+            background-color: whitesmoke;
+            padding: 10px;
+            border-bottom-left-radius: 10px;
+            border-bottom-right-radius: 10px;
+        }
+        #rawjson {
+            margin-top: 20px;
+            background-color: whitesmoke;
         }
     </style>
 
@@ -44,10 +74,11 @@
         }
     </script>
 
+    <div class="refresh" ><button id="refreshButton" onclick="fetchStatus()">refresh</button></div>
     <h1>Weatherbuoy Management Console</h1>
-    <div><button id="refresh" onclick="fetchStatus()">refresh</button></div>
-    <div class="weatherChart" id="rawjson"></div>
-    <div id="systems">systems</div>
+    <div id="systems"></div>
+    <div id="rawjson"></div>
+    <!-- <div id="lastcommand"></div> -->
 
     <script>
         let weatherBuoySystems = {};
@@ -55,7 +86,8 @@
             // https://medium.com/codingurukul/fetch-api-a-modern-replacement-for-xmlhttprequest-c24ced9ff8d3
             let response = await fetch("/weatherbuoy/status");
             weatherBuoySystems = await response.json();
-            //document.getElementById("rawjson").innerText = JSON.stringify(weatherBuoySystems);
+            document.getElementById("rawjson").innerHTML = "<pre>" + JSON.stringify(weatherBuoySystems, null, 4) + "</pre>";
+            //document.getElementById("lastcommand").innerHTML = "<pre>" + JSON.stringify(weatherBuoySystems, null, 4) + "</pre>";
 
             //console.log(weatherBuoySystems.systems);
             for (const [systemName, system] of Object.entries(weatherBuoySystems.systems)) {
@@ -64,12 +96,13 @@
                 let systemDiv = document.getElementById(systemName);
                 if(!systemDiv) {
                     systemDiv = document.createElement("div");
+                    systemDiv.className = "system";
                     systemDiv.id = systemName;
                     document.getElementById("systems").appendChild(systemDiv);
                     console.log("creating new div")
                 }
 
-                let systemHtml = "<h2>" + systemName + "</h2>";
+                let systemHtml = "<h2>" + systemName + "</h2><div class='systeminfo'>";
                 /*systemHtml += "<table>";
 
                 let addHtmlTableRow = (key, value) => {
@@ -82,14 +115,17 @@
 
                 systemHtml += "</table"; */
 
-                systemHtml += "Application version: " + system["systemAppVersion"] + "<br>";
-                systemHtml += "Uptime: " + system["systemUptime"] + " seconds<br>";
+                systemHtml += "Firmware: " + system["systemAppVersion"] + "<br>";
+                systemHtml += "Uptime: " + system["systemUptime"] + " seconds  " +  (system["reset-reason"] ? system["reset-reason"] : "") + "<br>";
+                systemHtml += "Memory: " + Math.round(system["systemHeapFree"]/1024) + "kB " +  Math.round(system["systemHeapFreeMin"]/1024) + "kB <br>";
+                systemHtml += "</div>";
                 systemHtml += "<div class='rawdata'>" + system["maximet"] + "</div>";
 
                 systemDiv.innerHTML = systemHtml;
             }            
         }
         setInterval(fetchStatus, 10000);
+        fetchStatus();
 
     </script>
 

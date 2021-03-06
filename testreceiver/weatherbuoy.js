@@ -1,13 +1,15 @@
 const express = require('express');
 const path = require('path');
 
-exports.weatherBuoyApp = function(app) {
+exports.weatherBuoyApp = function(app, certificatePem) {
     const KEEP_ALIVE_TIMEOUT = 20; // seconds
     const MAX_SSID_HOSTNAME_LENGTH = 32;
     
     global.weatherBuoy = {
-        sendMessage: "",
-        systems: {}
+        systems: {},
+        lastCommandTimestamp: 0,
+        lastCommand: "",
+        activeCommand: ""
     }
 
 
@@ -79,7 +81,7 @@ exports.weatherBuoyApp = function(app) {
         if (req.query["firmware"]) {
             if (req.query.firmware.endsWith(".bin")) {
                 message += "set-firmware: " + req.query.firmware + "\r\n";
-                message += "set-cert-pem: " + Buffer.from(keys.certificate) + "\r\n";
+                message += "set-cert-pem: " + Buffer.from(certificatePem) + "\r\n";
             } else {
                 errMsg += "ERROR: invalid ota URL '" + req.query.firmware + "'\r\n";
             }
@@ -115,7 +117,7 @@ exports.weatherBuoyApp = function(app) {
         if (command || message.length) {
             message += "timestamp: " + new Date().toISOString() + "\r\n";
             if (command) {
-                global.weatherBuoy.sendMessage = message;
+                global.weatherBuoy.activeCommand = message;
                 resMsg = "Command '" + command + "' to Weatherbuoy stations POSTED!: \r\n--->\r\n" + message + "<---";
                 res.status(200);
             } else {
@@ -138,7 +140,7 @@ exports.weatherBuoyApp = function(app) {
             resMsg += "special commands: [status | clear] - to view the status of message delivery or clear the message\r\n";
             res.status(200);
         }
-        if (global.weatherBuoy.sendMessage) {
+        if (global.weatherBuoy.activeCommand) {
             resMsg +="\r\nStatus: ===>\r\n" + global.weatherbuoyMessage + "<===\r\n"; 
         }
         console.log(resMsg);
@@ -198,22 +200,24 @@ exports.weatherBuoyApp = function(app) {
             });
 
             //console.log(global.weatherBuoy);
-            //global.weatherBuoy.sendMessage = "";
+            //global.weatherBuoy.activeCommand = "";
             console.log(JSON.stringify(global.weatherBuoy, null, 4));
 
-            if (global.weatherBuoy.sendMessage) {
+            if (global.weatherBuoy.activeCommand) {
                 console.log("*---------weatherbuoymessage-------------");
-                console.log(global.weatherBuoy.sendMessage);
+                console.log(global.weatherBuoy.activeCommand);
                 console.log("----------weatherbuoymessage------------*");
-                let sendmsg = global.weatherBuoy.sendMessage.split("\r\n");
+                let sendmsg = global.weatherBuoy.activeCommand.split("\r\n");
                 let sendToHostname = null;
                 sendmsg.forEach((m)=>{ kv = m.split(": "); if (kv[0] == "to") sendToHostname = kv[1];});
                 console.log("sendToHostname: " + sendToHostname);
     
                 // if there is a hostname match, we will forward the message to the weatherbuy
                 if (sendToHostname && systemHostname && (sendToHostname == systemHostname)) {
-                    responseToWeatherbuoyBody = global.weatherBuoy.sendMessage; 
+                    responseToWeatherbuoyBody = global.weatherBuoy.activeCommand; 
                     console.log("Weatherbuoy " + systemHostname + " did FETCH the message: \r\n--->\r\n" + responseToWeatherbuoyBody + "<---");
+                    global.weatherBuoy.lastCommand = responseToWeatherbuoyBody;
+                    global.weatherBuoy.lastCommandTimestamp = new Date().toISOString();
                 }
 
             }
@@ -224,7 +228,7 @@ exports.weatherBuoyApp = function(app) {
         res.set("Content-Length", responseToWeatherbuoyBody.length);
         res.status(200);
         res.send(responseToWeatherbuoyBody);
-        global.weatherBuoy.sendMessage = "";
+        global.weatherBuoy.activeCommand = "";
     });
 }
 
