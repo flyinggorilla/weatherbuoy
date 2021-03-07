@@ -20,7 +20,7 @@ void fReadMaximetTask(void *pvParameter) {
 
 void ReadMaximet::Start() {
 	xTaskCreate(&fReadMaximetTask, "ReadMaximet", 8192, this, ESP_TASK_MAIN_PRIO, NULL);
-}
+} 
 
 #define STX (0x02) // ASCII start of text
 #define ETX (0x03) // ASCII end of text

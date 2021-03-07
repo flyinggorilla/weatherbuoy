@@ -15,6 +15,12 @@ static const char SENDDATA_QUEUE_SIZE = 5;
 static const unsigned int MAX_ACCEPTABLE_RESPONSE_BODY_LENGTH = 16*1024;
 static const bool HTTP_KEEP_ALIVE_ENABLED = false;  // enabling doesnt work on local test system, SSL connections abort
 
+extern const unsigned char certificate_pem_start[] asm("_binary_certificate_pem_start");
+extern const unsigned char certificate_pem_end[]   asm("_binary_certificate_pem_end");
+unsigned int uWsCertLength = certificate_pem_end - certificate_pem_start;
+const char* sWsCert = (const char*)certificate_pem_start;
+
+
 //ESP_EVENT_DECLARE_BASE(SENDDATA_EVENT_BASE);
 ESP_EVENT_DEFINE_BASE(SENDDATA_EVENT_BASE);
 
@@ -234,20 +240,23 @@ void SendData::PerformHttpPost(const char *postData) {
             // Optionally Execute OTA Update command
             if (command.equals("update")) {
                 const String &pem = ReadMessagePemValue("set-cert-pem:");
-                ESP_LOGD(tag, "***** Setting up OTA update '%s'\r\n%s\r\n *****", value.c_str(), pem.c_str());
                 mEspHttpClientConfig.method = HTTP_METHOD_GET; 
                 if (!mrConfig.msTargetUrl.endsWith("/")) {
                     mrConfig.msTargetUrl += "/";
                 } 
-                mrConfig.msTargetUrl += "firmware.bin"; // e.g. add "firmware.bin"
+                mrConfig.msTargetUrl += "firmware.bin"; 
                 mEspHttpClientConfig.url = mrConfig.msTargetUrl.c_str();
-                mEspHttpClientConfig.skip_cert_common_name_check = true;
-                if (pem) {
+                mEspHttpClientConfig.skip_cert_common_name_check = false;
+                mEspHttpClientConfig.cert_pem = sWsCert;
+                if (pem.length()) {
+                    mEspHttpClientConfig.skip_cert_common_name_check = true;
                     mEspHttpClientConfig.cert_pem = pem.c_str();
-                }
+                } 
+                ESP_LOGI(tag, "OTA Url: %s", mEspHttpClientConfig.url);
+                ESP_LOGI(tag, "OTA PEM %s certificate: %d bytes\r\n%s", pem.length() ? "custom" : "embedded", strlen(mEspHttpClientConfig.cert_pem), mEspHttpClientConfig.cert_pem);
                 err = esp_https_ota(&mEspHttpClientConfig);
                 if (err == ESP_OK) {
-                    ESP_LOGI(tag, "**** Successful OTA update *****");
+                    ESP_LOGI(tag, "Successful OTA update");
                 } else {
                     ESP_LOGE(tag, "Error reading response %s", esp_err_to_name(err));
                 }
