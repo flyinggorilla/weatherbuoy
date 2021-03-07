@@ -1,7 +1,9 @@
 const express = require('express');
 const path = require('path');
+const https = require("https");
+const http = require("http");
 
-exports.weatherBuoyApp = function(app, certificatePem) {
+exports.weatherBuoyApp = function(app, certificatePem = null, forwardingurl) {
     const KEEP_ALIVE_TIMEOUT = 20; // seconds
     const MAX_SSID_HOSTNAME_LENGTH = 32;
     
@@ -19,13 +21,10 @@ exports.weatherBuoyApp = function(app, certificatePem) {
     }
 
 
-    app.keepAliveTimeout = KEEP_ALIVE_TIMEOUT * 1000; // 20 seconds
+    app.keepAliveTimeout = KEEP_ALIVE_TIMEOUT * 1000; 
 
     app.get('/weatherbuoy/firmware.bin', function (req, res) {
         console.log("Request to weatherbuoy firmware!", req.query);
-        //var path = require('path');
-        // "C:\Users\bernd\Documents\weatherbuoy\build\esp32weatherbuoy.bin"
-        //res.sendFile(path.join(__dirname + '/../build/esp32weatherbuoy.bin'));
         if (global.weatherBuoy.firmwarebin) {
             res.setHeader("Content-Type", "application/octet-stream");
             res.send(global.weatherBuoy.firmwarebin);
@@ -38,10 +37,7 @@ exports.weatherBuoyApp = function(app, certificatePem) {
 
     let jsonReplacer = function (key, value) {
         if (key == "firmwarebin") {
-            //console.log("replacer: ", key, ", ", value, "vtype: ", typeof value);
             if (value && value["data"]) {
-                //console.log("type: ", typeof value.type);
-                //console.log("data: ", typeof value.data);
                 return value.data.length;
             }
             return "-";
@@ -222,8 +218,10 @@ exports.weatherBuoyApp = function(app, certificatePem) {
         let systemHeapFreeMin = null;
         let systemHeapFree = null;
         let systemAppversion = null;
+        let maximetValue = null;
         let linesFromWeatherbuoy = req.body.split("\r\n");
         linesFromWeatherbuoy.forEach((m)=>{ kv = m.split(": "); if (kv[0] == "system") systemValue = kv[1];});
+        linesFromWeatherbuoy.forEach((m)=>{ kv = m.split(": "); if (kv[0] == "maximet") maximetValue = kv[1];});
         try {
             systemValue = systemValue.split(",");
             systemAppversion = systemValue[0];
@@ -232,6 +230,10 @@ exports.weatherBuoyApp = function(app, certificatePem) {
             systemHeapFree = systemValue[3];
             systemHeapFreeMin = systemValue[4];
             console.log("Weatherbuoy: " + systemHostname + ", " + systemAppversion + ", " + systemUptime + ", " + systemHeapFree + ", " + systemHeapFreeMin);
+            if (maximetValue) {
+                console.log("MaximetValue: ", maximetValue);
+                ProcessMeasurements(systemHostname, systemUptime, systemHeapFree, systemHeapFreeMin, maximetValue);
+            }
         } catch {
             console.log("Error, garbled system data from weatherbuoy: " + systemHostname + ", " + systemAppversion + ", " + systemHeapFree + ", " + systemHeapFreeMin);
             systemHostname = null;
@@ -287,83 +289,44 @@ exports.weatherBuoyApp = function(app, certificatePem) {
         res.send(responseToWeatherbuoyBody);
         global.weatherBuoy.command.active = "";
     });
+
+    function ProcessMeasurements(host, uptime, heapfree, heapfreemin, maximetdata) {
+        //let where = "time > '" + startTime.toISOString() + "' ";
+
+
+//        let sendmsg = global.weatherBuoy.command.active.split("\r\n");
+        try {
+            let tempstr = maximetdata.split(",");
+            if (tempstr.length > 15) {
+                temp = parseFloat(tempstr[15]);
+                console.log("TEMP: ", temp);
+            } else {
+                temp = "";
+            }
+            
+            //let uri =  encodeURI('/query?db=weather&u=' + influxdb_username + '&p=' + influxdb_password + '&epoch=ms&q=') + encodeURIComponent(query);
+            let url = forwardingurl + "?host="+host+"&uptime="+uptime+"&heapfree="+heapfree+"&heapfreemin="+heapfreemin+"&temp="+temp;
+            console.log(url);
+            const options = {
+                headers: { 'Content-type': 'application/json' }
+            };
+        
+            http.get(url, options, (queryres) => {
+                console.log('statusCode:', queryres.statusCode);
+                console.log('headers:', queryres.headers);
+            }).on('error', function (e) {
+                console.log("Got an error: ", e);
+            }); 
+    
+        } catch (error) {
+            console.error(error);
+            console.log("Error processing measurements or forwarding data.")
+        }
+    
+
+    }
+
 }
 
 
-/*
-app.get('/data', (appreq, appres) => {
-    console.log("host: " + appreq.hostname)
-    console.log("subdomains: " + appreq.subdomains)
-    console.log(appreq.query)
-    var scope = "today";
-    if (typeof appreq.query.scope != 'undefined') {
-        scope = appreq.query.scope;
-    }
-
-    var station = "kammer";
-    if (typeof appreq.query.station != 'undefined') {
-        station = appreq.query.station;
-    }
-
-    console.log(`station: ${station} scope: ${scope}`);
-
-    //let scope = "24h";
-    //let where = "time > now() - 1d";
-    let resolution = "1h";
-
-    let days = parseInt(scope.replace("d", "")) // d1, d3, d7, ...
-    if (!days) days = 0; // today
-    let startTime = new Date();
-    startTime.setDate(startTime.getDate() - days);
-    startTime.setHours(isProduction ? -2 : 0) // delta from UTC
-    startTime.setMinutes(0);
-    startTime.setSeconds(0)
-    startTime.setMilliseconds(0);
-    let where = "time > '" + startTime.toISOString() + "' ";
-
-    let uri =  encodeURI('/query?db=weather&u=' + influxdb_username + '&p=' + influxdb_password + '&epoch=ms&q=') + encodeURIComponent(query);
-
-
-    const options = {
-        host: influxdb_hostname,
-        port: influxdb_port,
-        path: uri,
-        headers: { 'accept-encoding': 'gzip,deflate' }
-    };
-
-    https.get(options, (queryres) => {
-        var chunks = [];
-        console.log('statusCode:', queryres.statusCode);
-        console.log('headers:', queryres.headers);
-
-        queryres.on('data', function (chunk) {
-            chunks.push(chunk);
-            //console.log("huhuu - reading cbhunk: " + chunk)
-        });
-
-        queryres.on('end', function () {
-            //if(.headers['content-encoding'] == 'gzip'){
-            //console.log("BODY:" + body);
-            var gzippedBody = Buffer.concat(chunks);
-            let unzippedBody = zlib.gunzipSync(gzippedBody).toString();
-
-            //var influxdata = JSON.parse(unzippedBody);
-            //console.log("Got a response: ", influxdata.toString());
-
-            const response = {
-                statusCode: 200,
-                body: unzippedBody // , //JSON.stringify('Hello from Lambda!'),
-                //isBase64Encoded: false
-            };
-            appres.set('Content-Encoding', 'gzip')
-            appres.set("Content-type", "application/json")
-            appres.set("Access-Control-Allow-Origin", "*");
-            appres.send(gzippedBody);
-        });
-    }).on('error', function (e) {
-        console.log("Got an error: ", e);
-        appres.status(500).send("Got an error");
-    });
-
-});*/
 
