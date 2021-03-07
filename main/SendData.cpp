@@ -123,6 +123,16 @@ void SendData::PerformHttpPost(const char *postData) {
         mPostData += "intervalhealth: ";
         mPostData += mrConfig.miSendDataIntervalHealth;
         mPostData += "\r\n";
+        if (mrConfig.msMaximetColumns) {
+            mPostData += "maximetcolumns: ";
+            mPostData += mrConfig.msMaximetColumns;
+            mPostData += "\r\n";
+        }
+        if (mrConfig.msMaximetUnits) {
+            mPostData += "maximetunits: ";
+            mPostData += mrConfig.msMaximetUnits;
+            mPostData += "\r\n";
+        }
         mbSendDiagnostics = false;
     }
 

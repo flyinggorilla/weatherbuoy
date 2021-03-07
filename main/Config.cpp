@@ -38,7 +38,8 @@ bool Config::Load(){
 	ReadInt(h, "IntervalNighttime", miSendDataIntervalNighttime);
 	ReadInt(h, "IntervalHealth", miSendDataIntervalHealth);
 	ReadString(h, "TargetUrl", msTargetUrl);
-	//ReadString(h, "LastGoodTargetUrl", msLastGoodTargetUrl);
+	ReadString(h, "MaximetColumns", msMaximetColumns);
+	ReadString(h, "MaximetUnits", msMaximetUnits);
 
 	nvs_close(h);
 	return true;
@@ -76,11 +77,16 @@ bool Config::Save()
 		return nvs_close(h), false;
 	if (!WriteInt(h, "IntervalHealth", miSendDataIntervalHealth))
 		return nvs_close(h), false;
+	if (!WriteString(h, "MaximetColumns", msMaximetColumns))
+		return nvs_close(h), false;
+	if (!WriteString(h, "MaximetUnits", msMaximetUnits))
+		return nvs_close(h), false;
 
 	nvs_commit(h);
 	nvs_close(h);
 	return true;
 }
+
 
 //------------------------------------------------------------------------------------
 

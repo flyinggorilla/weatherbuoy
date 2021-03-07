@@ -182,15 +182,15 @@ exports.weatherBuoyApp = function(app, certificatePem) {
         } else {
             resMsg = "Welcome to Weatherbuoy command center:\r\n";
             resMsg += JSON.stringify(global.weatherBuoy, jsonReplacer, 4) + "\r\n";
-            resMsg += "example: https://atterwind.info/weatherbuoy?command=diagnose&to=test.weatherbuoy\r\n";
-            resMsg += "example: https://atterwind.info/weatherbuoy?command=restart&to=test.weatherbuoy\r\n";
-            resMsg += "example: https://atterwind.info/weatherbuoy?command=config&to=test.weatherbuoy&apssid=test.weatherbuoy&appass=secret\r\n";
-            resMsg += "example: https://atterwind.info/weatherbuoy?command=update&to=test.weatherbuoy&firmware=esp32weatherbuoy202101010.bin\r\n";
-            resMsg += "usage: curl [--insecure] \"<url>\"\r\n";
-            resMsg += "       curl --insecure \"https://localhost:9100/weatherbuoy?to=testWeatherbuoy&restart\"\r\n";
+            resMsg += 'example: curl "https://<hostname>/weatherbuoy?command=diagnose&to=test.weatherbuoy"\r\n';
+            resMsg += 'example: curl "https://<hostname>/weatherbuoy?command=restart&to=test.weatherbuoy"\r\n';
+            resMsg += 'example: curl "https://<hostname>/weatherbuoy?command=config&to=test.weatherbuoy&apssid=test.weatherbuoy&appass=secret\r\n';
+            resMsg += 'example: curl -H "Content-Type: application/octet-stream" -T .\\build\\esp32weatherbuoy.bin "https://<hostname>/weatherbuoy?command=update&to=test.weatherbuoy"\r\n';
+            resMsg += 'usage: curl [--insecure | -k] "<url>"\r\n';
+            resMsg += '       curl --insecure "https://<hostname>/weatherbuoy?to=testWeatherbuoy&restart"\r\n';
             resMsg += "receipient: to=<hostname>\r\n";
-            resMsg += "commands: command=[restart|diagnose|config|update]\r\n";
-            resMsg += "configs: apssid=<*>, appass=<*>, stassid=<*>,d stapass=<*>, hostname=<*>, targeturl=<url>, firmware=<[/?&=*]*.bin>\r\n";
+            resMsg += "commands: command=[restart|diagnose|config|update|clear]\r\n";
+            resMsg += "configs: apssid=<*>, appass=<*>, stassid=<*>,d stapass=<*>, hostname=<*>, targeturl=<url>\r\n";
             resMsg += "configs: intervaldaytime=<seconds>, intervalnighttime=<seconds>, intervalhealth=<seconds>\r\n";
             resMsg += "special commands: [status | clear] - to view the status of message delivery or clear the message\r\n";
             res.status(200);
@@ -208,15 +208,13 @@ exports.weatherBuoyApp = function(app, certificatePem) {
     app.post('/weatherbuoy', (req, res, next) => {
         let responseToWeatherbuoyBody = "";
         if (false) {
-            //console.log(req.body);
             console.log(req.method, " request to weatherbouy ", req.query)
             console.log("STORE host: " + req.hostname)
             console.log("subdomains: " + req.subdomains)
             console.log("headers", req.rawHeaders);
             console.log("query: ", req.query);
-            //console.log("body: --->\r\n" + req.body + "<---");
+            console.log(req.body);
         }
-        console.log(req.body);
 
         // parse hostname of weatherbuoy
         let systemHostname = null;

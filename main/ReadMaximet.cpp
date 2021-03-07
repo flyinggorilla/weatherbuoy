@@ -33,6 +33,17 @@ void ReadMaximet::ReadMaximetTask() {
     unsigned int lastSendMs = 0; 
     unsigned int intervalMs = 0;
 
+    enum MaximetStates {
+        UNDEFINED,
+        STARTUP,
+        COLUMNS,
+        UNITS,
+        ENDSTARTUP,
+        SENDINGDATA
+    };
+
+    MaximetStates maximetState = UNDEFINED;
+
 bool bDayTime = true; /////////////////////////////// TODO *****************************
 
     while (true) {
@@ -44,6 +55,7 @@ bool bDayTime = true; /////////////////////////////// TODO *********************
         int dataEnd = line.lastIndexOf(ETX);
 
         if (dataStart >= 0 && dataEnd > 0) {
+            maximetState = SENDINGDATA;
             if (bDayTime) {
                 intervalMs = mrConfig.miSendDataIntervalDaytime * 1000; //ms;
             } else {
@@ -65,11 +77,39 @@ bool bDayTime = true; /////////////////////////////// TODO *********************
                 char c = line[i];
                 if (c < 0x20 || c > 0x7E) {
                     ESP_LOGI(tag, "Garbled data '%d' bytes %s", line.length(), line.c_str());
+                    maximetState = UNDEFINED;
                     ok = false;
                     break;
                 }
             }
             if (ok) {
+                if (line.startsWith("STARTUP: OK")) {
+                    maximetState = STARTUP;
+                }
+                switch (maximetState) {
+                    case UNDEFINED:
+                        break;
+                    case STARTUP : 
+                        maximetState = COLUMNS;
+                        break;
+                    case COLUMNS : 
+                        maximetState = UNITS;
+                        mrConfig.msMaximetColumns = line;
+                        break;
+                    case UNITS : 
+                        maximetState = ENDSTARTUP;
+                        mrConfig.msMaximetUnits = line;
+                        if (mrConfig.msMaximetColumns && mrConfig.msMaximetUnits) {
+                            mrConfig.Save();    
+                            ESP_LOGI(tag, "Saving Maximet config");                        
+                        }
+                        break;
+                    case ENDSTARTUP:
+                        maximetState = SENDINGDATA;
+                        break;
+                    case SENDINGDATA:
+                        break;
+                }
                 ESP_LOGI(tag, "Metadata '%s'", line.c_str());
             }
         }

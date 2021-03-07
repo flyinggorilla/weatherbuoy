@@ -11,7 +11,6 @@ public:
 
 	bool Load();
 	bool Save();
-
 	void ToggleAPMode() { mbAPMode = !mbAPMode; };
 
 private:
@@ -34,10 +33,12 @@ public:
 	String msSTAPass;
 	String msHostname;
 	String msTargetUrl;
-	//String msLastGoodTargetUrl;
 	int miSendDataIntervalDaytime; // seconds
 	int miSendDataIntervalNighttime; // seconds
 	int miSendDataIntervalHealth; // seconds
+    String msMaximetColumns; 
+    String msMaximetUnits; 
+
 };
 
 #endif /* MAIN_CONFIG_H_ */
