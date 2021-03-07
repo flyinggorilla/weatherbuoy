@@ -115,8 +115,32 @@
 
                 systemHtml += "</table"; */
 
+                let secToStr = (seconds) => {
+                    let ret = "";
+                    if (typeof seconds != "string")
+                        return "-";
+                    let s = parseInt(seconds);
+                    let d = Math.trunc(s / (60*60*24));
+                    s = s - d * 60*60*24
+                    let h = Math.trunc(s / (60*60));
+                    s = s - h*60*60;
+                    let m = Math.trunc(s / 60);
+                    s = s - m * 60;
+                    if (d) {
+                        ret += d + " days ";
+                    }
+                    if (h) {
+                        ret += h + " hours ";
+                    }
+                    if (m) {
+                        ret += m + " minutes ";
+                    }
+                    ret += s + " seconds";
+                    return ret;
+                }
+
                 systemHtml += "Firmware: " + system["systemAppVersion"] + "<br>";
-                systemHtml += "Uptime: " + system["systemUptime"] + " seconds  " +  (system["reset-reason"] ? system["reset-reason"] : "") + "<br>";
+                systemHtml += "Uptime: " + secToStr(system["systemUptime"]) +  (system["reset-reason"] ? system["reset-reason"] : "") + "<br>";
                 systemHtml += "Memory: " + Math.round(system["systemHeapFree"]/1024) + "kB " +  Math.round(system["systemHeapFreeMin"]/1024) + "kB <br>";
                 systemHtml += "</div>";
                 systemHtml += "<div class='rawdata'>" + system["maximet"] + "</div>";

@@ -223,28 +223,25 @@ void SendData::PerformHttpPost(const char *postData) {
 
             // Optionally Execute OTA Update command
             if (command.equals("update")) {
-                value = ReadMessageValue("set-firmware:");
                 const String &pem = ReadMessagePemValue("set-cert-pem:");
-                if (value.length()) {
-                    ESP_LOGD(tag, "***** Setting up OTA update '%s'\r\n%s\r\n *****", value.c_str(), pem.c_str());
-                    mEspHttpClientConfig.method = HTTP_METHOD_GET; 
-                    if (!mrConfig.msTargetUrl.endsWith("/") && !(value.startsWith("/"))) {
-                        mrConfig.msTargetUrl += "/";
-                    } 
-                    mrConfig.msTargetUrl += value; // e.g. add "firmware.bin"
-                    mEspHttpClientConfig.url = mrConfig.msTargetUrl.c_str();
-                    mEspHttpClientConfig.skip_cert_common_name_check = true;
+                ESP_LOGD(tag, "***** Setting up OTA update '%s'\r\n%s\r\n *****", value.c_str(), pem.c_str());
+                mEspHttpClientConfig.method = HTTP_METHOD_GET; 
+                if (!mrConfig.msTargetUrl.endsWith("/")) {
+                    mrConfig.msTargetUrl += "/";
+                } 
+                mrConfig.msTargetUrl += "firmware.bin"; // e.g. add "firmware.bin"
+                mEspHttpClientConfig.url = mrConfig.msTargetUrl.c_str();
+                mEspHttpClientConfig.skip_cert_common_name_check = true;
+                if (pem) {
                     mEspHttpClientConfig.cert_pem = pem.c_str();
-                    err = esp_https_ota(&mEspHttpClientConfig);
-                    if (err == ESP_OK) {
-                        ESP_LOGI(tag, "**** Successful OTA update *****");
-                    } else {
-                        ESP_LOGE(tag, "Error reading response %s", esp_err_to_name(err));
-                    }
-                    restart = true;
-                } else {
-                    ESP_LOGE(tag, "OTA update path missing!");
                 }
+                err = esp_https_ota(&mEspHttpClientConfig);
+                if (err == ESP_OK) {
+                    ESP_LOGI(tag, "**** Successful OTA update *****");
+                } else {
+                    ESP_LOGE(tag, "Error reading response %s", esp_err_to_name(err));
+                }
+                restart = true;
             }
 
             if (restart) {

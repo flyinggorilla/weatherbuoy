@@ -7,9 +7,15 @@ exports.weatherBuoyApp = function(app, certificatePem) {
     
     global.weatherBuoy = {
         systems: {},
-        lastCommandTimestamp: 0,
-        lastCommand: "",
-        activeCommand: ""
+        command: {
+            last: {
+                time: "",
+                command: "",
+                to: ""
+            },
+            active: ""            
+        },
+        firmwarebin: undefined
     }
 
 
@@ -17,24 +23,66 @@ exports.weatherBuoyApp = function(app, certificatePem) {
 
     app.get('/weatherbuoy/firmware.bin', function (req, res) {
         console.log("Request to weatherbuoy firmware!", req.query);
-        var path = require('path');
+        //var path = require('path');
         // "C:\Users\bernd\Documents\weatherbuoy\build\esp32weatherbuoy.bin"
-        res.sendFile(path.join(__dirname + '/../build/esp32weatherbuoy.bin'));
+        //res.sendFile(path.join(__dirname + '/../build/esp32weatherbuoy.bin'));
+        if (global.weatherBuoy.firmwarebin) {
+            res.setHeader("Content-Type", "application/octet-stream");
+            res.send(global.weatherBuoy.firmwarebin);
+            res.status(200);
+        } else {
+            console.log("Error: no firmware available.");
+            res.status(404);
+        }
     });
+
+    let jsonReplacer = function (key, value) {
+        if (key == "firmwarebin") {
+            //console.log("replacer: ", key, ", ", value, "vtype: ", typeof value);
+            if (value && value["data"]) {
+                //console.log("type: ", typeof value.type);
+                //console.log("data: ", typeof value.data);
+                return value.data.length;
+            }
+            return "-";
+        }
+        return value;
+    }
     
     app.get('/weatherbuoy/status', function (req, res) {
         console.log("Request to weatherbuoy status data!");
         res.setHeader("Content-Type", "application/json");
-        res.send(JSON.stringify(global.weatherBuoy));
+        res.send(JSON.stringify(global.weatherBuoy, jsonReplacer));
         res.status(200);
     })
+
+    // in case of using the extended upload limit only for firmware upload path
+    // app.use("/weatherbuoy/firmware", express.raw({limit: "1500kb"}));
+    app.use(express.raw({limit: "1500kb"}));
+    app.put("/weatherbuoy", (req, res) => {
+        console.log("Firmware upload PUT request.");
+        //console.log(req.headers);
+        //console.log(req.body.length);
+        if (req.body.length > 384*1024 && req.body.length < 1500*1024) {
+            global.weatherBuoy.firmwarebin = req.body;
+            let msg = "Firmware received " + req.body.length + " bytes";
+            console.log(msg);
+            processQueryStringCommand(req, res, msg);
+            return;
+        } 
+        let msg = "Firmware declined " + req.body.length + " bytes";
+        console.log(msg);
+        res.send(msg);
+        res.status(400);
+    });
 
     app.use(express.text()); // express.raw() is another option;
     app.get('/weatherbuoy', function (req, res) {
         console.log("Request to weatherbuoy", req.query)
+        processQueryStringCommand(req, res);
+    })
 
-        console.log("HEADERS:", req.headers);
-
+    function processQueryStringCommand (req, res, firmwaremsg = null) {
         // detect web browser to return HTML
         let bBrowser = false;
         if (req.headers["accept"] && req.headers.accept.toLowerCase().includes("text/html")) {
@@ -45,9 +93,6 @@ exports.weatherBuoyApp = function(app, certificatePem) {
         } else  {
             res.setHeader("Content-Type", "text/plain");
         }
-
-
-
 
         let message = "";
         let errMsg = "";
@@ -81,7 +126,6 @@ exports.weatherBuoyApp = function(app, certificatePem) {
         if (req.query["firmware"]) {
             if (req.query.firmware.endsWith(".bin")) {
                 message += "set-firmware: " + req.query.firmware + "\r\n";
-                message += "set-cert-pem: " + Buffer.from(certificatePem) + "\r\n";
             } else {
                 errMsg += "ERROR: invalid ota URL '" + req.query.firmware + "'\r\n";
             }
@@ -93,12 +137,23 @@ exports.weatherBuoyApp = function(app, certificatePem) {
             if (req.query.command == "restart" || req.query.command == "diagnose" || req.query.command == "update" || req.query.command == "config") {
                 command = req.query.command;
                 if (command == "update") {
-                    if (message.indexOf("set-firmware:") < 0) {
+                    if (certificatePem) {
+                        message += "set-cert-pem: " + Buffer.from(certificatePem) + "\r\n";
+                    }
+                    if (!global.weatherBuoy.firmwarebin) {
                         console.log("ERROR: cannot perform OTA update, because firmware is missing.'");
                         res.status(400).send('Error: OTA firmare filename missing!')
                         return;
                     }
                 }
+            } else if (req.query.command == "clear") {
+                global.weatherBuoy.command.active = "";
+                global.weatherBuoy.firmwarebin = undefined;
+                let r = "Cleared active message buffer, cleared firmware.";
+                console.log(r);
+                res.send(r);
+                res.status(200);
+                return;
             }
         } 
         
@@ -113,20 +168,20 @@ exports.weatherBuoyApp = function(app, certificatePem) {
             return;
         } 
 
-
-        if (command || message.length) {
+        if (command || message.length || firmwaremsg) {
             message += "timestamp: " + new Date().toISOString() + "\r\n";
+            resMsg = firmwaremsg ? firmwaremsg + "\r\n" : "";
             if (command) {
-                global.weatherBuoy.activeCommand = message;
-                resMsg = "Command '" + command + "' to Weatherbuoy stations POSTED!: \r\n--->\r\n" + message + "<---";
+                global.weatherBuoy.command.active = message;
+                resMsg += "Command '" + command + "' to Weatherbuoy stations POSTED!: \r\n--->\r\n" + message + "<---";
                 res.status(200);
             } else {
-                resMsg = "No command, so stay relaxed, nothing happened: \r\n--->\r\n" + message + "<---";
-                res.status(202);
+                resMsg += "No command, so stay relaxed, nothing happened: \r\n--->\r\n" + message + "<---";
+                res.status(firmwaremsg ? 200 : 202);
             }
         } else {
             resMsg = "Welcome to Weatherbuoy command center:\r\n";
-            resMsg += JSON.stringify(global.weatherBuoy, null, 4) + "\r\n";
+            resMsg += JSON.stringify(global.weatherBuoy, jsonReplacer, 4) + "\r\n";
             resMsg += "example: https://atterwind.info/weatherbuoy?command=diagnose&to=test.weatherbuoy\r\n";
             resMsg += "example: https://atterwind.info/weatherbuoy?command=restart&to=test.weatherbuoy\r\n";
             resMsg += "example: https://atterwind.info/weatherbuoy?command=config&to=test.weatherbuoy&apssid=test.weatherbuoy&appass=secret\r\n";
@@ -140,13 +195,14 @@ exports.weatherBuoyApp = function(app, certificatePem) {
             resMsg += "special commands: [status | clear] - to view the status of message delivery or clear the message\r\n";
             res.status(200);
         }
-        if (global.weatherBuoy.activeCommand) {
-            resMsg +="\r\nStatus: ===>\r\n" + global.weatherbuoyMessage + "<===\r\n"; 
+        if (global.weatherBuoy.command.active) {
+            resMsg +="\r\nStatus: ===>\r\n" + global.weatherBuoy.command.active + "<===\r\n"; 
         }
-        console.log(resMsg);
+        //console.log(resMsg);
         res.send(resMsg);
-    })
 
+
+    }
 
     app.use(express.text({ defaultCharset: "ascii", type: "text/*" })); // express.raw() is another option;
     app.post('/weatherbuoy', (req, res, next) => {
@@ -177,7 +233,7 @@ exports.weatherBuoyApp = function(app, certificatePem) {
             systemUptime = systemValue[2];
             systemHeapFree = systemValue[3];
             systemHeapFreeMin = systemValue[4];
-            console.log("Weatherbuoy: " + systemHostname + ", " + systemAppversion + ", " + systemHeapFree + ", " + systemHeapFreeMin);
+            console.log("Weatherbuoy: " + systemHostname + ", " + systemAppversion + ", " + systemUptime + ", " + systemHeapFree + ", " + systemHeapFreeMin);
         } catch {
             console.log("Error, garbled system data from weatherbuoy: " + systemHostname + ", " + systemAppversion + ", " + systemHeapFree + ", " + systemHeapFreeMin);
             systemHostname = null;
@@ -199,25 +255,28 @@ exports.weatherBuoyApp = function(app, certificatePem) {
                 };
             });
 
-            //console.log(global.weatherBuoy);
-            //global.weatherBuoy.activeCommand = "";
-            console.log(JSON.stringify(global.weatherBuoy, null, 4));
+            //console.log(JSON.stringify(global.weatherBuoy, null, 4));
 
-            if (global.weatherBuoy.activeCommand) {
+            if (global.weatherBuoy.command.active) {
                 console.log("*---------weatherbuoymessage-------------");
-                console.log(global.weatherBuoy.activeCommand);
+                console.log(global.weatherBuoy.command.active);
                 console.log("----------weatherbuoymessage------------*");
-                let sendmsg = global.weatherBuoy.activeCommand.split("\r\n");
+                let sendmsg = global.weatherBuoy.command.active.split("\r\n");
                 let sendToHostname = null;
+                let sendCommand = null;
                 sendmsg.forEach((m)=>{ kv = m.split(": "); if (kv[0] == "to") sendToHostname = kv[1];});
-                console.log("sendToHostname: " + sendToHostname);
+                sendmsg.forEach((m)=>{ kv = m.split(": "); if (kv[0] == "command") sendCommand = kv[1];});
+                console.log("sendToHostname: ", sendToHostname, " command: ", sendCommand);
     
                 // if there is a hostname match, we will forward the message to the weatherbuy
                 if (sendToHostname && systemHostname && (sendToHostname == systemHostname)) {
-                    responseToWeatherbuoyBody = global.weatherBuoy.activeCommand; 
+                    responseToWeatherbuoyBody = global.weatherBuoy.command.active; 
                     console.log("Weatherbuoy " + systemHostname + " did FETCH the message: \r\n--->\r\n" + responseToWeatherbuoyBody + "<---");
-                    global.weatherBuoy.lastCommand = responseToWeatherbuoyBody;
-                    global.weatherBuoy.lastCommandTimestamp = new Date().toISOString();
+
+                    //"last": "to: test.weatherbuoy\r\ncommand: diagnose\r\ntimestamp: 2021-03-07T10:19:46.156Z\r\n",
+                    global.weatherBuoy.command.last.command = sendCommand;
+                    global.weatherBuoy.command.last.to = sendToHostname;
+                    global.weatherBuoy.command.last.time = new Date().toISOString();
                 }
 
             }
@@ -228,7 +287,7 @@ exports.weatherBuoyApp = function(app, certificatePem) {
         res.set("Content-Length", responseToWeatherbuoyBody.length);
         res.status(200);
         res.send(responseToWeatherbuoyBody);
-        global.weatherBuoy.activeCommand = "";
+        global.weatherBuoy.command.active = "";
     });
 }
 
