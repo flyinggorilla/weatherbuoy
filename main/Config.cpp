@@ -16,6 +16,9 @@ Config::Config() {
 	miSendDataIntervalDaytime = CONFIG_WEATHERBUOY_SENDDATA_INTERVAL_DAYTIME;
 	miSendDataIntervalNighttime = CONFIG_WEATHERBUOY_SENDDATA_INTERVAL_NIGHTTIME;
 	miSendDataIntervalHealth = CONFIG_WEATHERBUOY_SENDDATA_INTERVAL_HEALTH;	
+    msModemApn = CONFIG_WEATHERBUOY_MODEM_APN;
+    msModemUser = CONFIG_WEATHERBUOY_MODEM_USER;
+    msModemPass = CONFIG_WEATHERBUOY_MODEM_PASS;
 }
 
 Config::~Config() {
@@ -40,6 +43,9 @@ bool Config::Load(){
 	ReadString(h, "TargetUrl", msTargetUrl);
 	ReadString(h, "MaximetColumns", msMaximetColumns);
 	ReadString(h, "MaximetUnits", msMaximetUnits);
+	ReadString(h, "ModemApn", msModemApn);
+	ReadString(h, "ModemUser", msModemUser);
+	ReadString(h, "ModemPass", msModemPass);
 
 	nvs_close(h);
 	return true;
@@ -80,6 +86,13 @@ bool Config::Save()
 	if (!WriteString(h, "MaximetColumns", msMaximetColumns))
 		return nvs_close(h), false;
 	if (!WriteString(h, "MaximetUnits", msMaximetUnits))
+		return nvs_close(h), false;
+
+	if (!WriteString(h, "ModemApn", msModemPass))
+		return nvs_close(h), false;
+	if (!WriteString(h, "ModemUser", msModemUser))
+		return nvs_close(h), false;
+	if (!WriteString(h, "ModemPass", msModemPass))
 		return nvs_close(h), false;
 
 	nvs_commit(h);

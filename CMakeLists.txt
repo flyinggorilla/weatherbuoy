@@ -6,7 +6,7 @@ include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 string(TIMESTAMP version v%y%m%d.%H%M UTC)
 set(PROJECT_VER ${version}) 
-project(esp32weatherbuoy) 
+project(esp32weatherbuoy)  
 
 
 ########## MANDATORY MENUCONFIG OPTIONS #############

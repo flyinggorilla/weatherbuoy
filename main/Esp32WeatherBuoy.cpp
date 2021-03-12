@@ -18,6 +18,7 @@
 #include "Wifi.h"
 #include "nvs_flash.h"
 #include "esp_ota_ops.h"
+#include "Modem.h"
 
 static const char tag[] = "WeatherBuoy";
 
@@ -52,7 +53,35 @@ void Esp32WeatherBuoy::Start() {
         ESP_LOGE(tag, "Error, could not load configuration.");
     }
 
-    ESP_LOGI(tag, "Hostname: %s", config.msHostname.c_str());
+    
+    Modem modem(config.msModemApn, config.msModemUser, config.msModemPass);
+    modem.TurnOn();
+    modem.InitNetwork();
+
+    modem.Command("AT", "ATtention");
+    modem.Command("ATI", "Display Product Identification Information");
+    modem.Command("AT+CGMM", "Model Identification");
+    modem.Command("AT+GMM", "Request TA Model Identification");
+    modem.Command("AT+CGSN", "Product Serial Number Identification (IMEI)");
+    modem.Command("AT+CREG?", "Network Registration Information States *****************************");
+    modem.Command("AT+CGMR", "Request TA Revision Identification of Software Release");
+    modem.Command("AT+GMR", "Request TA Revision Identification of Software Release");
+    modem.Command("AT+CGMI", "Request Manufacturer Identification");
+    modem.Command("AT+GMI", "Request Manufacturer Identification");
+    modem.Command("AT+CIMI", "Request international mobile subscriber identity");
+    modem.Command("AT+CSQ", "Signal Quality Report");
+    modem.Command("AT+CNUM", "Subscriber Number");
+    modem.Command("AT+CBC", "Battery Charge");
+    modem.Command("AT+GSN", "Request TA Serial Number Identification (IMEI)");
+    modem.Command("AT+GCAP", "Request Complete TA Capabilities List");
+    modem.Command("AT&V", "Display Current Configuration", 5000);
+    modem.Command("ATO", "Switch from Command Mode to Data Mode (return to Online data state)", 100);
+    modem.Command("AT+CEER", "Request Extended Error Report", 1000);
+     
+
+    ESP_LOGI(tag, "Free memory: %d", esp_get_free_heap_size());
+
+/*    ESP_LOGI(tag, "Hostname: %s", config.msHostname.c_str());
     ESP_LOGI(tag, "Target URL: %s", config.msTargetUrl.c_str());
     ESP_LOGI(tag, "App Version: %s", esp_ota_get_app_description()->version);
 
@@ -71,5 +100,5 @@ void Esp32WeatherBuoy::Start() {
                 ESP_LOGE(tag, "Could not post data, likely due to a full queue");
         }
         vTaskDelay(mConfig.miSendDataIntervalHealth*1000 / portTICK_PERIOD_MS);
-    } 
+    }  */
 }
