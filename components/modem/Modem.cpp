@@ -7,6 +7,8 @@
 #include "esp_event.h"
 #include "esp_netif_ppp.h"
 
+
+
 static const char tag[] = "Modem";
 
 // SIM800L
@@ -77,14 +79,14 @@ static esp_err_t esp_modem_transmit(void *h, void *buffer, size_t len)
     return ESP_FAIL;
 }
 
-
+/*
 static esp_err_t modem_netif_receive_cb(void *buffer, size_t len, void *context)
 {
     esp_modem_netif_driver_t *driver = (esp_modem_netif_driver_t *)context;
     esp_netif_receive(driver->base.netif, buffer, len, NULL);
     return ESP_OK;
 }
-
+*/
 
 static esp_err_t esp_modem_post_attach_start(esp_netif_t * esp_netif, void * args)
 {
@@ -107,7 +109,7 @@ static esp_err_t esp_modem_post_attach_start(esp_netif_t * esp_netif, void * arg
     esp_netif_ppp_set_params(esp_netif, &ppp_config);
 
     //ESP_ERROR_CHECK(esp_event_handler_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, &on_ppp_changed, dte));
-    return pModem->StartPPP();
+    return pModem->StartPPP() ? ESP_OK : ESP_ERR_ESP_NETIF_DRIVER_ATTACH_FAILED;
 }
 
 bool Modem::StartPPP() {
@@ -125,6 +127,27 @@ bool Modem::StartPPP() {
 }
 
 
+void fReceiverTask(void *pvParameter) {
+	((Modem*) pvParameter)->ReceiverTask();
+	vTaskDelete(NULL);
+}
+
+void Modem::Start() {
+	xTaskCreate(&fReceiverTask, "ModemReceiver", 8192, this, ESP_TASK_MAIN_PRIO, NULL);
+} 
+
+void Modem::ReceiverTask() {
+    while(true) {
+        bool read = ReadIntoBuffer();
+        if (read) {
+            esp_netif_receive(mModemNetifDriver.base.netif, mpBuffer, muiBufferLen, NULL);
+            ESP_LOGI(tag, "ReceiverTask() received %d bytes", muiBufferLen);
+        }
+    }
+}
+
+
+
 void Modem::InitNetwork() {
 	//ESP_ERROR_CHECK(nvs_flash_init());
 	ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_init());
@@ -132,12 +155,23 @@ void Modem::InitNetwork() {
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID,&modemEventHandler, this, NULL));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, &modemEventHandler, this, NULL));		
 
+
+    // Init netif object
+    esp_netif_config_t cfg = ESP_NETIF_DEFAULT_PPP();
+    esp_netif_t *esp_netif = esp_netif_new(&cfg);
+    assert(esp_netif);
+
     mModemNetifDriver.base.post_attach = esp_modem_post_attach_start;
     mModemNetifDriver.pModem = this;
+    //esp_netif_ppp_set_auth(esp_netif, NETIF_PPP_AUTHTYPE_PAP, msUser.c_str(), msPass.c_str());
+    esp_netif_ppp_set_auth(esp_netif, NETIF_PPP_AUTHTYPE_NONE, msUser.c_str(), msPass.c_str());
+    ESP_ERROR_CHECK(esp_netif_attach(esp_netif, &mModemNetifDriver));
 }
 
 void Modem::OnEvent(esp_event_base_t base, int32_t id, void* event_data)
 {
+
+    ESP_LOGI(tag, "Modem::OnEvent(base=%d, id=%d)", (int)base, (int)id);
 
     if (base == IP_EVENT) {
         ESP_LOGI(tag, "IP event! %d", id);

@@ -57,6 +57,7 @@ void Esp32WeatherBuoy::Start() {
     Modem modem(config.msModemApn, config.msModemUser, config.msModemPass);
     modem.TurnOn();
     modem.InitNetwork();
+    modem.Start();
 
     modem.Command("AT", "ATtention");
     modem.Command("ATI", "Display Product Identification Information");

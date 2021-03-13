@@ -23,6 +23,9 @@ public:
 	Modem(String apn, String user, String pass);
 	virtual ~Modem();
     void InitNetwork();
+
+    void Start();
+    void ReceiverTask();
     
     bool ReadLine(String& line);
     bool WriteLine(const char *sWrite);
