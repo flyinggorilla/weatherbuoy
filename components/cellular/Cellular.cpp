@@ -1,4 +1,4 @@
-#include "Modem.h"
+#include "Cellular.h"
 #include "EspString.h"
 #include "driver/uart.h"
 #include "driver/gpio.h"
@@ -9,21 +9,21 @@
 
 
 
-static const char tag[] = "Modem";
+static const char tag[] = "Cellular";
 
 // SIM800L
-#define MODEM_GPIO_PWKEY GPIO_NUM_4
-#define MODEM_GPIO_RST GPIO_NUM_5
-#define MODEM_GPIO_POWER GPIO_NUM_23
-#define MODEM_GPIO_TX GPIO_NUM_27
-#define MODEM_GPIO_RX GPIO_NUM_26
+#define CELLULAR_GPIO_PWKEY GPIO_NUM_4
+#define CELLULAR_GPIO_RST GPIO_NUM_5
+#define CELLULAR_GPIO_POWER GPIO_NUM_23
+#define CELLULAR_GPIO_TX GPIO_NUM_27
+#define CELLULAR_GPIO_RX GPIO_NUM_26
 
 void modemEventHandler(void* ctx, esp_event_base_t base, int32_t id, void* event_data)
 {
-	return ((Modem *)ctx)->OnEvent(base, id, event_data);
+	return ((Cellular *)ctx)->OnEvent(base, id, event_data);
 }
 
-Modem::Modem(String apn, String user, String pass) {
+Cellular::Cellular(String apn, String user, String pass) {
     msApn = apn;
     msUser = user;
     msPass = pass;
@@ -46,7 +46,7 @@ Modem::Modem(String apn, String user, String pass) {
     static int iUartEventQueueSize = 5;
     ESP_ERROR_CHECK(uart_driver_install(muiUartNo, bufferSize, 0, iUartEventQueueSize, &mhUartEventQueueHandle, 0));
     ESP_ERROR_CHECK(uart_param_config(muiUartNo, &uart_config));
-    ESP_ERROR_CHECK(uart_set_pin(muiUartNo, MODEM_GPIO_TX, MODEM_GPIO_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+    ESP_ERROR_CHECK(uart_set_pin(muiUartNo, CELLULAR_GPIO_TX, CELLULAR_GPIO_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     muiBufferSize = bufferSize;
     muiBufferPos = 0;
     muiBufferLen = 0;
@@ -66,14 +66,14 @@ Modem::Modem(String apn, String user, String pass) {
 
 }
 
-Modem::~Modem() {
+Cellular::~Cellular() {
     free(mpBuffer);
 }
 
 
-static esp_err_t esp_modem_transmit(void *h, void *buffer, size_t len)
+static esp_err_t esp_cellular_transmit(void *h, void *buffer, size_t len)
 {
-    Modem *modem = (Modem*)h;
+    Cellular *modem = (Cellular*)h;
     if (modem->WriteData((const char *)buffer, len) > 0) {
         return ESP_OK;
     }
@@ -83,19 +83,19 @@ static esp_err_t esp_modem_transmit(void *h, void *buffer, size_t len)
 /*
 static esp_err_t modem_netif_receive_cb(void *buffer, size_t len, void *context)
 {
-    esp_modem_netif_driver_t *driver = (esp_modem_netif_driver_t *)context;
+    esp_cellular_netif_driver_t *driver = (esp_cellular_netif_driver_t *)context;
     esp_netif_receive(driver->base.netif, buffer, len, NULL);
     return ESP_OK;
 }
 */
 
-static esp_err_t esp_modem_post_attach_start(esp_netif_t * esp_netif, void * args)
+static esp_err_t esp_cellular_post_attach_start(esp_netif_t * esp_netif, void * args)
 {
-    esp_modem_netif_driver_t *pDriver = (esp_modem_netif_driver_t*)args;
-    Modem *pModem = pDriver->pModem;
+    esp_cellular_netif_driver_t *pDriver = (esp_cellular_netif_driver_t*)args;
+    Cellular *pModem = pDriver->pModem;
     const esp_netif_driver_ifconfig_t driver_ifconfig = {
             .handle = pModem,
-            .transmit = esp_modem_transmit,
+            .transmit = esp_cellular_transmit,
             .transmit_wrap = NULL,
             .driver_free_rx_buffer = NULL
     };
@@ -113,31 +113,31 @@ static esp_err_t esp_modem_post_attach_start(esp_netif_t * esp_netif, void * arg
     return pModem->StartPPP() ? ESP_OK : ESP_ERR_ESP_NETIF_DRIVER_ATTACH_FAILED;
 }
 
-bool Modem::StartPPP() {
+bool Cellular::StartPPP() {
 /*    modem_dce_t *dce = dte->dce;
-    MODEM_CHECK(dce, "DTE has not yet bind with DCE", err);
-    esp_modem_dte_t *esp_dte = __containerof(dte, esp_modem_dte_t, parent);
+    CELLULAR_CHECK(dce, "DTE has not yet bind with DCE", err);
+    esp_cellular_dte_t *esp_dte = __containerof(dte, esp_cellular_dte_t, parent);
     // Set PDP Context 
-    MODEM_CHECK(dce->define_pdp_context(dce, 1, "IP", CONFIG_EXAMPLE_COMPONENT_MODEM_APN) == ESP_OK, "set MODEM APN failed", err);
+    CELLULAR_CHECK(dce->define_pdp_context(dce, 1, "IP", CONFIG_EXAMPLE_COMPONENT_CELLULAR_APN) == ESP_OK, "set MODEM APN failed", err);
     // Enter PPP mode 
-    MODEM_CHECK(dte->change_mode(dte, MODEM_PPP_MODE) == ESP_OK, "enter ppp mode failed", err);
+    CELLULAR_CHECK(dte->change_mode(dte, CELLULAR_PPP_MODE) == ESP_OK, "enter ppp mode failed", err);
 
     // post PPP mode started event 
-    esp_event_post_to(esp_dte->event_loop_hdl, ESP_MODEM_EVENT, ESP_MODEM_EVENT_PPP_START, NULL, 0, 0); */
+    esp_event_post_to(esp_dte->event_loop_hdl, ESP_CELLULAR_EVENT, ESP_CELLULAR_EVENT_PPP_START, NULL, 0, 0); */
     return true;
 }
 
 
 void fReceiverTask(void *pvParameter) {
-	((Modem*) pvParameter)->ReceiverTask();
+	((Cellular*) pvParameter)->ReceiverTask();
 	vTaskDelete(NULL);
 }
 
-void Modem::Start() {
+void Cellular::Start() {
 	xTaskCreate(&fReceiverTask, "ModemReceiver", 8192, this, ESP_TASK_MAIN_PRIO, NULL);
 } 
 
-void Modem::ReceiverTask() {
+void Cellular::ReceiverTask() {
 
 
     while(true) {
@@ -151,7 +151,7 @@ void Modem::ReceiverTask() {
 
 
 
-void Modem::InitNetwork() {
+void Cellular::InitNetwork() {
 	//ESP_ERROR_CHECK(nvs_flash_init());
 	ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_init());
 	ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -164,17 +164,17 @@ void Modem::InitNetwork() {
     esp_netif_t *esp_netif = esp_netif_new(&cfg);
     assert(esp_netif);
 
-    mModemNetifDriver.base.post_attach = esp_modem_post_attach_start;
+    mModemNetifDriver.base.post_attach = esp_cellular_post_attach_start;
     mModemNetifDriver.pModem = this;
     //esp_netif_ppp_set_auth(esp_netif, NETIF_PPP_AUTHTYPE_PAP, msUser.c_str(), msPass.c_str());
     esp_netif_ppp_set_auth(esp_netif, NETIF_PPP_AUTHTYPE_NONE, msUser.c_str(), msPass.c_str());
     ESP_ERROR_CHECK(esp_netif_attach(esp_netif, &mModemNetifDriver));
 }
 
-void Modem::OnEvent(esp_event_base_t base, int32_t id, void* event_data)
+void Cellular::OnEvent(esp_event_base_t base, int32_t id, void* event_data)
 {
 
-    ESP_LOGI(tag, "Modem::OnEvent(base=%d, id=%d)", (int)base, (int)id);
+    ESP_LOGI(tag, "Cellular::OnEvent(base=%d, id=%d)", (int)base, (int)id);
 
     if (base == IP_EVENT) {
         ESP_LOGI(tag, "IP event! %d", id);
@@ -184,7 +184,7 @@ void Modem::OnEvent(esp_event_base_t base, int32_t id, void* event_data)
             ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
             esp_netif_t *netif = event->esp_netif;
 
-            ESP_LOGI(tag, "Modem Connect to PPP Server");
+            ESP_LOGI(tag, "Cellular Connect to PPP Server");
             ESP_LOGI(tag, "~~~~~~~~~~~~~~");
             ESP_LOGI(tag, "IP          : " IPSTR, IP2STR(&event->ip_info.ip));
             ESP_LOGI(tag, "Netmask     : " IPSTR, IP2STR(&event->ip_info.netmask));
@@ -199,7 +199,7 @@ void Modem::OnEvent(esp_event_base_t base, int32_t id, void* event_data)
 
             ESP_LOGI(tag, "GOT ip event!!!");
         } else if (id == IP_EVENT_PPP_LOST_IP) {
-            ESP_LOGI(tag, "Modem Disconnect from PPP Server");
+            ESP_LOGI(tag, "Cellular Disconnect from PPP Server");
             mbConnected = false;
         } else if (id == IP_EVENT_GOT_IP6) {
             ESP_LOGI(tag, "GOT IPv6 event!");
@@ -211,7 +211,7 @@ void Modem::OnEvent(esp_event_base_t base, int32_t id, void* event_data)
 
 }
 
-bool Modem::ReadIntoBuffer() {
+bool Cellular::ReadIntoBuffer() {
     muiBufferPos = 0;
     muiBufferLen = 0;
     uart_event_t event;
@@ -318,7 +318,7 @@ bool Modem::ReadIntoBuffer() {
     return true;
 }*/
 
-bool Modem::ReadLine(String& line) {
+bool Cellular::ReadLine(String& line) {
     line = "";
 
     int maxLineLength = muiBufferSize;
@@ -344,7 +344,7 @@ bool Modem::ReadLine(String& line) {
     return false;
 }
 
-int Modem::WriteData(const char* data, int len) {
+int Cellular::WriteData(const char* data, int len) {
     int iWriteLen = uart_write_bytes(muiUartNo, data, len);
     if (iWriteLen == len) {
         ESP_LOGI(tag, "WriteData(): %d bytes", len);
@@ -355,7 +355,7 @@ int Modem::WriteData(const char* data, int len) {
 }
 
 
-bool Modem::WriteLine(const char *sWrite) {
+bool Cellular::WriteLine(const char *sWrite) {
     String write(sWrite);
     write += "\r";
     int iWriteLen = uart_write_bytes(muiUartNo, write.c_str(), write.length());
@@ -368,7 +368,7 @@ bool Modem::WriteLine(const char *sWrite) {
     }
 }
 
-String Modem::Command(const char* sCommand, const char *sInfo, unsigned short maxLines) {
+String Cellular::Command(const char* sCommand, const char *sInfo, unsigned short maxLines) {
     String response;
     String message;
     ESP_LOGI(tag, "Command(%s) %s", sCommand, sInfo);
@@ -412,32 +412,32 @@ String Modem::Command(const char* sCommand, const char *sInfo, unsigned short ma
 #define clear_sim800_pwrsrc() gpio_set_level(SIM800_POWER,0)
 
 
-void Modem::TurnOn(void)
+void Cellular::TurnOn(void)
 {
     gpio_config_t io_conf;
     io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = (1<<MODEM_GPIO_PWKEY)+(1<<MODEM_GPIO_RST)+(1<<MODEM_GPIO_POWER);
+    io_conf.pin_bit_mask = (1<<CELLULAR_GPIO_PWKEY)+(1<<CELLULAR_GPIO_RST)+(1<<CELLULAR_GPIO_POWER);
     io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
     io_conf.intr_type = GPIO_INTR_DISABLE;
     gpio_config(& io_conf);
 
     ESP_LOGI(tag, "shutdown...");
-    gpio_set_level(MODEM_GPIO_PWKEY, 0);
-    gpio_set_level(MODEM_GPIO_RST, 0);
-    gpio_set_level(MODEM_GPIO_POWER, 0);
+    gpio_set_level(CELLULAR_GPIO_PWKEY, 0);
+    gpio_set_level(CELLULAR_GPIO_RST, 0);
+    gpio_set_level(CELLULAR_GPIO_POWER, 0);
     vTaskDelay(1000/portTICK_PERIOD_MS);
 
     ESP_LOGI(tag, "init...");
     vTaskDelay(1000/portTICK_PERIOD_MS);
-    gpio_set_level(MODEM_GPIO_POWER, 1);
+    gpio_set_level(CELLULAR_GPIO_POWER, 1);
     vTaskDelay(1000/portTICK_PERIOD_MS);
-    gpio_set_level(MODEM_GPIO_PWKEY, 1);
-    gpio_set_level(MODEM_GPIO_RST, 1);
+    gpio_set_level(CELLULAR_GPIO_PWKEY, 1);
+    gpio_set_level(CELLULAR_GPIO_RST, 1);
     vTaskDelay(1000/portTICK_PERIOD_MS);
-    gpio_set_level(MODEM_GPIO_RST, 0);
+    gpio_set_level(CELLULAR_GPIO_RST, 0);
     vTaskDelay(1000/portTICK_PERIOD_MS);
-    gpio_set_level(MODEM_GPIO_RST, 1);
+    gpio_set_level(CELLULAR_GPIO_RST, 1);
     vTaskDelay(3000/portTICK_PERIOD_MS);
     ESP_LOGI(tag, "modem turned on.");
 }

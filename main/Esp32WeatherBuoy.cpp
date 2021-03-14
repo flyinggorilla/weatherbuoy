@@ -16,9 +16,9 @@
 #include "SendData.h"
 #include "ReadMaximet.h"
 #include "Wifi.h"
+#include "Cellular.h"
 #include "nvs_flash.h"
 #include "esp_ota_ops.h"
-#include "Modem.h"
 
 static const char tag[] = "WeatherBuoy";
 
@@ -54,7 +54,7 @@ void Esp32WeatherBuoy::Start() {
     }
 
     
-    Modem modem(config.msModemApn, config.msModemUser, config.msModemPass);
+    Cellular modem(config.msModemApn, config.msModemUser, config.msModemPass);
     modem.TurnOn();
     modem.InitNetwork();
     modem.Start();

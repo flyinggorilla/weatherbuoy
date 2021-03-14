@@ -1,5 +1,5 @@
-#ifndef MAIN_MODEM_H_
-#define MAIN_MODEM_H_
+#ifndef MAIN_CELLULAR_H_
+#define MAIN_CELLULAR_H_
 
 #include "Config.h"
 #include "EspString.h"
@@ -9,19 +9,19 @@
 #include "esp_netif.h"
 
 
-class Modem;
+class Cellular;
 
 
-typedef struct esp_modem_netif_driver_s {
+typedef struct esp_cellular_netif_driver_s {
     esp_netif_driver_base_t base;           /*!< base structure reserved as esp-netif driver */
-    Modem                   *pModem;        /*!< ptr to the esp_modem objects (DTE) */
-} esp_modem_netif_driver_t;
+    Cellular                   *pModem;        /*!< ptr to the esp_modem objects (DTE) */
+} esp_cellular_netif_driver_t;
 
 
-class Modem {
+class Cellular {
 public:
-	Modem(String apn, String user, String pass);
-	virtual ~Modem();
+	Cellular(String apn, String user, String pass);
+	virtual ~Cellular();
     void InitNetwork();
 
     void Start();
@@ -60,13 +60,13 @@ private:
 
     bool mbConnected = false;
 
-    esp_modem_netif_driver_t mModemNetifDriver = {0};
+    esp_cellular_netif_driver_t mModemNetifDriver = {0};
 
 };
 
 
 
 
-#endif // MAIN_MODEM_H_
+#endif // MAIN_CELLULAR_H_
 
 
