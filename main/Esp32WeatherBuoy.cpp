@@ -59,6 +59,7 @@ void Esp32WeatherBuoy::Start() {
     modem.InitNetwork();
     modem.Start();
 
+
     modem.Command("AT", "ATtention");
     modem.Command("ATI", "Display Product Identification Information");
     modem.Command("AT+CGMM", "Model Identification");

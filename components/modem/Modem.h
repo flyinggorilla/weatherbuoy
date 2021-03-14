@@ -51,6 +51,7 @@ private:
     unsigned int muiBufferLen;
 
     unsigned int muiUartNo;
+    QueueHandle_t mhUartEventQueueHandle = nullptr;
     //String mData;
     //String mBuffer;
     String msApn;

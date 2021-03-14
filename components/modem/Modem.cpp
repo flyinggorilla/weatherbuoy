@@ -43,7 +43,8 @@ Modem::Modem(String apn, String user, String pass) {
     //muiUartNo = uartNo;
     muiUartNo = UART_NUM_2; /////////////////////////////////////////////***********************************
     int bufferSize = 2048;
-    ESP_ERROR_CHECK(uart_driver_install(muiUartNo, bufferSize, 0, 0, NULL, 0));
+    static int iUartEventQueueSize = 5;
+    ESP_ERROR_CHECK(uart_driver_install(muiUartNo, bufferSize, 0, iUartEventQueueSize, &mhUartEventQueueHandle, 0));
     ESP_ERROR_CHECK(uart_param_config(muiUartNo, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(muiUartNo, MODEM_GPIO_TX, MODEM_GPIO_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     muiBufferSize = bufferSize;
@@ -137,6 +138,8 @@ void Modem::Start() {
 } 
 
 void Modem::ReceiverTask() {
+
+
     while(true) {
         bool read = ReadIntoBuffer();
         if (read) {
@@ -208,27 +211,112 @@ void Modem::OnEvent(esp_event_base_t base, int32_t id, void* event_data)
 
 }
 
-
-
-
- 
 bool Modem::ReadIntoBuffer() {
     muiBufferPos = 0;
     muiBufferLen = 0;
+    uart_event_t event;
+    //Waiting for UART event.
+    if(xQueueReceive(mhUartEventQueueHandle, (void * )&event, (portTickType)portMAX_DELAY)) {
+        switch(event.type) {
+            //Event of UART receving data
+            /*We'd better handler data event fast, there would be much more data events than
+            other types of events. If we take too much time on data event, the queue might
+            be full.*/
+            case UART_DATA: {
+                    ESP_LOGI(tag, "[UART DATA]: %d", event.size);
+                    //uart_read_bytes(EX_UART_NUM, dtmp, event.size, portMAX_DELAY);
+
+                    int length = 0;
+                    ESP_ERROR_CHECK(uart_get_buffered_data_len(muiUartNo, (size_t*)&length));        
+                    ESP_LOGI(tag, "ReadIntoBuffer().get_buffered_data_len()=%d", length);
+
+                    int len = uart_read_bytes(muiUartNo, mpBuffer, muiBufferSize, 0); //100 / portTICK_RATE_MS); // wait 100ms to fill buffer
+                    if (len < 0) {
+                        ESP_LOGE(tag, "Error reading from serial interface #%d", muiUartNo);
+                        return false;
+                    }
+                    muiBufferLen = len;
+                    ESP_LOGI(tag, "ReadIntoBuffer() eventBytes=%d, actualBytes=%d", event.size, len);
+                    return true; 
+                }
+            //Event of HW FIFO overflow detected
+            case UART_FIFO_OVF:
+                ESP_LOGI(tag, "hw fifo overflow");
+                // If fifo overflow happened, you should consider adding flow control for your application.
+                // The ISR has already reset the rx FIFO,
+                // As an example, we directly flush the rx buffer here in order to read more data.
+                //uart_flush_input(EX_UART_NUM);
+                //xQueueReset(uart0_queue);
+                break;
+            //Event of UART ring buffer full
+            case UART_BUFFER_FULL:
+                ESP_LOGI(tag, "ring buffer full");
+                // If buffer full happened, you should consider encreasing your buffer size
+                // As an example, we directly flush the rx buffer here in order to read more data.
+                //uart_flush_input(EX_UART_NUM);
+                //xQueueReset(uart0_queue);
+                break;
+            //Event of UART RX break detected
+            case UART_BREAK:
+                ESP_LOGI(tag, "uart rx break");
+                break;
+            //Event of UART parity check error
+            case UART_PARITY_ERR:
+                ESP_LOGI(tag, "uart parity error");
+                break;
+            //Event of UART frame error
+            case UART_FRAME_ERR:
+                ESP_LOGI(tag, "uart frame error");
+                break;
+            //UART_PATTERN_DET
+            case UART_PATTERN_DET:
+                /*uart_get_buffered_data_len(EX_UART_NUM, &buffered_size);
+                int pos = uart_pattern_pop_pos(EX_UART_NUM);
+                ESP_LOGI(tag, "[UART PATTERN DETECTED] pos: %d, buffered size: %d", pos, buffered_size);
+                if (pos == -1) {
+                    // There used to be a UART_PATTERN_DET event, but the pattern position queue is full so that it can not
+                    // record the position. We should set a larger queue size.
+                    // As an example, we directly flush the rx buffer here.
+                    uart_flush_input(EX_UART_NUM);
+                } else {
+                    uart_read_bytes(EX_UART_NUM, dtmp, pos, 100 / portTICK_PERIOD_MS);
+                    uint8_t pat[PATTERN_CHR_NUM + 1];
+                    memset(pat, 0, sizeof(pat));
+                    uart_read_bytes(EX_UART_NUM, pat, PATTERN_CHR_NUM, 100 / portTICK_PERIOD_MS);
+                    ESP_LOGI(tag, "read data: %s", dtmp);
+                    ESP_LOGI(tag, "read pat : %s", pat);
+                } */
+                break;
+            //Others
+            default:
+                ESP_LOGI(tag, "uart event type: %d", event.type);
+                break;
+        }
+        return true;
+    }   
+    return false; 
+}
+
+
+ 
+/*bool Modem::ReadIntoBufferOld() {
+    muiBufferPos = 0;
+    muiBufferLen = 0;
     while (!muiBufferLen) {
-        int len = uart_read_bytes(muiUartNo, mpBuffer, muiBufferSize, 100 / portTICK_RATE_MS); // wait 100ms to fill buffer
+
+        int length = 0;
+        ESP_ERROR_CHECK(uart_get_buffered_data_len(muiUartNo, (size_t*)&length));        
+        ESP_LOGI(tag, "ReadIntoBuffer().get_buffered_data_len()=%d", length);
+
+        int len = uart_read_bytes(muiUartNo, mpBuffer, muiBufferSize, 0); //100 / portTICK_RATE_MS); // wait 100ms to fill buffer
         if (len < 0) {
             ESP_LOGE(tag, "Error reading from serial interface #%d", muiUartNo);
             return false;
         }
         muiBufferLen = len;
-        /*String buf;
-        buf.reserve(len);
-        memcpy((void*)buf.c_str(), mpBuffer, len);
-        ESP_LOGI(tag, "ReadIntoBuffer(): %s", buf.c_str());*/
     }
     return true;
-}
+}*/
 
 bool Modem::ReadLine(String& line) {
     line = "";
