@@ -33,9 +33,9 @@ public:
 	String msSTAPass;
 	String msHostname;
 	String msTargetUrl;
-	String msModemApn;
-	String msModemUser;
-	String msModemPass;
+	String msCellularApn;
+	String msCellularUser;
+	String msCellularPass;
 	int miSendDataIntervalDaytime; // seconds
 	int miSendDataIntervalNighttime; // seconds
 	int miSendDataIntervalHealth; // seconds

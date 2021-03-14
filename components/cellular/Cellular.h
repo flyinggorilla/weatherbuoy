@@ -23,27 +23,32 @@ public:
 	Cellular(String apn, String user, String pass);
 	virtual ~Cellular();
     void InitNetwork();
-
     void Start();
-    void ReceiverTask();
-    
-    bool ReadLine(String& line);
-    bool WriteLine(const char *sWrite);
-    int WriteData(const char* data, int len);
     String Command(const char *sCommand, const char *sInfo, unsigned short maxLines = 5);
-
-    //bool ReadLine();
-    //String& data() { return mData; }; 
     void TurnOn();
-
- 	void OnEvent(esp_event_base_t base, int32_t id, void *event_data);
-
-
-    bool StartPPP();
-
-
+    bool SwitchToCommandMode(); // todo, move to private
+    bool SwitchToPppMode(); // can be moved to private
 
 private:
+    friend esp_err_t esp_cellular_post_attach_start(esp_netif_t * esp_netif, void * args);
+
+ 	void OnEvent(esp_event_base_t base, int32_t id, void *event_data);
+    friend void cellularEventHandler(void* ctx, esp_event_base_t base, int32_t id, void* event_data);
+
+
+    void ReceiverTask();
+    friend void fReceiverTask(void *pvParameter);
+
+    bool ModemReadLine(String& line);
+    String ModemReadResponse(unsigned short maxLines = 10);
+
+    bool ModemWriteLine(const char *sWrite);
+    bool ModemWrite(String &command);
+
+    
+    int ModemWriteData(const char* data, int len);
+    friend esp_err_t esp_cellular_transmit(void *h, void *buffer, size_t len);
+
     bool ReadIntoBuffer();
     unsigned char *mpBuffer;
     unsigned int muiBufferSize;
@@ -59,6 +64,7 @@ private:
     String msPass;
 
     bool mbConnected = false;
+    bool mbCommandMode = true;
 
     esp_cellular_netif_driver_t mModemNetifDriver = {0};
 

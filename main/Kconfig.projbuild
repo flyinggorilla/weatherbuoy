@@ -31,13 +31,13 @@ menu "Weatherbuoy"
         int "Default interval in seconds to send health and diagnostics information"
         default 300
 
-    config WEATHERBUOY_MODEM_APN
+    config WEATHERBUOY_CELLULAR_APN
         string "Network provider APN"
             
-    config WEATHERBUOY_MODEM_USER
+    config WEATHERBUOY_CELLULAR_USER
         string "Network provider USER"
     
-    config WEATHERBUOY_MODEM_PASS
+    config WEATHERBUOY_CELLULAR_PASS
         string "Network provider PASS"
         
 endmenu

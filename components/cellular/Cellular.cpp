@@ -18,7 +18,7 @@ static const char tag[] = "Cellular";
 #define CELLULAR_GPIO_TX GPIO_NUM_27
 #define CELLULAR_GPIO_RX GPIO_NUM_26
 
-void modemEventHandler(void* ctx, esp_event_base_t base, int32_t id, void* event_data)
+void cellularEventHandler(void* ctx, esp_event_base_t base, int32_t id, void* event_data)
 {
 	return ((Cellular *)ctx)->OnEvent(base, id, event_data);
 }
@@ -71,10 +71,14 @@ Cellular::~Cellular() {
 }
 
 
-static esp_err_t esp_cellular_transmit(void *h, void *buffer, size_t len)
+esp_err_t esp_cellular_transmit(void *h, void *buffer, size_t len)
 {
     Cellular *modem = (Cellular*)h;
-    if (modem->WriteData((const char *)buffer, len) > 0) {
+    if (modem->mbCommandMode) {
+        ESP_LOGE(tag, "esp_cellular_transmit() cannot send because we are still in command mode");
+        return ESP_FAIL;
+    }
+    if (modem->ModemWriteData((const char *)buffer, len) > 0) {
         return ESP_OK;
     }
     return ESP_FAIL;
@@ -89,7 +93,7 @@ static esp_err_t modem_netif_receive_cb(void *buffer, size_t len, void *context)
 }
 */
 
-static esp_err_t esp_cellular_post_attach_start(esp_netif_t * esp_netif, void * args)
+esp_err_t esp_cellular_post_attach_start(esp_netif_t * esp_netif, void * args)
 {
     esp_cellular_netif_driver_t *pDriver = (esp_cellular_netif_driver_t*)args;
     Cellular *pModem = pDriver->pModem;
@@ -109,23 +113,11 @@ static esp_err_t esp_cellular_post_attach_start(esp_netif_t * esp_netif, void * 
     };
     esp_netif_ppp_set_params(esp_netif, &ppp_config);
 
-    //ESP_ERROR_CHECK(esp_event_handler_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, &on_ppp_changed, dte));
-    return pModem->StartPPP() ? ESP_OK : ESP_ERR_ESP_NETIF_DRIVER_ATTACH_FAILED;
+    //ESP_LOGW(tag, "esp_cellular_post_attach_start() - register too many event handlers? NETIF_PPP_STATUS should have been already registered!!");
+    //ESP_ERROR_CHECK(esp_event_handler_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, &cellularEventHandler, pModem));
+    return pModem->SwitchToPppMode() ? ESP_OK : ESP_ERR_ESP_NETIF_DRIVER_ATTACH_FAILED;
 }
 
-bool Cellular::StartPPP() {
-/*    modem_dce_t *dce = dte->dce;
-    CELLULAR_CHECK(dce, "DTE has not yet bind with DCE", err);
-    esp_cellular_dte_t *esp_dte = __containerof(dte, esp_cellular_dte_t, parent);
-    // Set PDP Context 
-    CELLULAR_CHECK(dce->define_pdp_context(dce, 1, "IP", CONFIG_EXAMPLE_COMPONENT_CELLULAR_APN) == ESP_OK, "set MODEM APN failed", err);
-    // Enter PPP mode 
-    CELLULAR_CHECK(dte->change_mode(dte, CELLULAR_PPP_MODE) == ESP_OK, "enter ppp mode failed", err);
-
-    // post PPP mode started event 
-    esp_event_post_to(esp_dte->event_loop_hdl, ESP_CELLULAR_EVENT, ESP_CELLULAR_EVENT_PPP_START, NULL, 0, 0); */
-    return true;
-}
 
 
 void fReceiverTask(void *pvParameter) {
@@ -141,10 +133,20 @@ void Cellular::ReceiverTask() {
 
 
     while(true) {
+        // do nothing in command mode
+        if (mbCommandMode) {
+            vTaskDelay(5000/portTICK_PERIOD_MS);
+            ESP_LOGI(tag, "ReceiverTask() idle in command mode");
+            continue;
+        }
+
+        // ppp mode
         bool read = ReadIntoBuffer();
         if (read) {
             esp_netif_receive(mModemNetifDriver.base.netif, mpBuffer, muiBufferLen, NULL);
             ESP_LOGI(tag, "ReceiverTask() received %d bytes", muiBufferLen);
+        } else {
+            ESP_LOGE(tag, "ReceiverTask() ReadIntoBuffer return false");
         }
     }
 }
@@ -155,8 +157,8 @@ void Cellular::InitNetwork() {
 	//ESP_ERROR_CHECK(nvs_flash_init());
 	ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_init());
 	ESP_ERROR_CHECK(esp_event_loop_create_default());
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID,&modemEventHandler, this, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, &modemEventHandler, this, NULL));		
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID,&cellularEventHandler, this, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, &cellularEventHandler, this, NULL));		
 
 
     // Init netif object
@@ -168,7 +170,12 @@ void Cellular::InitNetwork() {
     mModemNetifDriver.pModem = this;
     //esp_netif_ppp_set_auth(esp_netif, NETIF_PPP_AUTHTYPE_PAP, msUser.c_str(), msPass.c_str());
     esp_netif_ppp_set_auth(esp_netif, NETIF_PPP_AUTHTYPE_NONE, msUser.c_str(), msPass.c_str());
-    ESP_ERROR_CHECK(esp_netif_attach(esp_netif, &mModemNetifDriver));
+    //ESP_ERROR_CHECK(esp_netif_attach(esp_netif, &mModemNetifDriver));
+    if (ESP_OK == esp_netif_attach(esp_netif, &mModemNetifDriver)) {
+        ESP_LOGI(tag, "Established cellular network connection.");
+    } else {
+        ESP_LOGW(tag, "Failed to establish cellular network connection. Retry later??");
+    }
 }
 
 void Cellular::OnEvent(esp_event_base_t base, int32_t id, void* event_data)
@@ -245,19 +252,23 @@ bool Cellular::ReadIntoBuffer() {
                 // If fifo overflow happened, you should consider adding flow control for your application.
                 // The ISR has already reset the rx FIFO,
                 // As an example, we directly flush the rx buffer here in order to read more data.
-                //uart_flush_input(EX_UART_NUM);
-                //xQueueReset(uart0_queue);
+                uart_flush_input(muiUartNo);
+                xQueueReset(mhUartEventQueueHandle);
                 break;
             //Event of UART ring buffer full
             case UART_BUFFER_FULL:
                 ESP_LOGI(tag, "ring buffer full");
                 // If buffer full happened, you should consider encreasing your buffer size
                 // As an example, we directly flush the rx buffer here in order to read more data.
-                //uart_flush_input(EX_UART_NUM);
-                //xQueueReset(uart0_queue);
+                uart_flush_input(muiUartNo);
+                xQueueReset(mhUartEventQueueHandle);
                 break;
             //Event of UART RX break detected
             case UART_BREAK:
+                if (event.timeout_flag && event.timeout_flag == 0) {
+                    mbCommandMode = true;
+                    uart_flush_input(muiUartNo);
+                }
                 ESP_LOGI(tag, "uart rx break");
                 break;
             //Event of UART parity check error
@@ -297,6 +308,111 @@ bool Cellular::ReadIntoBuffer() {
     return false; 
 }
 
+bool Cellular::SwitchToCommandMode() {
+        //dce->handle_line = sim800_handle_exit_data_mode;
+        //vTaskDelay(pdMS_TO_TICKS(1000)); // spec: 1s delay for the modem to recognize the escape sequence
+      //  mhUartEventQueueHandle
+
+
+    uart_event_t uartSwitchToPppEvent = {
+        .type = UART_BREAK,
+        .size = 0,
+        .timeout_flag = true
+    };
+
+    //Waiting for UART event.
+    // before xending the new message, run xQueueReset(????????????????)
+    if(xQueueSend(mhUartEventQueueHandle, (void * )&uartSwitchToPppEvent, (portTickType)portMAX_DELAY)) {
+
+        uart_flush(muiUartNo);
+
+        // The +++ character sequence causes the TA to cancel the data flow over the 
+        // AT interface and switch to Command mode. This allows you to enter AT 
+        // Command while maintaining the data connection to the remote server. 
+        // To prevent the +++ escape sequence from being misinterpreted as data, it 
+        // should comply to following sequence: 
+        // No characters entered for T1 time (1 second) 
+        // "+++" characters entered with no characters in between (1 second) 
+        // No characters entered for T1 timer (1 second) 
+        // Switch to Command mode, otherwise go to step 1. 
+        String write("+++");
+        vTaskDelay(1000/portTICK_PERIOD_MS);
+        int iWriteLen = ModemWriteData(write.c_str(), write.length());
+        vTaskDelay(1000/portTICK_PERIOD_MS);
+        if (iWriteLen == write.length()) {
+            ESP_LOGI(tag, "SwitchToCommandMode(): '%s'", write.c_str());
+            return true;
+        } else {
+            ESP_LOGE(tag, "Error SwitchToCommandMode(): '%s'", write.c_str());
+            return false;
+        }
+        vTaskDelay(1000/portTICK_PERIOD_MS);
+        String response = ModemReadResponse();
+        if (response.equals("OK")) {
+            ESP_LOGI(tag, "Switched to command mode.");
+            return true;
+        } 
+
+    }
+
+    ESP_LOGE(tag, "Error switching to command mode.");
+    return false;
+}
+
+bool Cellular::SwitchToPppMode() {
+    if (!mbCommandMode) {
+        ESP_LOGW(tag, "SwitchToPppMode() already in PPP mode");
+        return true;
+    }
+
+    ESP_LOGI(tag, "SwitchToPppMode()");
+
+    String response = Command("ATD*99#", "Connect for data connection.");
+    if (response.equals("CONNECT")) {
+        ESP_LOGI(tag, "SwitchToPppMode(NEW) CONNECTED");
+        mbCommandMode = true;
+        return true;
+    }
+
+    response = Command("ATO", "resumes the connection and switches back from Command mode to data mode.");
+    if (response.equals("CONNECT")) {
+        ESP_LOGI(tag, "SwitchToPppMode(RESUME) CONNECTED");
+        mbCommandMode = true;
+        return true;
+    }
+    return false;
+}
+
+/*
+static esp_err_t sim800_set_working_mode(modem_dce_t *dce, modem_mode_t mode)
+{
+    modem_dte_t *dte = dce->dte;
+    switch (mode) {
+    case MODEM_COMMAND_MODE:
+    case MODEM_PPP_MODE:
+        dce->handle_line = sim800_handle_atd_ppp;
+        DCE_CHECK(dte->send_cmd(dte, "ATD*99#\r", MODEM_COMMAND_TIMEOUT_MODE_CHANGE) == ESP_OK, "send command failed", err);
+            if (dce->state != MODEM_STATE_SUCCESS) {
+                // Initiate PPP mode could fail, if we've already "dialed" the data call before.
+                // in that case we retry with "ATO" to just resume the data mode
+                ESP_LOGD(DCE_TAG, "enter ppp mode failed, retry with ATO");
+                dce->handle_line = sim800_handle_atd_ppp;
+                DCE_CHECK(dte->send_cmd(dte, "ATO\r", MODEM_COMMAND_TIMEOUT_MODE_CHANGE) == ESP_OK, "send command failed", err);
+                DCE_CHECK(dce->state == MODEM_STATE_SUCCESS, "enter ppp mode failed", err);
+            }
+        ESP_LOGD(DCE_TAG, "enter ppp mode ok");
+        dce->mode = MODEM_PPP_MODE;
+        break;
+    default:
+        ESP_LOGW(DCE_TAG, "unsupported working mode: %d", mode);
+        goto err;
+        break;
+    }
+    return ESP_OK;
+err:
+    return ESP_FAIL;
+} */
+
 
  
 /*bool Modem::ReadIntoBufferOld() {
@@ -318,7 +434,7 @@ bool Cellular::ReadIntoBuffer() {
     return true;
 }*/
 
-bool Cellular::ReadLine(String& line) {
+bool Cellular::ModemReadLine(String& line) {
     line = "";
 
     int maxLineLength = muiBufferSize;
@@ -331,7 +447,7 @@ bool Cellular::ReadLine(String& line) {
             unsigned char c = mpBuffer[muiBufferPos++];
             if (c == 0x0D || c ==0x0A) {  // skip trailing line feeds \r\n
                 if (line.length()) {
-                    //ESP_LOGI(tag, "ReadLine(): %s", line.c_str());
+                    //ESP_LOGI(tag, "ModemReadLine(): %s", line.c_str());
                     return true;
                 }
             } else {
@@ -344,54 +460,67 @@ bool Cellular::ReadLine(String& line) {
     return false;
 }
 
-int Cellular::WriteData(const char* data, int len) {
+int Cellular::ModemWriteData(const char* data, int len) {
     int iWriteLen = uart_write_bytes(muiUartNo, data, len);
     if (iWriteLen == len) {
-        ESP_LOGI(tag, "WriteData(): %d bytes", len);
+        ESP_LOGI(tag, "ModemWriteData(): %d bytes", len);
     } else {
-        ESP_LOGE(tag, "Error WriteData(): %d", len);
+        ESP_LOGE(tag, "Error ModemWriteData(): %d", len);
     }
     return len;
 }
 
+bool Cellular::ModemWrite(String &command) {
+    int iWriteLen = uart_write_bytes(muiUartNo, command.c_str(), command.length());
+    if (iWriteLen == command.length()) {
+        ESP_LOGI(tag, "ModemWriteLine(): '%s'", command.c_str());
+        return true;
+    } 
+    
+    ESP_LOGE(tag, "Error ModemWriteLine(): '%s'", command.c_str());
+    return false;
+}
 
-bool Cellular::WriteLine(const char *sWrite) {
+
+bool Cellular::ModemWriteLine(const char *sWrite) {
     String write(sWrite);
     write += "\r";
-    int iWriteLen = uart_write_bytes(muiUartNo, write.c_str(), write.length());
-    if (iWriteLen == write.length()) {
-        ESP_LOGI(tag, "WriteLine(): '%s'", sWrite);
-        return true;
-    } else {
-        ESP_LOGE(tag, "Error WriteLine(): '%s'", sWrite);
-        return false;
-    }
+    return ModemWrite(write);
 }
+
+
+String Cellular::ModemReadResponse(unsigned short maxLines) {
+    String response;
+    String message;
+    while  (maxLines--) {
+        if (!ModemReadLine(response))
+            continue;
+        if (response.equals("OK")) {
+            ESP_LOGI(tag, "%s", message.length() ? message.c_str() : response.c_str());
+            return message.length() ? message : response;
+        } else if (response.startsWith("ERROR")) {
+            ESP_LOGE(tag, "Error Command %s", response.c_str());
+            return response;
+        }
+        if (message.length()) {
+            message += "\r\n";
+        } 
+        if (!response.length()) {
+            message += "\r\n";
+        }
+        message += response;
+        //ESP_LOGI(tag, "LINE: %s", response.c_str());
+    }
+    return response;
+}
+
 
 String Cellular::Command(const char* sCommand, const char *sInfo, unsigned short maxLines) {
     String response;
     String message;
     ESP_LOGI(tag, "Command(%s) %s", sCommand, sInfo);
-    if (WriteLine(sCommand)) {
-        while  (maxLines--) {
-            if (!ReadLine(response))
-                continue;
-            if (response.equals("OK")) {
-                ESP_LOGI(tag, "%s", message.length() ? message.c_str() : response.c_str());
-                return message.length() ? message : response;
-            } else if (response.startsWith("ERROR")) {
-                ESP_LOGE(tag, "Error Command(%s) %s", sCommand, response.c_str());
-                return response;
-            }
-            if (message.length()) {
-                message += "\r\n";
-            } 
-            if (!response.length()) {
-                message += "\r\n";
-            }
-            message += response;
-            //ESP_LOGI(tag, "LINE: %s", response.c_str());
-        }
+    if (ModemWriteLine(sCommand)) {
+        return ModemReadResponse(maxLines);
     }
     return response;
 }

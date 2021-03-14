@@ -14,10 +14,11 @@ public:
     //start the task
     void Start();
 
+private:
     //main loop run by the task
     void ReadMaximetTask();
+    friend void fReadMaximetTask(void *pvParameter);
 
-private:
     Config &mrConfig;
     SendData &mrSendData;
 };

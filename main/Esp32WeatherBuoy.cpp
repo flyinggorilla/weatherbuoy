@@ -54,31 +54,33 @@ void Esp32WeatherBuoy::Start() {
     }
 
     
-    Cellular modem(config.msModemApn, config.msModemUser, config.msModemPass);
-    modem.TurnOn();
-    modem.InitNetwork();
-    modem.Start();
+    Cellular cellular(config.msCellularApn, config.msCellularUser, config.msCellularPass);
+    cellular.TurnOn();
+    cellular.InitNetwork();
+    cellular.Start();
 
+    cellular.SwitchToPppMode();
+    cellular.Command("AT", "ATtention");
+    cellular.SwitchToCommandMode();
 
-    modem.Command("AT", "ATtention");
-    modem.Command("ATI", "Display Product Identification Information");
-    modem.Command("AT+CGMM", "Model Identification");
-    modem.Command("AT+GMM", "Request TA Model Identification");
-    modem.Command("AT+CGSN", "Product Serial Number Identification (IMEI)");
-    modem.Command("AT+CREG?", "Network Registration Information States *****************************");
-    modem.Command("AT+CGMR", "Request TA Revision Identification of Software Release");
-    modem.Command("AT+GMR", "Request TA Revision Identification of Software Release");
-    modem.Command("AT+CGMI", "Request Manufacturer Identification");
-    modem.Command("AT+GMI", "Request Manufacturer Identification");
-    modem.Command("AT+CIMI", "Request international mobile subscriber identity");
-    modem.Command("AT+CSQ", "Signal Quality Report");
-    modem.Command("AT+CNUM", "Subscriber Number");
-    modem.Command("AT+CBC", "Battery Charge");
-    modem.Command("AT+GSN", "Request TA Serial Number Identification (IMEI)");
-    modem.Command("AT+GCAP", "Request Complete TA Capabilities List");
-    modem.Command("AT&V", "Display Current Configuration", 5000);
-    modem.Command("ATO", "Switch from Command Mode to Data Mode (return to Online data state)", 100);
-    modem.Command("AT+CEER", "Request Extended Error Report", 1000);
+    cellular.Command("ATI", "Display Product Identification Information");
+    cellular.Command("AT+CGMM", "Model Identification");
+    cellular.Command("AT+GMM", "Request TA Model Identification");
+    cellular.Command("AT+CGSN", "Product Serial Number Identification (IMEI)");
+    cellular.Command("AT+CREG?", "Network Registration Information States *****************************");
+    cellular.Command("AT+CGMR", "Request TA Revision Identification of Software Release");
+    cellular.Command("AT+GMR", "Request TA Revision Identification of Software Release");
+    cellular.Command("AT+CGMI", "Request Manufacturer Identification");
+    cellular.Command("AT+GMI", "Request Manufacturer Identification");
+    cellular.Command("AT+CIMI", "Request international mobile subscriber identity");
+    cellular.Command("AT+CSQ", "Signal Quality Report");
+    cellular.Command("AT+CNUM", "Subscriber Number");
+    cellular.Command("AT+CBC", "Battery Charge");
+    cellular.Command("AT+GSN", "Request TA Serial Number Identification (IMEI)");
+    cellular.Command("AT+GCAP", "Request Complete TA Capabilities List");
+    cellular.Command("AT&V", "Display Current Configuration", 5000);
+    cellular.Command("ATO", "Switch from Command Mode to Data Mode (return to Online data state)", 100);
+    cellular.Command("AT+CEER", "Request Extended Error Report", 1000);
      
 
     ESP_LOGI(tag, "Free memory: %d", esp_get_free_heap_size());
