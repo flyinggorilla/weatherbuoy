@@ -118,13 +118,15 @@ void Esp32WeatherBuoy::Start() {
             break;
         vTaskDelay(2000/portTICK_PERIOD_MS);
     }
-    
+
+    cellular.SwitchToPppMode();
+
     for (int i = 0; i < 100; i++) {
-        cellular.Command("AT+CGDCONT=1,\"IP\",\"webapn.at\"", "Define PDP Context");
+//        cellular.Command("AT+CGDCONT=1,\"IP\",\"webapn.at\"", "Define PDP Context");
         //cellular.Command("ATD*99#", "setup data connection");
 
+        vTaskDelay(10000/portTICK_PERIOD_MS);
 
-        cellular.SwitchToPppMode();
 
 
         esp_http_client_config_t httpConfig = {0};
@@ -161,7 +163,6 @@ void Esp32WeatherBuoy::Start() {
         } else {
             ESP_LOGE(tag, "HTTP response was not OK with status %d", iHttpStatusCode);
         }
-        vTaskDelay(60000/portTICK_PERIOD_MS);
     }
 
 

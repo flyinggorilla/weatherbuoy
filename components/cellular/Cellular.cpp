@@ -387,14 +387,14 @@ bool Cellular::SwitchToPppMode() {
     response = Command("ATD*99#", "Connect for data connection.");
     if (response.equals("CONNECT")) {
         ESP_LOGI(tag, "SwitchToPppMode(NEW) CONNECTED");
-        mbCommandMode = true;
+        mbCommandMode = false;
         return true;
     }
 
     response = Command("ATO", "resumes the connection and switches back from Command mode to data mode.");
     if (response.equals("CONNECT")) {
         ESP_LOGI(tag, "SwitchToPppMode(RESUME) CONNECTED");
-        mbCommandMode = true;
+        mbCommandMode = false;
         return true;
     }
     return false;
