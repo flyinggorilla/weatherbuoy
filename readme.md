@@ -31,3 +31,13 @@
 | | | |
 | | | |
 
+
+## wiring
+
+| ESP32 / SimCom board | connection |
+|-|-|
+| 5V USB | ESP8266 VBat, RS232 to TTL |
+| GND | ESP8266 VBAT |
+| RX | RS232 to TTL -> Maximet  |
+| GPIO 34 | MAX471 voltage 12v / 5x divider = 0..2.4V |
+| GPIO 35 | MAX471 current (provided as analog voltage) |

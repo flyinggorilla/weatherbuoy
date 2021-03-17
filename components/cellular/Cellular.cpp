@@ -114,8 +114,11 @@ esp_err_t esp_cellular_post_attach_start(esp_netif_t * esp_netif, void * args)
     esp_netif_ppp_set_params(esp_netif, &ppp_config);
 
     //ESP_LOGW(tag, "esp_cellular_post_attach_start() - register too many event handlers? NETIF_PPP_STATUS should have been already registered!!");
-    //ESP_ERROR_CHECK(esp_event_handler_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, &cellularEventHandler, pModem));
-    return pModem->SwitchToPppMode() ? ESP_OK : ESP_ERR_ESP_NETIF_DRIVER_ATTACH_FAILED;
+    //ESP_ERROR_CHECK(esp_event_handler_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, cellularEventHandler, pModem));
+    return ESP_OK;
+    
+//**************************************************    
+    //return pModem->SwitchToPppMode() ? ESP_OK : ESP_ERR_ESP_NETIF_DRIVER_ATTACH_FAILED;
 }
 
 
@@ -157,8 +160,8 @@ void Cellular::InitNetwork() {
 	//ESP_ERROR_CHECK(nvs_flash_init());
 	ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_init());
 	ESP_ERROR_CHECK(esp_event_loop_create_default());
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID,&cellularEventHandler, this, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, &cellularEventHandler, this, NULL));		
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, cellularEventHandler, this, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, cellularEventHandler, this, NULL));		
 
 
     // Init netif object
@@ -169,7 +172,7 @@ void Cellular::InitNetwork() {
     mModemNetifDriver.base.post_attach = esp_cellular_post_attach_start;
     mModemNetifDriver.pModem = this;
     //esp_netif_ppp_set_auth(esp_netif, NETIF_PPP_AUTHTYPE_PAP, msUser.c_str(), msPass.c_str());
-    esp_netif_ppp_set_auth(esp_netif, NETIF_PPP_AUTHTYPE_NONE, msUser.c_str(), msPass.c_str());
+    //esp_netif_ppp_set_auth(esp_netif, NETIF_PPP_AUTHTYPE_NONE, msUser.c_str(), msPass.c_str());
     //ESP_ERROR_CHECK(esp_netif_attach(esp_netif, &mModemNetifDriver));
     if (ESP_OK == esp_netif_attach(esp_netif, &mModemNetifDriver)) {
         ESP_LOGI(tag, "Established cellular network connection.");
@@ -221,6 +224,7 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void* event_data)
 bool Cellular::ReadIntoBuffer() {
     muiBufferPos = 0;
     muiBufferLen = 0;
+String buffer;  //####################################################################### REMOVE
     uart_event_t event;
     //Waiting for UART event.
     if(xQueueReceive(mhUartEventQueueHandle, (void * )&event, (portTickType)portMAX_DELAY)) {
@@ -230,12 +234,10 @@ bool Cellular::ReadIntoBuffer() {
             other types of events. If we take too much time on data event, the queue might
             be full.*/
             case UART_DATA: {
-                    ESP_LOGI(tag, "[UART DATA]: %d", event.size);
-                    //uart_read_bytes(EX_UART_NUM, dtmp, event.size, portMAX_DELAY);
-
                     int length = 0;
                     ESP_ERROR_CHECK(uart_get_buffered_data_len(muiUartNo, (size_t*)&length));        
-                    ESP_LOGI(tag, "ReadIntoBuffer().get_buffered_data_len()=%d", length);
+                    if(!mbCommandMode)
+                        ESP_LOGI(tag, "ReadIntoBuffer().get_buffered_data_len()=%d event=%d", length, event.size);
 
                     int len = uart_read_bytes(muiUartNo, mpBuffer, muiBufferSize, 0); //100 / portTICK_RATE_MS); // wait 100ms to fill buffer
                     if (len < 0) {
@@ -243,7 +245,13 @@ bool Cellular::ReadIntoBuffer() {
                         return false;
                     }
                     muiBufferLen = len;
-                    ESP_LOGI(tag, "ReadIntoBuffer() eventBytes=%d, actualBytes=%d", event.size, len);
+//********LEARN**********
+                    buffer.prepare(len);
+                    memcpy((void*)buffer.c_str(), mpBuffer, len);
+                    ESP_LOGI(tag, "ReadIntoBuffer() =>>%s<<==", buffer.c_str()); 
+//******************
+                    if(!mbCommandMode)
+                        ESP_LOGI(tag, "ReadIntoBuffer() eventBytes=%d, actualBytes=%d", event.size, len);
                     return true; 
                 }
             //Event of HW FIFO overflow detected
@@ -366,8 +374,17 @@ bool Cellular::SwitchToPppMode() {
     }
 
     ESP_LOGI(tag, "SwitchToPppMode()");
+    String command = "AT+CGDCONT=1,\"IP\",\"";
+    command += msApn;
+    command += "\"";
+    String response = Command(command.c_str(), "Define PDP Context");
+    if (!response.equals("OK")) {
+        ESP_LOGE(tag, "SwitchToPppMode(PDP Context) FAILED");
+        mbCommandMode = true;
+        return false;
+    }
 
-    String response = Command("ATD*99#", "Connect for data connection.");
+    response = Command("ATD*99#", "Connect for data connection.");
     if (response.equals("CONNECT")) {
         ESP_LOGI(tag, "SwitchToPppMode(NEW) CONNECTED");
         mbCommandMode = true;
@@ -473,11 +490,11 @@ int Cellular::ModemWriteData(const char* data, int len) {
 bool Cellular::ModemWrite(String &command) {
     int iWriteLen = uart_write_bytes(muiUartNo, command.c_str(), command.length());
     if (iWriteLen == command.length()) {
-        ESP_LOGI(tag, "ModemWriteLine(): '%s'", command.c_str());
+//        ESP_LOGD(tag, "ModemWrite(): '%s'", command.c_str());
         return true;
     } 
     
-    ESP_LOGE(tag, "Error ModemWriteLine(): '%s'", command.c_str());
+    ESP_LOGE(tag, "Error ModemWrite(): '%s'", command.c_str());
     return false;
 }
 
@@ -500,6 +517,12 @@ String Cellular::ModemReadResponse(unsigned short maxLines) {
             return message.length() ? message : response;
         } else if (response.startsWith("ERROR")) {
             ESP_LOGE(tag, "Error Command %s", response.c_str());
+            return response;
+        } else if (response.startsWith("CONNECT")) {
+            ESP_LOGI(tag, "Connected!");
+            return response;
+        } else if (response.startsWith("NO CARRIER")) {
+            ESP_LOGI(tag, "Connected!");
             return response;
         }
         if (message.length()) {
