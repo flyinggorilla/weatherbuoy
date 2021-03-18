@@ -72,3 +72,6 @@ Temporary Items
 .apdisk
 .settings/language.settings.xml
 coredump.dat
+
+
+*.out.txt

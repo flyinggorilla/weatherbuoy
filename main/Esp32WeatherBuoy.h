@@ -11,6 +11,8 @@ public:
 	virtual ~Esp32WeatherBuoy();
 
 	void Start();
+	void Wifi();
+	void TestHttp();
 
 /*	void TaskWebServer();
 	void TaskResetButton();

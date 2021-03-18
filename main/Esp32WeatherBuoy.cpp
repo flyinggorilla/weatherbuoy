@@ -42,9 +42,24 @@ void app_main();
 void app_main() {
 	ESP_ERROR_CHECK(esp_netif_init()); 
 	esp32WeatherBuoy.Start();
+	//esp32WeatherBuoy.Wifi();
 }
 
+void Esp32WeatherBuoy::Wifi() {
+    Config config;
 
+    ESP_LOGI(tag, "Atterwind ****WIFI MODE**** WeatherBuoy starting!");
+    if (!config.Load()) {
+        ESP_LOGE(tag, "Error, could not load configuration.");
+    }
+
+
+    //config.msSTASsid = "";
+    //config.msSTAPass = "";
+    //config.Save();
+    wifi.StartSTAMode(config.msSTASsid, config.msSTAPass, config.msHostname);
+    TestHttp();
+}
 
 
 void Esp32WeatherBuoy::Start() {
@@ -68,9 +83,14 @@ void Esp32WeatherBuoy::Start() {
 
   //  cellular.SwitchToPppMode();
 
-    cellular.Command("AT", "ATtention"); // OK
+    String response;
+
+    cellular.Command("AT", "OK", &response, "ATtention"); // OK
     //cellular.SwitchToCommandMode();
-    cellular.Command("AT+CPIN?", "Is a PIN needed?"); // +CPIN: READY
+    cellular.Command("AT+CPIN?", "OK", &response, "Is a PIN needed?"); // +CPIN: READY
+
+
+
 
    /* //cellular.Command("ATI", "Display Product Identification Information");
     //cellular.Command("AT+CGMM", "Model Identification");
@@ -105,69 +125,42 @@ void Esp32WeatherBuoy::Start() {
 
     // +CSTT: "movistar.bluevia.es","",""
 
-    cellular.Command("AT+CGATT?", "Check if the MS is connected to the GPRS network. 0=disconnected"); // +CGATT: 0
-    cellular.Command("AT+CGATT=l", "Register with GPRS network."); // 
-    cellular.Command("AT+CGATT?", "Check if the MS is connected to the GPRS network. 0=disconnected"); // +CGATT: 0
-    cellular.Command("AT+CREG=?", "List of Network Registration Information States"); // +CREG: (0-2)
-    cellular.Command("AT+CREG=1", "Register on home network");  // OK
+//    cellular.Command("AT+CGATT?", "Check if the MS is connected to the GPRS network. 0=disconnected"); // +CGATT: 0
+//    cellular.Command("AT+CGATT=l", "Register with GPRS network."); // 
+//    cellular.Command("AT+CGATT?", "Check if the MS is connected to the GPRS network. 0=disconnected"); // +CGATT: 0
+//    cellular.Command("AT+CREG=?", "List of Network Registration Information States"); // +CREG: (0-2)
+//    cellular.Command("AT+CREG=1", "Register on home network");  // OK
 //    cellular.Command("AT+CGATT=?", "Attach/Detach to GPRS. List of supported states"); // +CGATT: (0,1)
 
     while (true) {
-        String response = cellular.Command("AT+CREG?", "Network Registration Information States "); // +CREG: 0,2 // +CREG: 1,5
-        if (response.equals("+CREG: 1,5")) 
-            break;
+        if (cellular.Command("AT+CREG?", "OK", &response, "Network Registration Information States ")) { // +CREG: 0,2 // +CREG: 1,5
+            if (response.indexOf("+CREG: ") >= 0 && response.indexOf(",5") >= 0)
+                break;
+        }
         vTaskDelay(2000/portTICK_PERIOD_MS);
     }
 
-    cellular.SwitchToPppMode();
-
-    for (int i = 0; i < 100; i++) {
-//        cellular.Command("AT+CGDCONT=1,\"IP\",\"webapn.at\"", "Define PDP Context");
-        //cellular.Command("ATD*99#", "setup data connection");
-
-        vTaskDelay(10000/portTICK_PERIOD_MS);
-
-
-
-        esp_http_client_config_t httpConfig = {0};
-        httpConfig.url = "http://ptsv2.com/t/wb";
-        httpConfig.url = "http://216.239.32.21/t/wb";
-        
-        httpConfig.method = HTTP_METHOD_GET; 
-        esp_http_client_handle_t httpClient = esp_http_client_init(&httpConfig);
-        esp_http_client_set_header(httpClient, "Content-Type", "text/plain");
-        esp_err_t err;
-        err = esp_http_client_open(httpClient, 0);
-        if (err != ESP_OK) {
-            ESP_LOGE(tag, "Error %s in esp_http_client_open(): %s", esp_err_to_name(err), httpConfig.url);
-        }
-
-        int sent = esp_http_client_write(httpClient, "", 0);
-        if (sent == 0) {
-            ESP_LOGD(tag, "esp_http_client_write(): OK, sent: %d", sent);
-        } else {
-            ESP_LOGE(tag, "esp_http_client_write(): Could only send %d of %d bytes", sent, 0);
-        }
-
-
-        // retreive HTTP response and headers
-        int iContentLength = esp_http_client_fetch_headers(httpClient);
-        if (iContentLength == ESP_FAIL) {
-            ESP_LOGE(tag, "esp_http_client_fetch_headers(): could not receive HTTP response");
-        }
-
-        // Check HTTP status code
-        int iHttpStatusCode = esp_http_client_get_status_code(httpClient);
-        if ((iHttpStatusCode >= 200) && (iHttpStatusCode < 400)) {
-            ESP_LOGI(tag, "HTTP response OK. Status %d, Content-Length %d", iHttpStatusCode , iContentLength);
-        } else {
-            ESP_LOGE(tag, "HTTP response was not OK with status %d", iHttpStatusCode);
-        }
+    #define RUNCOMMAND_READ_SMS false
+    if (RUNCOMMAND_READ_SMS) {
+        cellular.Command("AT+CMGF=1", "OK", nullptr, "If the modem reponds with OK this SMS mode is supported"); 
+        cellular.Command("AT+CMGL=\"ALL\"", "OK", &response, "dump all SMS", 1000); //
+                    //     W (17440) WeatherBuoy: SMS '+CMGL: 1,"REC READ","810820","","21/03/18,14:15:32+04"
+                    // Lieber yesss! Kunde, jetzt den aktuellen Stand Ihrer Freieinheiten per SMS abfragen! Einfach mit dem Text: "Info" antworten. Weitere Infos unter www.yess
+                    // +CMGL: 2,"REC READ","810820","","21/03/18,14:15:32+04"
+                    // s.at. Ihr yesss! Team
+                    // +CMGL: 3,"REC READ","810810","","21/03/18,15:25:44+04"
+                    // ruppe werden, k�nnen Sie diese SMS einfach ignorieren. Ihr yesss! Team
+                    // +CMGL: 4,"REC READ","810810","","21/03/18,15:25:44+04"
+                    // Lieber yesss! Kunde, die Rufnummer 436818******* m�chte Sie zu einer Gruppe hinzuf�gen. Der Aktivierungscode lautet: xxxxx
+                    // Wollen Sie nicht Teil dieser G
+                    // +CMGL: 5,"REC READ","+436640000000","","21/03/18,15:31:19+04"
+                    // bernds test message '
+        ESP_LOGW(tag, "SMS '%s'", response.c_str());
     }
 
-
-
-
+    cellular.SwitchToPppMode();
+  
+    TestHttp();
 
 
     ESP_LOGI(tag, "Free memory: %d", esp_get_free_heap_size());
@@ -197,4 +190,53 @@ void Esp32WeatherBuoy::Start() {
         }
         vTaskDelay(mConfig.miSendDataIntervalHealth*1000 / portTICK_PERIOD_MS);
     }  */
+}
+
+
+void Esp32WeatherBuoy::TestHttp() {
+    for (int i = 0; i < 100; i++) {
+//        cellular.Command("AT+CGDCONT=1,\"IP\",\"webapn.at\"", "Define PDP Context");
+        //cellular.Command("ATD*99#", "setup data connection");
+
+        vTaskDelay(10000/portTICK_PERIOD_MS);
+
+
+
+        esp_http_client_config_t httpConfig = {0};
+        //httpConfig.url = "http://ptsv2.com/t/wb/post?testSepperl";
+        //httpConfig.url = "http://216.239.32.21/t/wb/post?test1";
+        httpConfig.url = "http://scooterlabs.com/echo";
+        httpConfig.url = "http://66.39.74.7/echo";
+        
+        httpConfig.method = HTTP_METHOD_GET; 
+        esp_http_client_handle_t httpClient = esp_http_client_init(&httpConfig);
+        //esp_http_client_set_header(httpClient, "Content-Type", "text/plain");
+        esp_err_t err;
+        err = esp_http_client_open(httpClient, 0);
+        if (err != ESP_OK) {
+            ESP_LOGE(tag, "Error %s in esp_http_client_open(): %s", esp_err_to_name(err), httpConfig.url);
+        }
+
+        int sent = esp_http_client_write(httpClient, "", 0);
+        if (sent == 0) {
+            ESP_LOGD(tag, "esp_http_client_write(): OK, sent: %d", sent);
+        } else {
+            ESP_LOGE(tag, "esp_http_client_write(): Could only send %d of %d bytes", sent, 0);
+        }
+
+
+        // retreive HTTP response and headers
+        int iContentLength = esp_http_client_fetch_headers(httpClient);
+        if (iContentLength == ESP_FAIL) {
+            ESP_LOGE(tag, "esp_http_client_fetch_headers(): could not receive HTTP response");
+        }
+
+        // Check HTTP status code
+        int iHttpStatusCode = esp_http_client_get_status_code(httpClient);
+        if ((iHttpStatusCode >= 200) && (iHttpStatusCode < 400)) {
+            ESP_LOGI(tag, "HTTP response OK. Status %d, Content-Length %d", iHttpStatusCode , iContentLength);
+        } else {
+            ESP_LOGE(tag, "HTTP response was not OK with status %d", iHttpStatusCode);
+        }
+    }
 }

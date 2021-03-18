@@ -14,7 +14,7 @@ class Cellular;
 
 typedef struct esp_cellular_netif_driver_s {
     esp_netif_driver_base_t base;           /*!< base structure reserved as esp-netif driver */
-    Cellular                   *pModem;        /*!< ptr to the esp_modem objects (DTE) */
+    Cellular               *pCellular;        /*!< ptr to the esp_modem objects (DTE) */
 } esp_cellular_netif_driver_t;
 
 
@@ -24,7 +24,7 @@ public:
 	virtual ~Cellular();
     void InitNetwork();
     void Start();
-    String Command(const char *sCommand, const char *sInfo, unsigned short maxLines = 5);
+    bool Command(const char *sCommand,const char *sSuccess, String *sResponse = nullptr, const char *sInfo = nullptr, unsigned short maxLines = 100);
     void TurnOn();
     bool SwitchToCommandMode(); // todo, move to private
     bool SwitchToPppMode(); // can be moved to private
@@ -40,7 +40,7 @@ private:
     friend void fReceiverTask(void *pvParameter);
 
     bool ModemReadLine(String& line);
-    String ModemReadResponse(unsigned short maxLines = 10);
+    bool ModemReadResponse(String &sResponse, const char *expectedLastLineResponse, unsigned short maxLines);
 
     bool ModemWriteLine(const char *sWrite);
     bool ModemWrite(String &command);
@@ -66,7 +66,8 @@ private:
     bool mbConnected = false;
     bool mbCommandMode = true;
 
-    esp_cellular_netif_driver_t mModemNetifDriver = {0};
+    esp_cellular_netif_driver_t mModemNetifDriver;
+    esp_netif_t *mpEspNetif = nullptr;
 
 };
 
