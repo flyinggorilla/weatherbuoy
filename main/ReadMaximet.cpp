@@ -26,7 +26,7 @@ void ReadMaximet::Start() {
 #define ETX (0x03) // ASCII end of text
 
 void ReadMaximet::ReadMaximetTask() {
-    Serial serial(UART_NUM_1, GPIO_NUM_16, SERIAL_BAUD_RATE, SERIAL_BUFFER_SIZE);
+    Serial serial(UART_NUM_1, CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN, SERIAL_BAUD_RATE, SERIAL_BUFFER_SIZE);
 
     String line;
     unsigned int uptimeMs = 0;
@@ -46,6 +46,7 @@ void ReadMaximet::ReadMaximetTask() {
 
 bool bDayTime = true; /////////////////////////////// TODO *****************************
 
+    ESP_LOGI(tag, "ReadMaximet task started.");
     while (true) {
         if (!serial.ReadLine(line)) {
             ESP_LOGE(tag, "Could not read line from serial");

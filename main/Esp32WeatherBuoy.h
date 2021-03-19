@@ -12,7 +12,13 @@ public:
 
 	void Start();
 	void Wifi();
-	void TestHttp();
+
+	enum OnlineMode {
+		MODE_OFFLINE,
+		MODE_WIFISTA,
+		MODE_WIFIAP,
+		MODE_CELLULAR
+	};
 
 /*	void TaskWebServer();
 	void TaskResetButton();

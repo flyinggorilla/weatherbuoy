@@ -16,7 +16,8 @@ public:
     bool PostData(String &data);
     bool PostHealth();
 private:
-    esp_event_loop_handle_t mhLoopHandle;
+    esp_event_loop_handle_t mhLoopHandle = nullptr;
+    esp_event_handler_instance_t mhEventHandlerInstance = nullptr;
     Config &mrConfig;
 
 private: // esp http client

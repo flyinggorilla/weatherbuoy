@@ -1,3 +1,5 @@
+//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+
 #include "Cellular.h"
 #include "EspString.h"
 #include "driver/uart.h"
@@ -23,7 +25,10 @@ void cellularEventHandler(void* ctx, esp_event_base_t base, int32_t id, void* ev
 	return ((Cellular *)ctx)->OnEvent(base, id, event_data);
 }
 
-Cellular::Cellular(String apn, String user, String pass) {
+Cellular::Cellular() {
+}
+
+bool Cellular::Init(String apn, String user, String pass) {
     msApn = apn;
     msUser = user;
     msPass = pass;
@@ -52,18 +57,9 @@ Cellular::Cellular(String apn, String user, String pass) {
     muiBufferLen = 0;
     mpBuffer = (uint8_t *) malloc(muiBufferSize);
 
-
-/*
-
-    // Set pattern interrupt, used to detect the end of a line. 
-    res = uart_enable_pattern_det_baud_intr(esp_dte->uart_port, '\n', 1, MIN_PATTERN_INTERVAL, MIN_POST_IDLE, MIN_PRE_IDLE);
-    // Set pattern queue size 
-    esp_dte->pattern_queue_size = config->pattern_queue_size;
-    res |= uart_pattern_queue_reset(esp_dte->uart_port, config->pattern_queue_size);
-    // Starting in command mode -> explicitly disable RX interrupt 
-    uart_disable_rx_intr(esp_dte->uart_port);
-*/
-
+    TurnOn();
+    InitNetwork();
+    return true;
 }
 
 Cellular::~Cellular() {
@@ -619,11 +615,11 @@ bool Cellular::Command(const char* sCommand, const char *sSuccess, String *spRes
     }
     if (ModemWriteLine(sCommand)) {
         if (ModemReadResponse(*spResponse, sSuccess, maxLines)) {
-            ESP_LOGD(tag, "%s --> Command(%s):\r\n%s", sCommand, sInfo ? sInfo : "", spResponse->c_str());
+            ESP_LOGD(tag, "%s --> Command(%s):\r\n%s", sInfo ? sInfo : "", sCommand, spResponse->c_str());
             return true;
         }
     }
-    ESP_LOGE(tag, "%s --> Command(%s)=?%s:\r\n%s", sCommand, sSuccess, sInfo ? sInfo : "", spResponse->c_str());
+    ESP_LOGE(tag, "%s --> Command(%s)=?%s:\r\n%s", sInfo ? sInfo : "", sCommand, sSuccess, spResponse->c_str());
     return false;
 }
 

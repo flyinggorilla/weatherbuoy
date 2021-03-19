@@ -11,7 +11,7 @@
 #include "esputil.h"
 
 static const char tag[] = "SendData";
-static const char SENDDATA_QUEUE_SIZE = 5; 
+static const int SENDDATA_QUEUE_SIZE = (5); 
 static const unsigned int MAX_ACCEPTABLE_RESPONSE_BODY_LENGTH = 16*1024;
 static const bool HTTP_KEEP_ALIVE_ENABLED = false;  // enabling doesnt work on local test system, SSL connections abort
 
@@ -31,9 +31,8 @@ enum {
 
 
 // 1. Define the event handler
-void eventHandler(void* handler_arg, esp_event_base_t base, int32_t id, void* event_data)
+void fSendDataEventHandler(void* handler_arg, esp_event_base_t base, int32_t id, void* event_data)
 {
-    //ESP_LOGI(tag, "EVENT: %d", id);
     if (base == SENDDATA_EVENT_BASE) {
         ((SendData*)handler_arg)->EventHandler(id, event_data);
     }
@@ -139,6 +138,8 @@ void SendData::PerformHttpPost(const char *postData) {
             mPostData += mrConfig.msMaximetUnits;
             mPostData += "\r\n";
         }
+        mPostData += "cellulardata: ";
+        mPostData += "TODO\r\n";
         mbSendDiagnostics = false;
     }
 
@@ -307,9 +308,9 @@ SendData::SendData(Config &config) : mrConfig(config) {
         .task_stack_size = 8192,
         .task_core_id = tskNO_AFFINITY //CORE_ID_REGVAL_APP
     };
-    mhLoopHandle = nullptr;
-    esp_event_loop_create(&loop_args, &mhLoopHandle);
-    esp_event_handler_register_with(mhLoopHandle, SENDDATA_EVENT_BASE, SENDDATA_EVENT_POSTDATA, eventHandler, this);
+    ESP_ERROR_CHECK(esp_event_loop_create(&loop_args, &mhLoopHandle));
+    assert(mhLoopHandle);
+    ESP_ERROR_CHECK(esp_event_handler_instance_register_with(mhLoopHandle, SENDDATA_EVENT_BASE, ESP_EVENT_ANY_ID, fSendDataEventHandler, this, &mhEventHandlerInstance));
 
     // esp http client
     mhEspHttpClient = nullptr; 
@@ -333,7 +334,7 @@ bool SendData::PostHealth() {
 
 
 SendData::~SendData() {
-    esp_event_handler_unregister_with(mhLoopHandle, SENDDATA_EVENT_BASE, SENDDATA_EVENT_POSTDATA, eventHandler);
+    esp_event_handler_instance_unregister_with(mhLoopHandle, SENDDATA_EVENT_BASE, ESP_EVENT_ANY_ID, mhEventHandlerInstance);
     esp_event_loop_delete(mhLoopHandle);
 
     esp_http_client_cleanup(mhEspHttpClient);    

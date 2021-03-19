@@ -13,7 +13,7 @@ menu "Weatherbuoy"
             Default Hostname. Will be also used for Wifi AP SSID. Max 32 char.
 
     config WEATHERBUOY_WIFI_AP_PASS
-        string "Default WiFi AP Password"
+        string "Default WiFi AP Password."
         default ""
 
     config WEATHERBUOY_TARGET_URL
@@ -35,9 +35,16 @@ menu "Weatherbuoy"
         string "Network provider APN"
             
     config WEATHERBUOY_CELLULAR_USER
-        string "Network provider USER"
+        string "Network provider USER (Leave blank for Yesss network)."
+        default ""
     
     config WEATHERBUOY_CELLULAR_PASS
-        string "Network provider PASS"
-        
+        string "Network provider PASS (Leave blank for Yesss network)."
+        default ""
+
+    config WEATHERBUOY_READMAXIMET_RX_PIN
+        int "RX serial GPIO port to receive Maximet data. 16 on Huzzah32, 3 on TTGO"
+        default 3
+            
+
 endmenu

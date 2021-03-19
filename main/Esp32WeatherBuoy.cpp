@@ -26,6 +26,7 @@ static const char tag[] = "WeatherBuoy";
 Config config;
 Esp32WeatherBuoy esp32WeatherBuoy;
 Wifi wifi;
+Cellular cellular;
 
 
 Esp32WeatherBuoy::Esp32WeatherBuoy() {
@@ -42,26 +43,10 @@ void app_main();
 void app_main() {
 	ESP_ERROR_CHECK(esp_netif_init()); 
 	esp32WeatherBuoy.Start();
-	//esp32WeatherBuoy.Wifi();
 }
 
-void Esp32WeatherBuoy::Wifi() {
-    Config config;
-
-    ESP_LOGI(tag, "Atterwind ****WIFI MODE**** WeatherBuoy starting!");
-    if (!config.Load()) {
-        ESP_LOGE(tag, "Error, could not load configuration.");
-    }
-
-
-    //config.msSTASsid = "";
-    //config.msSTAPass = "";
-    //config.Save();
-    wifi.StartSTAMode(config.msSTASsid, config.msSTAPass, config.msHostname);
-    TestHttp();
-}
-
-void TestATCommands(Cellular &cellular);
+void TestHttp();
+void TestATCommands();
 
 void Esp32WeatherBuoy::Start() {
 
@@ -72,47 +57,40 @@ void Esp32WeatherBuoy::Start() {
         ESP_LOGE(tag, "Error, could not load configuration.");
     }
 
+    OnlineMode onlineMode = MODE_CELLULAR;
+
+    ESP_LOGI(tag, "Hostname: %s", config.msHostname.c_str());
+    ESP_LOGI(tag, "Target URL: %s", config.msTargetUrl.c_str());
+    ESP_LOGI(tag, "App Version: %s", esp_ota_get_app_description()->version);
+
     Max471Meter max471Meter;
     ESP_LOGI(tag, "Max471Meter: voltage %d mV, current %d mA??", max471Meter.Voltage(), max471Meter.Current());
 
 
-    
-    Cellular cellular(config.msCellularApn, config.msCellularUser, config.msCellularPass);
-    cellular.TurnOn();
-    cellular.InitNetwork();
-    cellular.Start();
+    switch(onlineMode) {
+        case MODE_CELLULAR: 
+            cellular.Init(config.msCellularApn, config.msCellularUser, config.msCellularPass);
+            cellular.Start();
+            cellular.SwitchToPppMode();
+            break;
+        case MODE_WIFISTA:
+            //config.msSTASsid = "";
+            //config.msSTAPass = "";
+            //config.Save();
+            ESP_LOGI(tag, "sssi %s pass %s host %s", config.msSTASsid.c_str(), config.msSTAPass.c_str(), config.msHostname.c_str());
+            wifi.StartSTAMode(config.msSTASsid, config.msSTAPass, config.msHostname);
+            break;
+        case MODE_WIFIAP:
+            ESP_LOGI(tag, "sssi %s pass %s host %s", config.msAPSsid.c_str(), config.msAPPass.c_str(), config.msHostname.c_str());
+            wifi.StartAPMode(config.msAPSsid, config.msAPPass, config.msHostname);
+            break;
+        case MODE_OFFLINE:
+            ESP_LOGW(tag, "Staying offline.");
+    }
 
 
-    ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", cellular.getDataSent(), cellular.getDataReceived());
-
-    cellular.SwitchToPppMode();
-    ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", cellular.getDataSent(), cellular.getDataReceived());
-  
-    TestHttp();
-
-    ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", cellular.getDataSent(), cellular.getDataReceived());
-
-    ESP_LOGI(tag, "Free memory: %d", esp_get_free_heap_size());
-
-    cellular.SwitchToCommandMode();
-
-    ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", cellular.getDataSent(), cellular.getDataReceived());
-
-    TestATCommands(cellular);
-
-    while (true) {
-        vTaskDelay(mConfig.miSendDataIntervalHealth*1000 / portTICK_PERIOD_MS);
-    }  
-
-
-/*    ESP_LOGI(tag, "Hostname: %s", config.msHostname.c_str());
-    ESP_LOGI(tag, "Target URL: %s", config.msTargetUrl.c_str());
-    ESP_LOGI(tag, "App Version: %s", esp_ota_get_app_description()->version);
-
-    //ESP_LOGI(tag, "sssi %s pass %s host %s", config.msAPSsid.c_str(), config.msAPPass.c_str(), config.msHostname.c_str());
-    //wifi.StartAPMode(config.msAPSsid, config.msAPPass, config.msHostname);
-    ESP_LOGI(tag, "sssi %s pass %s host %s", config.msSTASsid.c_str(), config.msSTAPass.c_str(), config.msHostname.c_str());
-    wifi.StartSTAMode(config.msSTASsid, config.msSTAPass, config.msHostname);
+    //TestATCommands();
+    //TestHttp();
 
     SendData sendData(config);
 
@@ -124,11 +102,11 @@ void Esp32WeatherBuoy::Start() {
                 ESP_LOGE(tag, "Could not post data, likely due to a full queue");
         }
         vTaskDelay(mConfig.miSendDataIntervalHealth*1000 / portTICK_PERIOD_MS);
-    }  */
+    }  
 }
 
 
-void Esp32WeatherBuoy::TestHttp() {
+void TestHttp() {
     for (int i = 0; i < 5; i++) {
 //        cellular.Command("AT+CGDCONT=1,\"IP\",\"webapn.at\"", "Define PDP Context");
         //cellular.Command("ATD*99#", "setup data connection");
@@ -177,7 +155,20 @@ void Esp32WeatherBuoy::TestHttp() {
     }
 }
 
-void TestATCommands(Cellular &cellular) {
+void TestATCommands() {
+    ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", cellular.getDataSent(), cellular.getDataReceived());
+    ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", cellular.getDataSent(), cellular.getDataReceived());
+  
+    ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", cellular.getDataSent(), cellular.getDataReceived());
+
+    ESP_LOGI(tag, "Free memory: %d", esp_get_free_heap_size());
+
+    cellular.SwitchToCommandMode();
+
+    ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", cellular.getDataSent(), cellular.getDataReceived());
+
+
+
     String response;
     cellular.Command("ATI", "OK", nullptr, "Display Product Identification Information"); // SIM800 R14.18
     cellular.Command("AT+CGMM", "OK", nullptr,  "Model Identification"); // SIMCOM_SIM800L
@@ -216,6 +207,10 @@ void TestATCommands(Cellular &cellular) {
                     // bernds test message '
         ESP_LOGI(tag, "SMS '%s'", response.c_str());
     }
+
+    while (true) {
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }  
 
     // cellular.Command("AT&V", "OK", nullptr,  "Display Current Configuration", 5000); // DEFAULT PROFILE ..... lots of stuff
     // cellular.Command("ATO", "OK", nullptr,  "Switch from Command Mode to Data Mode (return to Online data state)", 100);
