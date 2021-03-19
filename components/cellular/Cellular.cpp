@@ -157,6 +157,15 @@ void Cellular::Start() {
     }
     ESP_LOGI(tag, "Operator: %s", msOperator.c_str());
 
+    Command("AT+CROAMING", "OK", &response,  "Roaming State 0=home, 1=intl, 2=other"); // +CROAMING: 2
+    if (response.startsWith("+CROAMING: 0")) {
+        ESP_LOGI(tag, "No roaming.");
+    } else if (response.startsWith("+CROAMING: 1")) {
+        ESP_LOGW(tag, "International roaming.");
+    } else if (response.startsWith("+CROAMING: 2")) {
+        ESP_LOGI(tag, "Roaming into network %s", msOperator.c_str());
+    } 
+
     Command("AT+CSQ", "OK", &response,  "Signal Quality Report"); // +CSQ: 13,0
     ESP_LOGI(tag, "Signal Quality: %s", response.substring(6).c_str());
     Command("AT+CNUM", "OK", &response,  "Subscriber Number"); // +CNUM: "","+43681207*****",145,0,4
@@ -173,8 +182,8 @@ void Cellular::ReceiverTask() {
     while(true) {
         // do nothing in command mode
         if (mbCommandMode) {
-            vTaskDelay(5000/portTICK_PERIOD_MS);
-            ESP_LOGI(tag, "ReceiverTask() idle in command mode");
+            vTaskDelay(1000/portTICK_PERIOD_MS);
+            //ESP_LOGD(tag, "ReceiverTask() idle in command mode");
             continue;
         }
 
@@ -375,9 +384,9 @@ bool Cellular::ReadIntoBuffer() {
                         return false;
                     }
                     muiBufferLen = len;
-                    muiReceivedTotal += len;
 
                     if(!mbCommandMode) {
+                        muiReceivedTotal += len;
                         ESP_LOGD(tag, "<<<<<<< RECEIVED %d bytes <<<<<<<", len);
                         ESP_LOG_BUFFER_HEXDUMP(tag, mpBuffer, len, ESP_LOG_DEBUG);
                     }
@@ -404,7 +413,8 @@ bool Cellular::ReadIntoBuffer() {
             case UART_BREAK:
                 if (event.timeout_flag && event.size == 0) {
                     mbCommandMode = true;
-                    //uart_flush_input(muiUartNo);
+                } else {
+                    uart_flush_input(muiUartNo);
                 }
                 ESP_LOGD(tag, "uart rx break");
                 break;
@@ -609,11 +619,11 @@ bool Cellular::Command(const char* sCommand, const char *sSuccess, String *spRes
     }
     if (ModemWriteLine(sCommand)) {
         if (ModemReadResponse(*spResponse, sSuccess, maxLines)) {
-            ESP_LOGD(tag, "Command(%s) %s\r\n===>%s<===", sCommand, sInfo ? sInfo : "", spResponse->c_str());
+            ESP_LOGD(tag, "%s --> Command(%s):\r\n%s", sCommand, sInfo ? sInfo : "", spResponse->c_str());
             return true;
         }
     }
-    ESP_LOGE(tag, "Command(%s)=?%s %s\r\n===>%s<===", sCommand, sSuccess, sInfo ? sInfo : "", spResponse->c_str());
+    ESP_LOGE(tag, "%s --> Command(%s)=?%s:\r\n%s", sCommand, sSuccess, sInfo ? sInfo : "", spResponse->c_str());
     return false;
 }
 

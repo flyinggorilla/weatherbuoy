@@ -189,28 +189,15 @@ void TestATCommands(Cellular &cellular) {
     cellular.Command("AT+CGMI", "OK", nullptr,  "Request Manufacturer Identification"); // SIMCOM_Ltd
     cellular.Command("AT+GMI", "OK", nullptr,  "Request Manufacturer Identification"); // SIMCOM_Ltd
     cellular.Command("AT+CIMI", "OK", nullptr,  "Request international mobile subscriber identity"); // 23212200*******
+    cellular.Command("AT+CROAMING", "OK", nullptr,  "Roaming State 0=home, 1=intl, 2=other"); // +CROAMING: 2
     cellular.Command("AT+CSQ", "OK", nullptr,  "Signal Quality Report"); // +CSQ: 13,0
     cellular.Command("AT+CNUM", "OK", nullptr,  "Subscriber Number"); // +CNUM: "","+43681207*****",145,0,4
     cellular.Command("AT+CBC", "OK", nullptr,  "Battery Charge"); // +CBC: 0,80,4043
     cellular.Command("AT+GSN", "OK", nullptr,  "Request TA Serial Number Identification (IMEI)"); // 8673720588*****
     cellular.Command("AT+GCAP", "OK", nullptr,  "Request Complete TA Capabilities List"); // +GCAP: +CGSM
-    cellular.Command("AT&V", "OK", nullptr,  "Display Current Configuration", 5000); // DEFAULT PROFILE ..... lots of stuff
-    // cellular.Command("ATO", "OK", nullptr,  "Switch from Command Mode to Data Mode (return to Online data state)", 100);
-    cellular.Command("AT+CEER", "OK", nullptr,  "Request Extended Error Report", 1000); // +CEER: No Cause
-    cellular.Command("AT+CGDCONT=1,\"IP\",\"webapn.at\"", "OK", nullptr,  "Define PDP Context"); // OK
     cellular.Command("AT+CSTT?", "OK", nullptr,  "Query APN and login info"); // +CSTT: "CMNET","",""
     cellular.Command("AT+COPS?", "OK", nullptr,  "Operator Selection"); // +COPS: 0,0,"A1"
     cellular.Command("AT+CGATT=?", "OK", nullptr,  "Attach or Detach from GPRS Service "); // +CGATT: (0,1)
-    cellular.Command("AT+CGATT=1", "OK", nullptr,  "Attach or Detach from GPRS Service "); 
-    cellular.Command("AT+CSTT: \"webapn.at\",\"\",\"\"", "OK", nullptr,  "Set APN");
-    cellular.Command("AT+CSTT: \"webapn.at\"", "OK", nullptr,  "Set APN");
-    cellular.Command("AT+CROAMING", "OK", nullptr,  "Roaming State 0=home, 1=intl, 2=other"); // +CROAMING: 2
-    cellular.Command("AT+CGATT?", "OK", nullptr,  "Check if the MS is connected to the GPRS network. 0=disconnected"); // +CGATT: 0
-    cellular.Command("AT+CGATT=l", "OK", nullptr,  "Register with GPRS network."); // 
-    cellular.Command("AT+CGATT?", "OK", nullptr,  "Check if the MS is connected to the GPRS network. 0=disconnected"); // +CGATT: 0
-    cellular.Command("AT+CREG=?", "OK", nullptr,  "List of Network Registration Information States"); // +CREG: (0-2)
-    cellular.Command("AT+CREG=1", "OK", nullptr,  "Register on home network");  // OK
-    cellular.Command("AT+CGATT=?", "OK", nullptr,  "Attach/Detach to GPRS. List of supported states"); // +CGATT: (0,1)
 
     #define RUNCOMMAND_READ_SMS true
     if (RUNCOMMAND_READ_SMS) {
@@ -227,8 +214,21 @@ void TestATCommands(Cellular &cellular) {
                     // Wollen Sie nicht Teil dieser G
                     // +CMGL: 5,"REC READ","+436640000000","","21/03/18,15:31:19+04"
                     // bernds test message '
-        ESP_LOGW(tag, "SMS '%s'", response.c_str());
+        ESP_LOGI(tag, "SMS '%s'", response.c_str());
     }
 
+    // cellular.Command("AT&V", "OK", nullptr,  "Display Current Configuration", 5000); // DEFAULT PROFILE ..... lots of stuff
+    // cellular.Command("ATO", "OK", nullptr,  "Switch from Command Mode to Data Mode (return to Online data state)", 100);
+    // cellular.Command("AT+CEER", "OK", nullptr,  "Request Extended Error Report", 1000); // +CEER: No Cause
+    // cellular.Command("AT+CGDCONT=1,\"IP\",\"webapn.at\"", "OK", nullptr,  "Define PDP Context"); // OK
+    // cellular.Command("AT+CGATT=1", "OK", nullptr,  "Attach or Detach from GPRS Service "); 
+    // cellular.Command("AT+CSTT: \"webapn.at\",\"\",\"\"", "OK", nullptr,  "Set APN");
+    // cellular.Command("AT+CSTT: \"webapn.at\"", "OK", nullptr,  "Set APN");
+    // cellular.Command("AT+CGATT?", "OK", nullptr,  "Check if the MS is connected to the GPRS network. 0=disconnected"); // +CGATT: 0
+    // cellular.Command("AT+CGATT=l", "OK", nullptr,  "Register with GPRS network."); // 
+    // cellular.Command("AT+CGATT?", "OK", nullptr,  "Check if the MS is connected to the GPRS network. 0=disconnected"); // +CGATT: 0
+    // cellular.Command("AT+CREG=?", "OK", nullptr,  "List of Network Registration Information States"); // +CREG: (0-2)
+    // cellular.Command("AT+CREG=1", "OK", nullptr,  "Register on home network");  // OK
+    // cellular.Command("AT+CGATT=?", "OK", nullptr,  "Attach/Detach to GPRS. List of supported states"); // +CGATT: (0,1)
 
 }
