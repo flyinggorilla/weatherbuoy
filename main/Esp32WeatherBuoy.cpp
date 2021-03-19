@@ -61,6 +61,7 @@ void Esp32WeatherBuoy::Wifi() {
     TestHttp();
 }
 
+void TestATCommands(Cellular &cellular);
 
 void Esp32WeatherBuoy::Start() {
 
@@ -81,89 +82,23 @@ void Esp32WeatherBuoy::Start() {
     cellular.InitNetwork();
     cellular.Start();
 
-  //  cellular.SwitchToPppMode();
 
-    String response;
-
-    cellular.Command("AT", "OK", &response, "ATtention"); // OK
-    //cellular.SwitchToCommandMode();
-    cellular.Command("AT+CPIN?", "OK", &response, "Is a PIN needed?"); // +CPIN: READY
-
-
-
-
-   /* //cellular.Command("ATI", "Display Product Identification Information");
-    //cellular.Command("AT+CGMM", "Model Identification");
-    cellular.Command("AT+GMM", "Request TA Model Identification");
-    cellular.Command("AT+CGSN", "Product Serial Number Identification (IMEI)");
-    cellular.Command("AT+CREG?", "Network Registration Information States *****************************");
-    //cellular.Command("AT+CGMR", "Request TA Revision Identification of Software Release");
-    //cellular.Command("AT+GMR", "Request TA Revision Identification of Software Release");
-    //cellular.Command("AT+CGMI", "Request Manufacturer Identification");
-    //cellular.Command("AT+GMI", "Request Manufacturer Identification");
-    cellular.Command("AT+CIMI", "Request international mobile subscriber identity");
-    cellular.Command("AT+CSQ", "Signal Quality Report");
-    cellular.Command("AT+CNUM", "Subscriber Number");
-    cellular.Command("AT+CBC", "Battery Charge");
-    cellular.Command("AT+GSN", "Request TA Serial Number Identification (IMEI)");
-    //cellular.Command("AT+GCAP", "Request Complete TA Capabilities List");
-    //cellular.Command("AT&V", "Display Current Configuration", 5000);
-    //cellular.Command("ATO", "Switch from Command Mode to Data Mode (return to Online data state)", 100);
-    cellular.Command("AT+CEER", "Request Extended Error Report", 1000);
-    String command;
-    //command.printf("AT+CSTT: \"%s\",\"%s\",\"%s\"", CONFIG_WEATHERBUOY_CELLULAR_APN, CONFIG_WEATHERBUOY_CELLULAR_USER, CONFIG_WEATHERBUOY_CELLULAR_PASS);
-    //command.printf("AT+CSTT: \"%s\"", CONFIG_WEATHERBUOY_CELLULAR_APN);
-    //cellular.Command(command.c_str(), "Start Task and Set APN, USER NAME, PASSWORD", 1000);
-    cellular.Command("AT+CGDCONT=1,\"IP\",\"webapn.at\"", "Define PDP Context");
-    cellular.Command("AT+CSTT?", "Query APN and login info");
-    cellular.Command("AT+COPS?", "Operator Selection");
-    cellular.Command("AT+CGATT=?", "Attach or Detach from GPRS Service ");
-    cellular.Command("AT+CGATT=1", "Attach or Detach from GPRS Service ");
-    cellular.Command("AT+CSTT: \"webapn.at\",\"\",\"\"", "Set APN");
-    cellular.Command("AT+CSTT: \"webapn.at\"", "Set APN");
-    cellular.Command("AT+CROAMING", "Roaming State 0=home, 1=intl, 2=other");*/
-
-    // +CSTT: "movistar.bluevia.es","",""
-
-//    cellular.Command("AT+CGATT?", "Check if the MS is connected to the GPRS network. 0=disconnected"); // +CGATT: 0
-//    cellular.Command("AT+CGATT=l", "Register with GPRS network."); // 
-//    cellular.Command("AT+CGATT?", "Check if the MS is connected to the GPRS network. 0=disconnected"); // +CGATT: 0
-//    cellular.Command("AT+CREG=?", "List of Network Registration Information States"); // +CREG: (0-2)
-//    cellular.Command("AT+CREG=1", "Register on home network");  // OK
-//    cellular.Command("AT+CGATT=?", "Attach/Detach to GPRS. List of supported states"); // +CGATT: (0,1)
-
-    while (true) {
-        if (cellular.Command("AT+CREG?", "OK", &response, "Network Registration Information States ")) { // +CREG: 0,2 // +CREG: 1,5
-            if (response.indexOf("+CREG: ") >= 0 && response.indexOf(",5") >= 0)
-                break;
-        }
-        vTaskDelay(2000/portTICK_PERIOD_MS);
-    }
-
-    #define RUNCOMMAND_READ_SMS false
-    if (RUNCOMMAND_READ_SMS) {
-        cellular.Command("AT+CMGF=1", "OK", nullptr, "If the modem reponds with OK this SMS mode is supported"); 
-        cellular.Command("AT+CMGL=\"ALL\"", "OK", &response, "dump all SMS", 1000); //
-                    //     W (17440) WeatherBuoy: SMS '+CMGL: 1,"REC READ","810820","","21/03/18,14:15:32+04"
-                    // Lieber yesss! Kunde, jetzt den aktuellen Stand Ihrer Freieinheiten per SMS abfragen! Einfach mit dem Text: "Info" antworten. Weitere Infos unter www.yess
-                    // +CMGL: 2,"REC READ","810820","","21/03/18,14:15:32+04"
-                    // s.at. Ihr yesss! Team
-                    // +CMGL: 3,"REC READ","810810","","21/03/18,15:25:44+04"
-                    // ruppe werden, k�nnen Sie diese SMS einfach ignorieren. Ihr yesss! Team
-                    // +CMGL: 4,"REC READ","810810","","21/03/18,15:25:44+04"
-                    // Lieber yesss! Kunde, die Rufnummer 436818******* m�chte Sie zu einer Gruppe hinzuf�gen. Der Aktivierungscode lautet: xxxxx
-                    // Wollen Sie nicht Teil dieser G
-                    // +CMGL: 5,"REC READ","+436640000000","","21/03/18,15:31:19+04"
-                    // bernds test message '
-        ESP_LOGW(tag, "SMS '%s'", response.c_str());
-    }
+    ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", cellular.getDataSent(), cellular.getDataReceived());
 
     cellular.SwitchToPppMode();
+    ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", cellular.getDataSent(), cellular.getDataReceived());
   
     TestHttp();
 
+    ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", cellular.getDataSent(), cellular.getDataReceived());
 
     ESP_LOGI(tag, "Free memory: %d", esp_get_free_heap_size());
+
+    cellular.SwitchToCommandMode();
+
+    ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", cellular.getDataSent(), cellular.getDataReceived());
+
+    TestATCommands(cellular);
 
     while (true) {
         vTaskDelay(mConfig.miSendDataIntervalHealth*1000 / portTICK_PERIOD_MS);
@@ -194,7 +129,7 @@ void Esp32WeatherBuoy::Start() {
 
 
 void Esp32WeatherBuoy::TestHttp() {
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 5; i++) {
 //        cellular.Command("AT+CGDCONT=1,\"IP\",\"webapn.at\"", "Define PDP Context");
         //cellular.Command("ATD*99#", "setup data connection");
 
@@ -203,10 +138,10 @@ void Esp32WeatherBuoy::TestHttp() {
 
 
         esp_http_client_config_t httpConfig = {0};
-        //httpConfig.url = "http://ptsv2.com/t/wb/post?testSepperl";
+        httpConfig.url = "http://ptsv2.com/t/wb/post?testWeatherbuoy";
         //httpConfig.url = "http://216.239.32.21/t/wb/post?test1";
-        httpConfig.url = "http://scooterlabs.com/echo";
-        httpConfig.url = "http://66.39.74.7/echo";
+        //httpConfig.url = "http://scooterlabs.com/echo";
+        //httpConfig.url = "http://66.39.74.7/echo";
         
         httpConfig.method = HTTP_METHOD_GET; 
         esp_http_client_handle_t httpClient = esp_http_client_init(&httpConfig);
@@ -235,8 +170,65 @@ void Esp32WeatherBuoy::TestHttp() {
         int iHttpStatusCode = esp_http_client_get_status_code(httpClient);
         if ((iHttpStatusCode >= 200) && (iHttpStatusCode < 400)) {
             ESP_LOGI(tag, "HTTP response OK. Status %d, Content-Length %d", iHttpStatusCode , iContentLength);
+            return;
         } else {
             ESP_LOGE(tag, "HTTP response was not OK with status %d", iHttpStatusCode);
         }
     }
+}
+
+void TestATCommands(Cellular &cellular) {
+    String response;
+    cellular.Command("ATI", "OK", nullptr, "Display Product Identification Information"); // SIM800 R14.18
+    cellular.Command("AT+CGMM", "OK", nullptr,  "Model Identification"); // SIMCOM_SIM800L
+    cellular.Command("AT+GMM", "OK", nullptr,  "Request TA Model Identification"); // SIMCOM_SIM800L
+    cellular.Command("AT+CGSN", "OK", nullptr,  "Product Serial Number Identification (IMEI)"); // 8673720588*****
+    cellular.Command("AT+CREG?", "OK", nullptr,  "Network Registration Information States"); // +CREG: 0,5
+    cellular.Command("AT+CGMR", "OK", nullptr,  "Request TA Revision Identification of Software Release"); // Revision:1418B05SIM800L24
+    cellular.Command("AT+GMR", "OK", nullptr,  "Request TA Revision Identification of Software Release"); // Revision:1418B05SIM800L24
+    cellular.Command("AT+CGMI", "OK", nullptr,  "Request Manufacturer Identification"); // SIMCOM_Ltd
+    cellular.Command("AT+GMI", "OK", nullptr,  "Request Manufacturer Identification"); // SIMCOM_Ltd
+    cellular.Command("AT+CIMI", "OK", nullptr,  "Request international mobile subscriber identity"); // 23212200*******
+    cellular.Command("AT+CSQ", "OK", nullptr,  "Signal Quality Report"); // +CSQ: 13,0
+    cellular.Command("AT+CNUM", "OK", nullptr,  "Subscriber Number"); // +CNUM: "","+43681207*****",145,0,4
+    cellular.Command("AT+CBC", "OK", nullptr,  "Battery Charge"); // +CBC: 0,80,4043
+    cellular.Command("AT+GSN", "OK", nullptr,  "Request TA Serial Number Identification (IMEI)"); // 8673720588*****
+    cellular.Command("AT+GCAP", "OK", nullptr,  "Request Complete TA Capabilities List"); // +GCAP: +CGSM
+    cellular.Command("AT&V", "OK", nullptr,  "Display Current Configuration", 5000); // DEFAULT PROFILE ..... lots of stuff
+    // cellular.Command("ATO", "OK", nullptr,  "Switch from Command Mode to Data Mode (return to Online data state)", 100);
+    cellular.Command("AT+CEER", "OK", nullptr,  "Request Extended Error Report", 1000); // +CEER: No Cause
+    cellular.Command("AT+CGDCONT=1,\"IP\",\"webapn.at\"", "OK", nullptr,  "Define PDP Context"); // OK
+    cellular.Command("AT+CSTT?", "OK", nullptr,  "Query APN and login info"); // +CSTT: "CMNET","",""
+    cellular.Command("AT+COPS?", "OK", nullptr,  "Operator Selection"); // +COPS: 0,0,"A1"
+    cellular.Command("AT+CGATT=?", "OK", nullptr,  "Attach or Detach from GPRS Service "); // +CGATT: (0,1)
+    cellular.Command("AT+CGATT=1", "OK", nullptr,  "Attach or Detach from GPRS Service "); 
+    cellular.Command("AT+CSTT: \"webapn.at\",\"\",\"\"", "OK", nullptr,  "Set APN");
+    cellular.Command("AT+CSTT: \"webapn.at\"", "OK", nullptr,  "Set APN");
+    cellular.Command("AT+CROAMING", "OK", nullptr,  "Roaming State 0=home, 1=intl, 2=other"); // +CROAMING: 2
+    cellular.Command("AT+CGATT?", "OK", nullptr,  "Check if the MS is connected to the GPRS network. 0=disconnected"); // +CGATT: 0
+    cellular.Command("AT+CGATT=l", "OK", nullptr,  "Register with GPRS network."); // 
+    cellular.Command("AT+CGATT?", "OK", nullptr,  "Check if the MS is connected to the GPRS network. 0=disconnected"); // +CGATT: 0
+    cellular.Command("AT+CREG=?", "OK", nullptr,  "List of Network Registration Information States"); // +CREG: (0-2)
+    cellular.Command("AT+CREG=1", "OK", nullptr,  "Register on home network");  // OK
+    cellular.Command("AT+CGATT=?", "OK", nullptr,  "Attach/Detach to GPRS. List of supported states"); // +CGATT: (0,1)
+
+    #define RUNCOMMAND_READ_SMS true
+    if (RUNCOMMAND_READ_SMS) {
+        cellular.Command("AT+CMGF=1", "OK", nullptr, "If the modem reponds with OK this SMS mode is supported"); 
+        cellular.Command("AT+CMGL=\"ALL\"", "OK", &response, "dump all SMS", 1000); //
+                    //     W (17440) WeatherBuoy: SMS '+CMGL: 1,"REC READ","810820","","21/03/18,14:15:32+04"
+                    // Lieber yesss! Kunde, jetzt den aktuellen Stand Ihrer Freieinheiten per SMS abfragen! Einfach mit dem Text: "Info" antworten. Weitere Infos unter www.yess
+                    // +CMGL: 2,"REC READ","810820","","21/03/18,14:15:32+04"
+                    // s.at. Ihr yesss! Team
+                    // +CMGL: 3,"REC READ","810810","","21/03/18,15:25:44+04"
+                    // ruppe werden, k�nnen Sie diese SMS einfach ignorieren. Ihr yesss! Team
+                    // +CMGL: 4,"REC READ","810810","","21/03/18,15:25:44+04"
+                    // Lieber yesss! Kunde, die Rufnummer 436818******* m�chte Sie zu einer Gruppe hinzuf�gen. Der Aktivierungscode lautet: xxxxx
+                    // Wollen Sie nicht Teil dieser G
+                    // +CMGL: 5,"REC READ","+436640000000","","21/03/18,15:31:19+04"
+                    // bernds test message '
+        ESP_LOGW(tag, "SMS '%s'", response.c_str());
+    }
+
+
 }

@@ -29,6 +29,13 @@ public:
     bool SwitchToCommandMode(); // todo, move to private
     bool SwitchToPppMode(); // can be moved to private
 
+    unsigned long getDataSent() { return muiSentTotal; };
+    unsigned long getDataReceived() { return muiReceivedTotal; };
+
+    String msOperator;
+    String msHardware;
+    String msSubscriber;
+
 private:
     friend esp_err_t esp_cellular_post_attach_start(esp_netif_t * esp_netif, void * args);
 
@@ -54,6 +61,13 @@ private:
     unsigned int muiBufferSize;
     unsigned int muiBufferPos;
     unsigned int muiBufferLen;
+
+    volatile unsigned long muiSentTotal = 0;
+    volatile unsigned long muiReceivedTotal = 0;
+    // is volatile good enough? doesnt guarantee atomicity, but only prevents compiler over-optimizations
+    //std::atomic_ulong muiSentTotal = 0;
+    //std::atomic_ulong muiReceivedTotal = 0;
+
 
     unsigned int muiUartNo;
     QueueHandle_t mhUartEventQueueHandle = nullptr;

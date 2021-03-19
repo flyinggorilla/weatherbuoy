@@ -20,7 +20,6 @@ static const char tag[] = "Cellular";
 
 void cellularEventHandler(void* ctx, esp_event_base_t base, int32_t id, void* event_data)
 {
-    ESP_LOGI("CELLULAREVENTHANDLER", "%d,%d", (int)base, id);
 	return ((Cellular *)ctx)->OnEvent(base, id, event_data);
 }
 
@@ -131,6 +130,41 @@ void fReceiverTask(void *pvParameter) {
 
 void Cellular::Start() {
 	xTaskCreate(&fReceiverTask, "ModemReceiver", 8192, this, ESP_TASK_MAIN_PRIO, NULL);
+
+    String response;
+    if (!Command("AT", "OK", nullptr, "ATtention")) {
+        ESP_LOGE(tag, "Severe problem, no connection to Modem");
+    };
+    Command("ATI", "OK", &msHardware, "Display Product Identification Information"); // SIM800 R14.18
+    Command("AT+CPIN?", "OK", &response, "Is a PIN needed?"); // +CPIN: READY
+    if(!response.startsWith("+CPIN: READY")) {
+        ESP_LOGE(tag, "Error, PIN required: %s", response.c_str());
+    }
+
+    int maxWaitForNetworkRegistration = 60;
+    while (maxWaitForNetworkRegistration--) {
+        if (Command("AT+CREG?", "OK", &response, "Network Registration Information States ")) { // +CREG: 0,2 // +CREG: 1,5
+            if (response.indexOf("+CREG: ") >= 0 && response.indexOf(",5") >= 0)
+                break;
+        }
+        vTaskDelay(1000/portTICK_PERIOD_MS);
+    }
+
+    Command("AT+COPS?", "OK", &response,  "Operator Selection"); // +COPS: 0,0,"A1"
+    msOperator = "";
+    if (response.startsWith("+COPS: ")) {
+        msOperator = response.substring(response.indexOf(",\"")+2, response.lastIndexOf("\""));
+    }
+    ESP_LOGI(tag, "Operator: %s", msOperator.c_str());
+
+    Command("AT+CSQ", "OK", &response,  "Signal Quality Report"); // +CSQ: 13,0
+    ESP_LOGI(tag, "Signal Quality: %s", response.substring(6).c_str());
+    Command("AT+CNUM", "OK", &response,  "Subscriber Number"); // +CNUM: "","+43681207*****",145,0,4
+    msSubscriber = "";
+    if (response.startsWith("+CNUM: ")) {
+        msSubscriber = response.substring(response.indexOf(",\"")+2, response.lastIndexOf("\","));
+    }
+    ESP_LOGI(tag, "Subscriber: %s", msSubscriber.c_str());
 } 
 
 void Cellular::ReceiverTask() {
@@ -148,7 +182,7 @@ void Cellular::ReceiverTask() {
         bool read = ReadIntoBuffer();
         if (read) {
             esp_netif_receive(mModemNetifDriver.base.netif, mpBuffer, muiBufferLen, NULL);
-            ESP_LOGI(tag, "ReceiverTask() received %d bytes", muiBufferLen);
+            //ESP_LOGD(tag, "ReceiverTask() received %d bytes", muiBufferLen);
         } else {
             ESP_LOGE(tag, "ReceiverTask() ReadIntoBuffer return false");
         }
@@ -165,7 +199,7 @@ void Cellular::InitNetwork() {
     ESP_ERROR_CHECK(esp_event_handler_instance_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, cellularEventHandler, this, nullptr));		
 
 //################################### likely irrelevant
- ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_PPP_GOT_IP, cellularEventHandler, this, nullptr));
+ //ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_PPP_GOT_IP, cellularEventHandler, this, nullptr));
 
 
     // Init netif object
@@ -188,7 +222,7 @@ void Cellular::InitNetwork() {
 void Cellular::OnEvent(esp_event_base_t base, int32_t id, void* event_data)
 {
 
-    ESP_LOGI(tag, "Cellular::OnEvent(base=%d, id=%d)", (int)base, (int)id);
+    //ESP_LOGI(tag, "Cellular::OnEvent(base=%d, id=%d)", (int)base, (int)id);
 
     if (base == IP_EVENT) {
         ESP_LOGI(tag, "IP event! %d", id);
@@ -221,7 +255,102 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void* event_data)
 
             ip_event_got_ip6_t *event = (ip_event_got_ip6_t *)event_data;
             ESP_LOGI(tag, "Got IPv6 address " IPV6STR, IPV62STR(event->ip6_info.ip));
-        }        
+        } else {
+            ESP_LOGW(tag, "Unknown IP_EVENT! id=%d", id);
+        }
+    } else if (base == NETIF_PPP_STATUS) {
+        const char  *status;
+        switch (id) {
+            case NETIF_PPP_ERRORNONE: 
+                status = "No error.";
+                break;
+            case NETIF_PPP_ERRORPARAM: 
+                status = "Invalid parameter.";
+                break;
+            case NETIF_PPP_ERROROPEN: 
+                status = "Unable to open PPP session.";
+                break;
+            case NETIF_PPP_ERRORDEVICE: 
+                status = "Invalid I/O device for PPP.";
+                break;
+            case NETIF_PPP_ERRORALLOC: 
+                status = "Unable to allocate resources.";
+                break;
+            case NETIF_PPP_ERRORUSER: 
+                status = "User interrupt.";
+                break;
+            case NETIF_PPP_ERRORCONNECT: 
+                status = "Connection lost.";
+                break;
+            case NETIF_PPP_ERRORAUTHFAIL: 
+                status = "Failed authentication challenge.";
+                break;
+            case NETIF_PPP_ERRORPROTOCOL: 
+                status = "Failed to meet protocol.";
+                break;
+            case NETIF_PPP_ERRORPEERDEAD: 
+                status = "Connection timeout";
+                break;
+            case NETIF_PPP_ERRORIDLETIMEOUT: 
+                status = "Idle Timeout";
+                break;
+            case NETIF_PPP_ERRORCONNECTTIME: 
+                status = "Max connect time reached";
+                break;
+            case NETIF_PPP_ERRORLOOPBACK: 
+                status = "Loopback detected";
+                break;
+            case NETIF_PPP_PHASE_DEAD: 
+                status = "NETIF_PPP_PHASE_DEAD";
+                break;
+            case NETIF_PPP_PHASE_MASTER: 
+                status = "NETIF_PPP_PHASE_MASTER";
+                break;
+            case NETIF_PPP_PHASE_HOLDOFF: 
+                status = "NETIF_PPP_PHASE_HOLDOFF";
+                break;
+            case NETIF_PPP_PHASE_INITIALIZE: 
+                status = "NETIF_PPP_PHASE_INITIALIZE";
+                break;
+            case NETIF_PPP_PHASE_SERIALCONN: 
+                status = "NETIF_PPP_PHASE_SERIALCONN";
+                break;
+            case NETIF_PPP_PHASE_DORMANT: 
+                status = "NETIF_PPP_PHASE_DORMANT";
+                break;
+            case NETIF_PPP_PHASE_ESTABLISH: 
+                status = "NETIF_PPP_PHASE_ESTABLISH";
+                break;
+            case NETIF_PPP_PHASE_AUTHENTICATE: 
+                status = "NETIF_PPP_PHASE_AUTHENTICATE";
+                break;
+            case NETIF_PPP_PHASE_CALLBACK: 
+                status = "NETIF_PPP_PHASE_CALLBACK";
+                break;
+            case NETIF_PPP_PHASE_NETWORK: 
+                status = "NETIF_PPP_PHASE_NETWORK";
+                break;
+            case NETIF_PPP_PHASE_RUNNING: 
+                status = "NETIF_PPP_PHASE_RUNNING";
+                break;
+            case NETIF_PPP_PHASE_TERMINATE: 
+                status = "NETIF_PPP_PHASE_TERMINATE";
+                break;
+            case NETIF_PPP_PHASE_DISCONNECT: 
+                status = "NETIF_PPP_PHASE_DISCONNECT";
+                break;
+            default:
+                ESP_LOGW(tag, "Unknown Netif PPP event! id=%d", id);
+                status = "UNKOWN";
+         }
+
+        if (id > NETIF_PPP_ERRORNONE && id < NETIF_PP_PHASE_OFFSET) {
+            ESP_LOGE(tag, "Netif PPP Status Error: %s", status);
+        } else {
+            ESP_LOGD(tag, "Netif PPP Status: %s", status);
+        }
+    } else {
+        ESP_LOGW(tag, "Unknown event! base=%d, id=%d", (int)base, id);
     }
 
 }
@@ -229,7 +358,6 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void* event_data)
 bool Cellular::ReadIntoBuffer() {
     muiBufferPos = 0;
     muiBufferLen = 0;
-String buffer;  //####################################################################### REMOVE
     uart_event_t event;
     //Waiting for UART event.
     if(xQueueReceive(mhUartEventQueueHandle, (void * )&event, (portTickType)portMAX_DELAY)) {
@@ -241,30 +369,23 @@ String buffer;  //##############################################################
             case UART_DATA: {
                     int length = 0;
                     ESP_ERROR_CHECK(uart_get_buffered_data_len(muiUartNo, (size_t*)&length));        
-                    if(!mbCommandMode) {
-                       // ESP_LOGI(tag, "ReadIntoBuffer().get_buffered_data_len()=%d event=%d", length, event.size);
-                    }
-
                     int len = uart_read_bytes(muiUartNo, mpBuffer, muiBufferSize, 0); //100 / portTICK_RATE_MS); // wait 100ms to fill buffer
                     if (len < 0) {
                         ESP_LOGE(tag, "Error reading from serial interface #%d", muiUartNo);
                         return false;
                     }
                     muiBufferLen = len;
-//********LEARN**********
-//                    buffer.prepare(len);
-//                    memcpy((void*)buffer.c_str(), mpBuffer, len);
-//                    ESP_LOGI(tag, "ReadIntoBuffer() =>>%s<<==", buffer.c_str()); 
-//******************
+                    muiReceivedTotal += len;
+
                     if(!mbCommandMode) {
-                        //ESP_LOGI(tag, "ReadIntoBuffer() eventBytes=%d, actualBytes=%d", event.size, len);
-                        ESP_LOG_BUFFER_HEXDUMP(tag, mpBuffer, len, ESP_LOG_INFO);
+                        ESP_LOGD(tag, "<<<<<<< RECEIVED %d bytes <<<<<<<", len);
+                        ESP_LOG_BUFFER_HEXDUMP(tag, mpBuffer, len, ESP_LOG_DEBUG);
                     }
                     return true; 
                 }
             //Event of HW FIFO overflow detected
             case UART_FIFO_OVF:
-                ESP_LOGI(tag, "hw fifo overflow");
+                ESP_LOGE(tag, "hw fifo overflow");
                 // If fifo overflow happened, you should consider adding flow control for your application.
                 // The ISR has already reset the rx FIFO,
                 // As an example, we directly flush the rx buffer here in order to read more data.
@@ -273,7 +394,7 @@ String buffer;  //##############################################################
                 break;
             //Event of UART ring buffer full
             case UART_BUFFER_FULL:
-                ESP_LOGI(tag, "ring buffer full");
+                ESP_LOGE(tag, "ring buffer full");
                 // If buffer full happened, you should consider encreasing your buffer size
                 // As an example, we directly flush the rx buffer here in order to read more data.
                 uart_flush_input(muiUartNo);
@@ -281,38 +402,22 @@ String buffer;  //##############################################################
                 break;
             //Event of UART RX break detected
             case UART_BREAK:
-                if (event.timeout_flag && event.timeout_flag == 0) {
+                if (event.timeout_flag && event.size == 0) {
                     mbCommandMode = true;
-                    uart_flush_input(muiUartNo);
+                    //uart_flush_input(muiUartNo);
                 }
-                ESP_LOGI(tag, "uart rx break");
+                ESP_LOGD(tag, "uart rx break");
                 break;
             //Event of UART parity check error
             case UART_PARITY_ERR:
-                ESP_LOGI(tag, "uart parity error");
+                ESP_LOGE(tag, "uart parity error");
                 break;
             //Event of UART frame error
             case UART_FRAME_ERR:
-                ESP_LOGI(tag, "uart frame error");
+                ESP_LOGE(tag, "uart frame error");
                 break;
             //UART_PATTERN_DET
             case UART_PATTERN_DET:
-                /*uart_get_buffered_data_len(EX_UART_NUM, &buffered_size);
-                int pos = uart_pattern_pop_pos(EX_UART_NUM);
-                ESP_LOGI(tag, "[UART PATTERN DETECTED] pos: %d, buffered size: %d", pos, buffered_size);
-                if (pos == -1) {
-                    // There used to be a UART_PATTERN_DET event, but the pattern position queue is full so that it can not
-                    // record the position. We should set a larger queue size.
-                    // As an example, we directly flush the rx buffer here.
-                    uart_flush_input(EX_UART_NUM);
-                } else {
-                    uart_read_bytes(EX_UART_NUM, dtmp, pos, 100 / portTICK_PERIOD_MS);
-                    uint8_t pat[PATTERN_CHR_NUM + 1];
-                    memset(pat, 0, sizeof(pat));
-                    uart_read_bytes(EX_UART_NUM, pat, PATTERN_CHR_NUM, 100 / portTICK_PERIOD_MS);
-                    ESP_LOGI(tag, "read data: %s", dtmp);
-                    ESP_LOGI(tag, "read pat : %s", pat);
-                } */
                 break;
             //Others
             default:
@@ -325,11 +430,6 @@ String buffer;  //##############################################################
 }
 
 bool Cellular::SwitchToCommandMode() {
-        //dce->handle_line = sim800_handle_exit_data_mode;
-        //vTaskDelay(pdMS_TO_TICKS(1000)); // spec: 1s delay for the modem to recognize the escape sequence
-      //  mhUartEventQueueHandle
-
-
     uart_event_t uartSwitchToPppEvent = {
         .type = UART_BREAK,
         .size = 0,
@@ -342,6 +442,9 @@ bool Cellular::SwitchToCommandMode() {
 
         uart_flush(muiUartNo);
 
+        //esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
+        // esp_netif_action_disconnected
+
         // The +++ character sequence causes the TA to cancel the data flow over the 
         // AT interface and switch to Command mode. This allows you to enter AT 
         // Command while maintaining the data connection to the remote server. 
@@ -352,22 +455,24 @@ bool Cellular::SwitchToCommandMode() {
         // No characters entered for T1 timer (1 second) 
         // Switch to Command mode, otherwise go to step 1. 
         String write("+++");
-        vTaskDelay(1000/portTICK_PERIOD_MS);
+        vTaskDelay(1000/portTICK_PERIOD_MS); // spec: 1s delay for the modem to recognize the escape sequence
         int iWriteLen = ModemWriteData(write.c_str(), write.length());
         vTaskDelay(1000/portTICK_PERIOD_MS);
+        vTaskDelay(1000/portTICK_PERIOD_MS);
         if (iWriteLen == write.length()) {
-            ESP_LOGI(tag, "SwitchToCommandMode(): '%s'", write.c_str());
-            return true;
+            ESP_LOGD(tag, "SwitchToCommandMode(%s):", write.c_str());
+            //uart_flush(muiUartNo);
         } else {
-            ESP_LOGE(tag, "Error SwitchToCommandMode(): '%s'", write.c_str());
+            ESP_LOGE(tag, "Error SwitchToCommandMode(%s): ", write.c_str());
             return false;
         }
-        vTaskDelay(1000/portTICK_PERIOD_MS);
         String response;
         if (ModemReadResponse(response, "OK", 5)) {
             ESP_LOGI(tag, "Switched to command mode.");
             return true;
         } 
+
+// 
 
     }
 
@@ -410,57 +515,6 @@ bool Cellular::SwitchToPppMode() {
     return false;
 }
 
-/*
-static esp_err_t sim800_set_working_mode(modem_dce_t *dce, modem_mode_t mode)
-{
-    modem_dte_t *dte = dce->dte;
-    switch (mode) {
-    case MODEM_COMMAND_MODE:
-    case MODEM_PPP_MODE:
-        dce->handle_line = sim800_handle_atd_ppp;
-        DCE_CHECK(dte->send_cmd(dte, "ATD*99#\r", MODEM_COMMAND_TIMEOUT_MODE_CHANGE) == ESP_OK, "send command failed", err);
-            if (dce->state != MODEM_STATE_SUCCESS) {
-                // Initiate PPP mode could fail, if we've already "dialed" the data call before.
-                // in that case we retry with "ATO" to just resume the data mode
-                ESP_LOGD(DCE_TAG, "enter ppp mode failed, retry with ATO");
-                dce->handle_line = sim800_handle_atd_ppp;
-                DCE_CHECK(dte->send_cmd(dte, "ATO\r", MODEM_COMMAND_TIMEOUT_MODE_CHANGE) == ESP_OK, "send command failed", err);
-                DCE_CHECK(dce->state == MODEM_STATE_SUCCESS, "enter ppp mode failed", err);
-            }
-        ESP_LOGD(DCE_TAG, "enter ppp mode ok");
-        dce->mode = MODEM_PPP_MODE;
-        break;
-    default:
-        ESP_LOGW(DCE_TAG, "unsupported working mode: %d", mode);
-        goto err;
-        break;
-    }
-    return ESP_OK;
-err:
-    return ESP_FAIL;
-} */
-
-
- 
-/*bool Modem::ReadIntoBufferOld() {
-    muiBufferPos = 0;
-    muiBufferLen = 0;
-    while (!muiBufferLen) {
-
-        int length = 0;
-        ESP_ERROR_CHECK(uart_get_buffered_data_len(muiUartNo, (size_t*)&length));        
-        ESP_LOGI(tag, "ReadIntoBuffer().get_buffered_data_len()=%d", length);
-
-        int len = uart_read_bytes(muiUartNo, mpBuffer, muiBufferSize, 0); //100 / portTICK_RATE_MS); // wait 100ms to fill buffer
-        if (len < 0) {
-            ESP_LOGE(tag, "Error reading from serial interface #%d", muiUartNo);
-            return false;
-        }
-        muiBufferLen = len;
-    }
-    return true;
-}*/
-
 bool Cellular::ModemReadLine(String& line) {
     line = "";
 
@@ -490,7 +544,10 @@ bool Cellular::ModemReadLine(String& line) {
 int Cellular::ModemWriteData(const char* data, int len) {
     int iWriteLen = uart_write_bytes(muiUartNo, data, len);
     if (iWriteLen == len) {
-        ESP_LOGI(tag, "ModemWriteData(): %d bytes", len);
+        ESP_LOGD(tag, ">>>>>>> SENT %d bytes >>>>>>>", len);
+        ESP_LOG_BUFFER_HEXDUMP(tag, data, len, ESP_LOG_DEBUG);
+        //ESP_LOGI(tag, "ModemWriteData(): %d bytes", len);
+        muiSentTotal += len;        
     } else {
         ESP_LOGE(tag, "Error ModemWriteData(): %d", len);
     }
@@ -545,16 +602,18 @@ bool Cellular::ModemReadResponse(String &sResponse, const char *expectedLastLine
 
 
 bool Cellular::Command(const char* sCommand, const char *sSuccess, String *spResponse, const char *sInfo, unsigned short maxLines) {
-    ESP_LOGI(tag, "Command(%s) %s", sCommand, sInfo);
+    // ESP_LOGI(tag, "Command(%s) %s", sCommand, sInfo);
     String response; 
     if (!spResponse) {
         spResponse = &response;
     }
     if (ModemWriteLine(sCommand)) {
         if (ModemReadResponse(*spResponse, sSuccess, maxLines)) {
+            ESP_LOGD(tag, "Command(%s) %s\r\n===>%s<===", sCommand, sInfo ? sInfo : "", spResponse->c_str());
             return true;
         }
     }
+    ESP_LOGE(tag, "Command(%s)=?%s %s\r\n===>%s<===", sCommand, sSuccess, sInfo ? sInfo : "", spResponse->c_str());
     return false;
 }
 
