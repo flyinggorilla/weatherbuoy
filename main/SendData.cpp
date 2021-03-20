@@ -139,7 +139,22 @@ void SendData::PerformHttpPost(const char *postData) {
             mPostData += "\r\n";
         }
         mPostData += "cellulardata: ";
-        mPostData += "TODO\r\n";
+        mPostData += mrCellular.getDataSent();
+        mPostData += ",";
+        mPostData += mrCellular.getDataReceived();
+        mPostData += "\r\n";
+        mPostData += "cellularstatus: ";
+        mPostData += mrCellular.msOperator;
+        mPostData += ",";
+        mPostData += mrCellular.msSubscriber;
+        mPostData += ",";
+        mPostData += mrCellular.msHardware;
+        mPostData += "\r\n";
+        mPostData += "battery: ";
+        mPostData += muiPowerVoltage;
+        mPostData += ",";
+        mPostData += muiPowerCurrent;
+        mPostData += "\r\n";
         mbSendDiagnostics = false;
     }
 
@@ -300,7 +315,7 @@ void SendData::EventHandler(int32_t id, void* event_data) {
 
 }
 
-SendData::SendData(Config &config) : mrConfig(config) {
+SendData::SendData(Config &config, Cellular &cellular) : mrConfig(config), mrCellular(cellular) {
     esp_event_loop_args_t loop_args = {
         .queue_size = SENDDATA_QUEUE_SIZE,
         .task_name = "SendData",
@@ -324,7 +339,9 @@ bool SendData::PostData(String &data) {
     return false;
 }
 
-bool SendData::PostHealth() {
+bool SendData::PostHealth(unsigned int powerVoltage, unsigned int powerCurrent) {
+    muiPowerVoltage = powerVoltage;
+    muiPowerCurrent = powerCurrent;
     if (ESP_OK == esp_event_post_to(mhLoopHandle, SENDDATA_EVENT_BASE, SENDDATA_EVENT_POSTHEALTH, (void*)"", 0, 1000 / portTICK_PERIOD_MS))
         return true;
   

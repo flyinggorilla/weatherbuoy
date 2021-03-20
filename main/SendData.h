@@ -5,20 +5,22 @@
 #include "EspString.h"
 #include "esp_http_client.h"
 #include "Config.h"
+#include "Cellular.h"
 
 class SendData {
 public:
-	SendData(Config &config);
+	SendData(Config &config, Cellular &cellular);
 	virtual ~SendData();
 	void EventHandler(int32_t id, void* event_data);
 
     // post string data to a message queue for sending. Data is copied into queue
     bool PostData(String &data);
-    bool PostHealth();
+    bool PostHealth(unsigned int powerVoltage, unsigned int powerCurrent);
 private:
     esp_event_loop_handle_t mhLoopHandle = nullptr;
     esp_event_handler_instance_t mhEventHandlerInstance = nullptr;
     Config &mrConfig;
+    Cellular &mrCellular;
 
 private: // esp http client
     #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
@@ -32,6 +34,11 @@ private: // esp http client
     void Cleanup();
     bool mbSendDiagnostics = false;
     bool mbOtaAppValidated = false;
+
+private: // health data
+    unsigned int muiPowerVoltage = 0;
+    unsigned int muiPowerCurrent = 0;
+
 };
 
 

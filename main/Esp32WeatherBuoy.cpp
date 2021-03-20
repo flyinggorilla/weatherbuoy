@@ -23,11 +23,7 @@
 
 static const char tag[] = "WeatherBuoy";
 
-Config config;
 Esp32WeatherBuoy esp32WeatherBuoy;
-Wifi wifi;
-Cellular cellular;
-
 
 Esp32WeatherBuoy::Esp32WeatherBuoy() {
 
@@ -46,11 +42,9 @@ void app_main() {
 }
 
 void TestHttp();
-void TestATCommands();
+void TestATCommands(Cellular &cellular);
 
 void Esp32WeatherBuoy::Start() {
-
-    Config config;
 
     ESP_LOGI(tag, "Atterwind WeatherBuoy starting!");
     if (!config.Load()) {
@@ -92,16 +86,16 @@ void Esp32WeatherBuoy::Start() {
     //TestATCommands();
     //TestHttp();
 
-    SendData sendData(config);
+    SendData sendData(config, cellular);
 
     ReadMaximet readMaximet(config, sendData);
     readMaximet.Start();
 
     while (true) {
-        if (!sendData.PostHealth()) {
+        if (!sendData.PostHealth(max471Meter.Voltage(), max471Meter.Current())) {
                 ESP_LOGE(tag, "Could not post data, likely due to a full queue");
         }
-        vTaskDelay(mConfig.miSendDataIntervalHealth*1000 / portTICK_PERIOD_MS);
+        vTaskDelay(config.miSendDataIntervalHealth*1000 / portTICK_PERIOD_MS);
     }  
 }
 
@@ -155,7 +149,7 @@ void TestHttp() {
     }
 }
 
-void TestATCommands() {
+void TestATCommands(Cellular &cellular) {
     ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", cellular.getDataSent(), cellular.getDataReceived());
     ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", cellular.getDataSent(), cellular.getDataReceived());
   
