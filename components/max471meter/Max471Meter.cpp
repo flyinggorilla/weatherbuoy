@@ -4,11 +4,7 @@
 #include "esp_system.h"
 #include "esp_log.h"
 
-    //example GPIO34 if ADC1, GPIO14 if ADC2
-
     // ADC1 = 32, 33, *34*, 36, 39
-    // ADC2 = 4, (dont 12), 13, *14*, 15, 25, (26), (27)
-
     // GPIO32 = ADC1_CH4
     // GPIO33 = ADC1_CH5
     // GPIO34 = ADC1_CH6
@@ -18,6 +14,7 @@
 
 
     // ADC2 CANNOT BE USED WHEN WIFI IS ACTIVATED!!
+    // ADC2 = 4, (dont 12), 13, *14*, 15, 25, (26), (27)
     // Since the ADC2 is shared with the WIFI module, which has higher priority, 
     // reading operation of adc2_get_raw() will fail between esp_wifi_start() and esp_wifi_stop(). 
     // Use the return code to see whether the reading is successful.
@@ -93,7 +90,7 @@ ADC::~ADC() {
 };
 
 
-Max471Meter::Max471Meter() : mVoltage{(gpio_num_t)CONFIG_MAX471METER_GPIO_VOLTAGE}, mCurrent{(gpio_num_t)CONFIG_MAX471METER_GPIO_CURRENT} {
+Max471Meter::Max471Meter(int gpioPinVoltage, int gpioPinCurrent) : mVoltage{(gpio_num_t)gpioPinVoltage}, mCurrent{(gpio_num_t)gpioPinCurrent} {
 
 }
 

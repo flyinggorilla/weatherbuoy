@@ -30,7 +30,7 @@ class ADC {
 
 class Max471Meter {
     public:
-        Max471Meter();
+        Max471Meter(int gpioPinVoltage, int gpioPinCurrent);
         virtual ~Max471Meter();
 
         unsigned int Voltage() { return mVoltage.Measure(); };

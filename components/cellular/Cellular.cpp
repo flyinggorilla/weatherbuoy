@@ -1,4 +1,4 @@
-//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 
 #include "Cellular.h"
 #include "EspString.h"
@@ -12,13 +12,22 @@
 
 
 static const char tag[] = "Cellular";
-
-// SIM800L
-#define CELLULAR_GPIO_PWKEY GPIO_NUM_4
-#define CELLULAR_GPIO_RST GPIO_NUM_5
-#define CELLULAR_GPIO_POWER GPIO_NUM_23
-#define CELLULAR_GPIO_TX GPIO_NUM_27
-#define CELLULAR_GPIO_RX GPIO_NUM_26
+#define LILYGO_TTGO_TPCIE true
+#ifdef LILYGO_TTGO_TCALL14
+    // LILYGO TTGO T-Call V1.4 SIM800 
+    #define CELLULAR_GPIO_PWKEY GPIO_NUM_4
+    #define CELLULAR_GPIO_RST GPIO_NUM_5
+    #define CELLULAR_GPIO_POWER GPIO_NUM_23 // Lilygo TTGO SIM800
+    #define CELLULAR_GPIO_TX GPIO_NUM_27
+    #define CELLULAR_GPIO_RX GPIO_NUM_26
+#elif LILYGO_TTGO_TPCIE
+    // LILYGO® TTGO T-PCIE SIM7600
+    #define CELLULAR_GPIO_PWKEY GPIO_NUM_4
+    //#define CELLULAR_GPIO_RST GPIO_NUM_5
+    #define CELLULAR_GPIO_POWER GPIO_NUM_25 // Lilygo T-PCIE SIM7600
+    #define CELLULAR_GPIO_TX GPIO_NUM_27
+    #define CELLULAR_GPIO_RX GPIO_NUM_26
+#endif
 
 void cellularEventHandler(void* ctx, esp_event_base_t base, int32_t id, void* event_data)
 {
@@ -33,20 +42,16 @@ bool Cellular::Init(String apn, String user, String pass) {
     msUser = user;
     msPass = pass;
 
-    #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
     uart_config_t uart_config = {
         .baud_rate = 115200,  //**********************************
-        //.baud_rate = 460800,  //**********************************
         .data_bits = UART_DATA_8_BITS,
         .parity    = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk = UART_SCLK_APB,
-        //.rx_flow_ctrl_thresh = 0,  // ignore warning
-        //.use_ref_tick = 0
+        .rx_flow_ctrl_thresh = 0,  // ignore warning
+        .source_clk = UART_SCLK_APB
     };
-    //muiUartNo = uartNo;
-    muiUartNo = UART_NUM_2; /////////////////////////////////////////////***********************************
+    muiUartNo = UART_NUM_2; // UART_NUM_1 is reserved for Maximet reading
     int bufferSize = 2048;
     static int iUartEventQueueSize = 5;
     ESP_ERROR_CHECK(uart_driver_install(muiUartNo, bufferSize, 0, iUartEventQueueSize, &mhUartEventQueueHandle, 0));
@@ -79,15 +84,6 @@ esp_err_t esp_cellular_transmit(void *h, void *buffer, size_t len)
     }
     return ESP_FAIL;
 }
-
-/*
-static esp_err_t modem_netif_receive_cb(void *buffer, size_t len, void *context)
-{
-    esp_cellular_netif_driver_t *driver = (esp_cellular_netif_driver_t *)context;
-    esp_netif_receive(driver->base.netif, buffer, len, NULL);
-    return ESP_OK;
-}
-*/
 
 esp_err_t esp_cellular_post_attach_start(esp_netif_t * esp_netif, void * args)
 {
@@ -173,8 +169,6 @@ void Cellular::Start() {
 } 
 
 void Cellular::ReceiverTask() {
-
-
     while(true) {
         // do nothing in command mode
         if (mbCommandMode) {
@@ -194,18 +188,11 @@ void Cellular::ReceiverTask() {
     }
 }
 
-
-
 void Cellular::InitNetwork() {
-	//ESP_ERROR_CHECK(nvs_flash_init());
 	ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_init());
 	ESP_ERROR_CHECK(esp_event_loop_create_default());
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, cellularEventHandler, this, nullptr));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, cellularEventHandler, this, nullptr));		
-
-//################################### likely irrelevant
- //ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, IP_EVENT_PPP_GOT_IP, cellularEventHandler, this, nullptr));
-
 
     // Init netif object
     esp_netif_config_t cfg = ESP_NETIF_DEFAULT_PPP();
@@ -216,11 +203,10 @@ void Cellular::InitNetwork() {
     mModemNetifDriver.pCellular = this;
     //esp_netif_ppp_set_auth(esp_netif, NETIF_PPP_AUTHTYPE_PAP, msUser.c_str(), msPass.c_str());
     //esp_netif_ppp_set_auth(esp_netif, NETIF_PPP_AUTHTYPE_NONE, msUser.c_str(), msPass.c_str());
-    //ESP_ERROR_CHECK(esp_netif_attach(esp_netif, &mModemNetifDriver));
     if (ESP_OK == esp_netif_attach(mpEspNetif, &mModemNetifDriver)) {
-        ESP_LOGI(tag, "Established cellular network connection.");
+        ESP_LOGI(tag, "Installed cellular network driver.");
     } else {
-        ESP_LOGW(tag, "Failed to establish cellular network connection. Retry later??");
+        ESP_LOGW(tag, "Failed to install cellular network driver. Retry later??");
     }
 }
 
@@ -390,12 +376,12 @@ bool Cellular::ReadIntoBuffer() {
                 }
             //Event of HW FIFO overflow detected
             case UART_FIFO_OVF:
-                ESP_LOGE(tag, "hw fifo overflow");
+                ESP_LOGW(tag, "hw fifo overflow");
                 // If fifo overflow happened, you should consider adding flow control for your application.
                 // The ISR has already reset the rx FIFO,
                 // As an example, we directly flush the rx buffer here in order to read more data.
-                uart_flush_input(muiUartNo);
-                xQueueReset(mhUartEventQueueHandle);
+                // uart_flush_input(muiUartNo);
+                // xQueueReset(mhUartEventQueueHandle);
                 break;
             //Event of UART ring buffer full
             case UART_BUFFER_FULL:
@@ -411,8 +397,8 @@ bool Cellular::ReadIntoBuffer() {
                     mbCommandMode = true;
                 } else {
                     uart_flush_input(muiUartNo);
+                    ESP_LOGD(tag, "uart rx break");
                 }
-                ESP_LOGD(tag, "uart rx break");
                 break;
             //Event of UART parity check error
             case UART_PARITY_ERR:
@@ -626,47 +612,76 @@ bool Cellular::Command(const char* sCommand, const char *sSuccess, String *spRes
 
 
 
-#define SIM800_PWKEY 4
-#define set_sim800_pwkey() gpio_set_level(SIM800_PWKEY,1)
-#define clear_sim800_pwkey() gpio_set_level(SIM800_PWKEY,0)
-
-#define SIM800_RST 5
-#define set_sim800_rst() gpio_set_level(SIM800_RST,1)
-#define clear_sim800_rst() gpio_set_level(SIM800_RST,0)
-
-#define SIM800_POWER 23
-#define set_sim800_pwrsrc() gpio_set_level(SIM800_POWER,1)
-#define clear_sim800_pwrsrc() gpio_set_level(SIM800_POWER,0)
-
-
 void Cellular::TurnOn(void)
 {
+
+#ifdef LILYGO_TTGO_TCALL14
     gpio_config_t io_conf;
     io_conf.mode = GPIO_MODE_OUTPUT;
-    io_conf.pin_bit_mask = (1<<CELLULAR_GPIO_PWKEY)+(1<<CELLULAR_GPIO_RST)+(1<<CELLULAR_GPIO_POWER);
+    io_conf.pin_bit_mask = (1<<CELLULAR_GPIO_PWKEY)+(1<<CELLULAR_GPIO_POWER);
+    //io_conf.pin_bit_mask = (1<<CELLULAR_GPIO_PWKEY)+(1<<CELLULAR_GPIO_RST)+(1<<CELLULAR_GPIO_POWER);
     io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
     io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
     io_conf.intr_type = GPIO_INTR_DISABLE;
     gpio_config(& io_conf);
 
-    ESP_LOGI(tag, "shutdown...");
+    ESP_LOGI(tag, "initializing modem...");
+    //ESP_LOGI(tag, "shutdown...");
     gpio_set_level(CELLULAR_GPIO_PWKEY, 0);
-    gpio_set_level(CELLULAR_GPIO_RST, 0);
+    //gpio_set_level(CELLULAR_GPIO_RST, 0);
     gpio_set_level(CELLULAR_GPIO_POWER, 0);
     vTaskDelay(1000/portTICK_PERIOD_MS);
 
-    ESP_LOGI(tag, "init...");
     vTaskDelay(1000/portTICK_PERIOD_MS);
     gpio_set_level(CELLULAR_GPIO_POWER, 1);
     vTaskDelay(1000/portTICK_PERIOD_MS);
     gpio_set_level(CELLULAR_GPIO_PWKEY, 1);
-    gpio_set_level(CELLULAR_GPIO_RST, 1);
-    vTaskDelay(1000/portTICK_PERIOD_MS);
-    gpio_set_level(CELLULAR_GPIO_RST, 0);
-    vTaskDelay(1000/portTICK_PERIOD_MS);
-    gpio_set_level(CELLULAR_GPIO_RST, 1);
+    //gpio_set_level(CELLULAR_GPIO_RST, 1);
+    //vTaskDelay(1000/portTICK_PERIOD_MS);
+    //gpio_set_level(CELLULAR_GPIO_RST, 0);
+    //vTaskDelay(1000/portTICK_PERIOD_MS);
+    //gpio_set_level(CELLULAR_GPIO_RST, 1);
     vTaskDelay(3000/portTICK_PERIOD_MS);
     ESP_LOGI(tag, "modem turned on.");
+#endif
+
+#ifdef LILYGO_TTGO_TPCIE
+    gpio_config_t io_conf;
+    io_conf.mode = GPIO_MODE_OUTPUT;
+    io_conf.pin_bit_mask = (1<<CELLULAR_GPIO_PWKEY)+(1<<CELLULAR_GPIO_POWER);
+    io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
+    io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
+    io_conf.intr_type = GPIO_INTR_DISABLE;
+    gpio_config(& io_conf);
+
+    ESP_LOGI(tag, "initializing LILYGO T-PCIE SIM7600 modem...");
+    // power down
+    gpio_set_level(CELLULAR_GPIO_PWKEY, 0);
+    gpio_set_level(CELLULAR_GPIO_POWER, 0);
+    vTaskDelay(1000/portTICK_PERIOD_MS);
+
+    // POWER_PIN : This pin controls the power supply of the SIM7600
+    gpio_set_level(CELLULAR_GPIO_POWER, 1);
+    //vTaskDelay(1000/portTICK_PERIOD_MS);
+
+    // PWR_PIN ： This Pin is the PWR-KEY of the SIM7600
+    gpio_set_level(CELLULAR_GPIO_PWKEY, 1);
+    vTaskDelay(500/portTICK_PERIOD_MS);
+    gpio_set_level(CELLULAR_GPIO_PWKEY, 0);
+
+    // wait a bit....
+    vTaskDelay(5000/portTICK_PERIOD_MS);
+    ESP_LOGI(tag, "modem turned on.");
+#endif
+
+/*
+    attachInterrupt(IND_PIN, []() {
+        detachInterrupt(IND_PIN);
+        // If SIM7600 starts normally, then set the onboard LED to flash once every 1 second
+        tick.attach_ms(1000, []() {
+            digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+        });
+    }, CHANGE);    */
 }
 
 
