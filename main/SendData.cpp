@@ -76,7 +76,11 @@ void SendData::Cleanup() {
 void SendData::PerformHttpPost(const char *postData) {
     // Initialize URL and HTTP client
     if (!mhEspHttpClient) {
-        memset(&mEspHttpClientConfig, 0, sizeof(mEspHttpClientConfig));
+        if (!mrConfig.msTargetUrl.startsWith("http")) {
+            ESP_LOGE(tag, "No proper target URL in form of'http(s)://server/' defined: url='%s'", mrConfig.msTargetUrl.c_str());
+            return;
+        }
+        memset(&mEspHttpClientConfig, 0, sizeof(esp_http_client_config_t));
         mEspHttpClientConfig.url = mrConfig.msTargetUrl.c_str();
         mEspHttpClientConfig.method = HTTP_METHOD_POST; 
         /* TCP only !!

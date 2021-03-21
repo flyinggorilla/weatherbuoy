@@ -47,3 +47,5 @@
 
 ### cannot flash via serial/USB anymore
 * remove serial connection to Maximet (or turn off/reset Maximet/Simulator device)
+### observing weird crashes, especially after changing git branches
+* completely delete the build folder and perform a 100% clean build
