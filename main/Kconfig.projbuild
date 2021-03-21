@@ -45,6 +45,10 @@ menu "Weatherbuoy"
     config WEATHERBUOY_READMAXIMET_RX_PIN
         int "RX serial GPIO port to receive Maximet data. 16 on Huzzah32, 3 on TTGO"
         default 3
-            
+
+    config WEATHERBUOY_READMAXIMET_TX_PIN
+        int "TX serial GPIO port to send Maximet data. 16 on Huzzah32, 1 or 12 on TTGO"
+        default 12
+                
 
 endmenu

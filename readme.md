@@ -42,10 +42,23 @@
 | GPIO 34 | MAX471 voltage 12v / 5x divider = 0..2.4V |
 | GPIO 35 | MAX471 current (provided as analog voltage) |
 
+## todo
+* change Maximet serial to 
+
+* handle disconnect!!! 
+I (86576) esp-netif_lwip-ppp: Connection lost
+I (86576) Cellular: IP event! 6
+I (86576) Cellular: Cellular Disconnect from PPP Server
 
 ## troubleshooting
 
 ### cannot flash via serial/USB anymore
 * remove serial connection to Maximet (or turn off/reset Maximet/Simulator device)
+  https://esp32.com/viewtopic.php?t=1205
 ### observing weird crashes, especially after changing git branches
 * completely delete the build folder and perform a 100% clean build
+ https://esp32.com/viewtopic.php?t=1205
+
+ UART0: RX: GPIO3, TX: GPIO1
+UART1: RX: GPIO9, TX: GPIO10
+UART2: RX: GPIO16, TX: GPIO17

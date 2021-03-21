@@ -1,6 +1,6 @@
 menu "Cellular"
     choice CELLULAR_DEVICE
-        prompt "Choose supported modem "
+        prompt "Choose supported modem"
         default LILYGO_TTGO_TCALL14_SIM800
         help
             Select modem device connected..

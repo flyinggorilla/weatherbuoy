@@ -26,7 +26,18 @@ void ReadMaximet::Start() {
 #define ETX (0x03) // ASCII end of text
 
 void ReadMaximet::ReadMaximetTask() {
-    Serial serial(UART_NUM_1, CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN, SERIAL_BAUD_RATE, SERIAL_BUFFER_SIZE);
+
+    // UART0: RX: GPIO3, TX: GPIO1 
+    // UART1: RX: GPIO9, TX: GPIO10 --- connected to flash!!!???
+    // UART2: RX: GPIO16, TX: GPIO17
+
+    // Use GPIO 12 for TX to not conflict with Console (!?)
+//    Serial serial(UART_NUM_1, GPIO_NUM_12, GPIO_NUM_14, SERIAL_BAUD_RATE, SERIAL_BUFFER_SIZE);
+    Serial serial(UART_NUM_1, CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN, CONFIG_WEATHERBUOY_READMAXIMET_TX_PIN, SERIAL_BAUD_RATE, SERIAL_BUFFER_SIZE);
+
+    ESP_LOGI(tag, "ReadMaximet task started. Waiting 30seconds for attaching to serial interface.");
+    vTaskDelay(30*1000/portTICK_PERIOD_MS);
+    serial.Attach();
 
     String line;
     unsigned int uptimeMs = 0;
@@ -46,7 +57,7 @@ void ReadMaximet::ReadMaximetTask() {
 
 bool bDayTime = true; /////////////////////////////// TODO *****************************
 
-    ESP_LOGI(tag, "ReadMaximet task started.");
+    ESP_LOGI(tag, "ReadMaximet task started and ready to receive data.");
     while (true) {
         if (!serial.ReadLine(line)) {
             ESP_LOGE(tag, "Could not read line from serial");

@@ -775,7 +775,7 @@ bool Cellular::TurnOn(void)
 
 
 
-    #ifdef CONFIG_LILYGO_TTGO_TCALL14_SIM800_______________
+    #ifdef CONFIG_LILYGO_TTGO_TCALL14_SIM800___________
         gpio_set_direction(CELLULAR_GPIO_PWKEY, GPIO_MODE_OUTPUT);
         gpio_set_direction(CELLULAR_GPIO_POWER, GPIO_MODE_OUTPUT);
   //      gpio_set_direction(CELLULAR_GPIO_STATUS, GPIO_MODE_INPUT);  ///######### TODO GPIO CONSTANT
@@ -795,7 +795,7 @@ bool Cellular::TurnOn(void)
         gpio_set_level(CELLULAR_GPIO_PWKEY, 0);
         vTaskDelay(1000/portTICK_PERIOD_MS); // Power-Key must be down for at least 1 second
         gpio_set_level(CELLULAR_GPIO_PWKEY, 1);
-    gpio_set_level(CELLULAR_GPIO_RST, 1);
+    //gpio_set_level(CELLULAR_GPIO_RST, 1);
         //vTaskDelay(1000/portTICK_PERIOD_MS);
         //gpio_set_level(CELLULAR_GPIO_RST, 0);
         //vTaskDelay(1000/portTICK_PERIOD_MS);
