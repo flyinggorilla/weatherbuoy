@@ -2,6 +2,7 @@
 build/
 
 #generated header files
+sdkconfig.latestold
 sdkconfig.old
 sdkconfig
 
