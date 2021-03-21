@@ -1,0 +1,43 @@
+menu "Cellular"
+    choice CELLULAR_DEVICE
+        prompt "Choose supported modem "
+        default LILYGO_TTGO_TCALL14_SIM800
+        help
+            Select modem device connected..
+        config LILYGO_TTGO_TCALL14_SIM800
+            bool "LILYGO_TTGO_TCALL14_SIM800"
+            help
+                Lilygo TTGP T-Call 1.4 ESP32 module with 
+                SIMCom SIM800L, a GSM/GPRS module.
+                It supports Quad-band 850/900/1800/1900MHz.
+        config LILYGO_TTGO_TPCIE_SIM7600
+            bool "LILYGO_TTGO_TPCIE_SIM7600"
+            help
+                Lilygo TTGP T-PCIE ESP32 module with SIM7600E modem
+                SIM7600 is Multi-Band LTE-TDD/LTE-FDD/HSPA+ and GSM/GPRS/EDGE module
+    endchoice
+
+    menu "UART Configuration"
+        config CELLULAR_MODEM_UART_EVENT_TASK_PRIORITY
+            int "UART Event Task Priority"
+            range 3 22
+            default 5
+            help
+                Priority of UART event task.
+
+        config CELLULAR_MODEM_UART_EVENT_QUEUE_SIZE
+            int "UART Event Queue Size"
+            range 5 40
+            default 10
+            help
+                Length of UART event queue.
+
+        config CELLULAR_MODEM_UART_RX_BUFFER_SIZE
+            int "UART RX Buffer Size"
+            range 256 2048
+            default 2048
+            help
+                Buffer size of UART RX buffer.
+    endmenu
+
+endmenu

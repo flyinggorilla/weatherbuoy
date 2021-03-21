@@ -41,3 +41,9 @@
 | RX | RS232 to TTL -> Maximet  |
 | GPIO 34 | MAX471 voltage 12v / 5x divider = 0..2.4V |
 | GPIO 35 | MAX471 current (provided as analog voltage) |
+
+
+## troubleshooting
+
+### cannot flash via serial/USB anymore
+* remove serial connection to Maximet (or turn off/reset Maximet/Simulator device)

@@ -21,7 +21,7 @@ typedef struct esp_cellular_netif_driver_s {
 class Cellular {
 public:
     Cellular();
-	bool Init(String apn, String user, String pass); // call before Start()
+	bool InitModem(String apn, String user, String pass); // call before Start()
 	virtual ~Cellular();
     void Start(); // call after Init()
     bool Command(const char *sCommand,const char *sSuccess, String *sResponse = nullptr, const char *sInfo = nullptr, unsigned short maxLines = 100);
@@ -36,7 +36,7 @@ public:
     String msSubscriber;
 
 private:
-    void TurnOn();
+    bool TurnOn();
     void InitNetwork();
 
     friend esp_err_t esp_cellular_post_attach_start(esp_netif_t * esp_netif, void * args);

@@ -54,7 +54,7 @@ void Esp32WeatherBuoy::Start() {
 
     switch(onlineMode) {
         case MODE_CELLULAR: 
-            cellular.Init(config.msCellularApn, config.msCellularUser, config.msCellularPass);
+            cellular.InitModem(config.msCellularApn, config.msCellularUser, config.msCellularPass);
             cellular.Start();
             cellular.SwitchToPppMode();
             break;
@@ -73,7 +73,7 @@ void Esp32WeatherBuoy::Start() {
             ESP_LOGW(tag, "Staying offline.");
     }
 
-
+    ESP_LOGI(tag, "Starting maximet stuff");
     //TestATCommands();
     //TestHttp();
 
