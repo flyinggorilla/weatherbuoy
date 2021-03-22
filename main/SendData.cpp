@@ -143,9 +143,9 @@ void SendData::PerformHttpPost(const char *postData) {
             mPostData += "\r\n";
         }
         mPostData += "cellulardata: ";
-        mPostData += mrCellular.getDataSent();
+        mPostData += (unsigned long)(mrCellular.getDataSent()/1024); // convert to kB
         mPostData += ",";
-        mPostData += mrCellular.getDataReceived();
+        mPostData += (unsigned long)(mrCellular.getDataReceived()/1024); // convert to kB
         mPostData += "\r\n";
         mPostData += "cellularstatus: ";
         mPostData += mrCellular.msOperator;

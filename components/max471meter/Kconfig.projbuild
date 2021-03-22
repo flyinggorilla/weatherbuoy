@@ -1,15 +1,15 @@
-menu "Max471Meter"
+#menu "Max471Meter"
 
-    config MAX471METER_GPIO_VOLTAGE
-        int "GPIO to measure voltage from MAX471"
-        default 35
-        help
-            Using ADC1 with possible GPIO: 32, 33, 34, 35, 36, 39 (Default 35)
+#     config MAX471METER_GPIO_VOLTAGE
+#         int "GPIO to measure voltage from MAX471"
+#         default 35
+#         help
+#             Using ADC1 with possible GPIO: 32, 33, 34, 35, 36, 39 (Default 35)
 
-    config MAX471METER_GPIO_CURRENT
-        int "GPIO to measure current from MAX471"
-        default 34
-        help
-            Using ADC1 with possible GPIO: 32, 33, 34, 35, 36, 39 (Default 35, good for T-Call, change to 33 on T-PCIE)
+#     config MAX471METER_GPIO_CURRENT
+#         int "GPIO to measure current from MAX471"
+#         default 34
+#         help
+#             Using ADC1 with possible GPIO: 32, 33, 34, 35, 36, 39 (Default 35, good for T-Call, change to 33 on T-PCIE)
         
-endmenu
+# endmenu

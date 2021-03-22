@@ -17,27 +17,27 @@ menu "Cellular"
                 SIM7600 is Multi-Band LTE-TDD/LTE-FDD/HSPA+ and GSM/GPRS/EDGE module
     endchoice
 
-    menu "UART Configuration"
-        config CELLULAR_MODEM_UART_EVENT_TASK_PRIORITY
-            int "UART Event Task Priority"
-            range 3 22
-            default 5
-            help
-                Priority of UART event task.
+    # menu "UART Configuration"
+    #     config CELLULAR_MODEM_UART_EVENT_TASK_PRIORITY
+    #         int "UART Event Task Priority"
+    #         range 3 22
+    #         default 5
+    #         help
+    #             Priority of UART event task.
 
-        config CELLULAR_MODEM_UART_EVENT_QUEUE_SIZE
-            int "UART Event Queue Size"
-            range 5 40
-            default 10
-            help
-                Length of UART event queue.
+    #     config CELLULAR_MODEM_UART_EVENT_QUEUE_SIZE
+    #         int "UART Event Queue Size"
+    #         range 5 40
+    #         default 10
+    #         help
+    #             Length of UART event queue.
 
-        config CELLULAR_MODEM_UART_RX_BUFFER_SIZE
-            int "UART RX Buffer Size"
-            range 256 2048
-            default 2048
-            help
-                Buffer size of UART RX buffer.
-    endmenu
+    #     config CELLULAR_MODEM_UART_RX_BUFFER_SIZE
+    #         int "UART RX Buffer Size"
+    #         range 256 2048
+    #         default 2048
+    #         help
+    #             Buffer size of UART RX buffer.
+    # endmenu
 
 endmenu

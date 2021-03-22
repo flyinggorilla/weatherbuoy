@@ -14,6 +14,24 @@
 
 static const char tag[] = "WeatherBuoy";
 
+// ------------------------------------------
+// change device in Menuconfig->Cellular
+// ------------------------------------------
+#ifdef CONFIG_LILYGO_TTGO_TCALL14_SIM800
+    // LILYGO TTGO T-Call V1.4 SIM800 
+    // ADC ----------------------------
+    // Using ADC1 with possible GPIO: 32, 34, 35, 36, 39 
+    #define CONFIG_MAX471METER_GPIO_VOLTAGE 35 
+    #define CONFIG_MAX471METER_GPIO_CURRENT 34
+#elif CONFIG_LILYGO_TTGO_TPCIE_SIM7600
+    // LILYGO® TTGO T-PCIE SIM7600
+    // ADC ----------------------------
+    // Using ADC1 with possible GPIO: 32, 33, 34, 35, 39 
+    #define CONFIG_MAX471METER_GPIO_VOLTAGE 33 
+    #define CONFIG_MAX471METER_GPIO_CURRENT 34
+#endif
+
+
 Esp32WeatherBuoy esp32WeatherBuoy;
 
 Esp32WeatherBuoy::Esp32WeatherBuoy() {
@@ -136,16 +154,16 @@ void TestHttp() {
 }
 
 void TestATCommands(Cellular &cellular) {
-    ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", cellular.getDataSent(), cellular.getDataReceived());
-    ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", cellular.getDataSent(), cellular.getDataReceived());
+    ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", (unsigned long)cellular.getDataSent(), (unsigned long)cellular.getDataReceived());
+    ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", (unsigned long)cellular.getDataSent(), (unsigned long)cellular.getDataReceived());
   
-    ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", cellular.getDataSent(), cellular.getDataReceived());
+    ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", (unsigned long)cellular.getDataSent(), (unsigned long)cellular.getDataReceived());
 
     ESP_LOGI(tag, "Free memory: %d", esp_get_free_heap_size());
 
     cellular.SwitchToCommandMode();
 
-    ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", cellular.getDataSent(), cellular.getDataReceived());
+    ESP_LOGI(tag, "Cellular Data usage: sent=%lu, received=%lu", (unsigned long)cellular.getDataSent(), (unsigned long)cellular.getDataReceived());
 
 
 
