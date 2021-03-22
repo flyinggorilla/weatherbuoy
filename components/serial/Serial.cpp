@@ -48,8 +48,7 @@ bool Serial::Attach() {
     ESP_ERROR_CHECK(uart_param_config(muiUartNo, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(muiUartNo, mGpioTx, mGpioRx, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     mbAttached = true;
-ESP_LOGW(tag, "CHANGED SERIAL PINS!!!!!!! #########################")    ;
-vTaskDelay(1000/portTICK_PERIOD_MS);
+    ESP_LOGI(tag, "Configured UART%d on pins RX=%d, TX=%d", muiUartNo, mGpioRx, mGpioTx);
     return true;
 }
 

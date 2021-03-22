@@ -27,12 +27,12 @@ void ReadMaximet::Start() {
 
 void ReadMaximet::ReadMaximetTask() {
 
-    // UART0: RX: GPIO3, TX: GPIO1 
+    // UART0: RX: GPIO3, TX: GPIO1 --- connected to console
     // UART1: RX: GPIO9, TX: GPIO10 --- connected to flash!!!???
-    // UART2: RX: GPIO16, TX: GPIO17
+    // UART2: RX: GPIO16, TX: GPIO17 --- no conflicts
 
-    // Use GPIO 12 for TX to not conflict with Console (!?)
-//    Serial serial(UART_NUM_1, GPIO_NUM_12, GPIO_NUM_14, SERIAL_BAUD_RATE, SERIAL_BUFFER_SIZE);
+    // Cannot use GPIO 12, as it will prevent to boot when pulled high.
+    // Change ports from default RX/TX to not conflict with Console
     Serial serial(UART_NUM_1, CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN, CONFIG_WEATHERBUOY_READMAXIMET_TX_PIN, SERIAL_BAUD_RATE, SERIAL_BUFFER_SIZE);
 
     ESP_LOGI(tag, "ReadMaximet task started. Waiting 30seconds for attaching to serial interface.");

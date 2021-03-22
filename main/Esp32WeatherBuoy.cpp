@@ -42,8 +42,6 @@ void Esp32WeatherBuoy::Start() {
         ESP_LOGE(tag, "Error, could not load configuration.");
     }
 
-    OnlineMode onlineMode = MODE_CELLULAR;
-
     ESP_LOGI(tag, "Hostname: %s", config.msHostname.c_str());
     ESP_LOGI(tag, "Target URL: %s", config.msTargetUrl.c_str());
     ESP_LOGI(tag, "App Version: %s", esp_ota_get_app_description()->version);
@@ -51,7 +49,7 @@ void Esp32WeatherBuoy::Start() {
     Max471Meter max471Meter(CONFIG_MAX471METER_GPIO_VOLTAGE, CONFIG_MAX471METER_GPIO_CURRENT);
     ESP_LOGI(tag, "Max471Meter: voltage %d mV, current %d mA??", max471Meter.Voltage(), max471Meter.Current());
 
-
+    OnlineMode onlineMode = MODE_CELLULAR;
     switch(onlineMode) {
         case MODE_CELLULAR: 
             cellular.InitModem(config.msCellularApn, config.msCellularUser, config.msCellularPass);
@@ -102,9 +100,6 @@ void TestHttp() {
 
         esp_http_client_config_t httpConfig = {0};
         httpConfig.url = "http://ptsv2.com/t/wb/post?testWeatherbuoy";
-        //httpConfig.url = "http://216.239.32.21/t/wb/post?test1";
-        //httpConfig.url = "http://scooterlabs.com/echo";
-        //httpConfig.url = "http://66.39.74.7/echo";
         
         httpConfig.method = HTTP_METHOD_GET; 
         esp_http_client_handle_t httpClient = esp_http_client_init(&httpConfig);

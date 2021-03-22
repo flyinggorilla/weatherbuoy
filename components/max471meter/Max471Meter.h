@@ -33,7 +33,7 @@ class Max471Meter {
         Max471Meter(int gpioPinVoltage, int gpioPinCurrent);
         virtual ~Max471Meter();
 
-        unsigned int Voltage() { return mVoltage.Measure(); };
+        unsigned int Voltage() { return mVoltage.Measure() * 5; };
         unsigned int Current() { return mCurrent.Measure(); };
 
     private:

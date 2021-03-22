@@ -13,7 +13,7 @@
 static const char tag[] = "SendData";
 static const int SENDDATA_QUEUE_SIZE = (5); 
 static const unsigned int MAX_ACCEPTABLE_RESPONSE_BODY_LENGTH = 16*1024;
-static const bool HTTP_KEEP_ALIVE_ENABLED = false;  // enabling doesnt work on local test system, SSL connections abort
+static const bool HTTP_KEEP_ALIVE_ENABLED = true;  // enabling doesnt work on local test system, SSL connections abort
 
 extern const unsigned char certificate_pem_start[] asm("_binary_certificate_pem_start");
 extern const unsigned char certificate_pem_end[]   asm("_binary_certificate_pem_end");
@@ -259,6 +259,11 @@ void SendData::PerformHttpPost(const char *postData) {
 
             // Optionally Execute OTA Update command
             if (command.equals("update")) {
+
+
+// ************* TODO TURN OFF MAXIMET SERIAL *****************
+///                mrReadMaximet.  OR SHUT DOWN UART DIRECTLY???
+
                 const String &pem = ReadMessagePemValue("set-cert-pem:");
                 mEspHttpClientConfig.method = HTTP_METHOD_GET; 
                 if (!mrConfig.msTargetUrl.endsWith("/")) {

@@ -3,6 +3,7 @@
 #include "esp_adc_cal.h"
 #include "esp_system.h"
 #include "esp_log.h"
+#include "driver/gpio.h"
 
     // ADC1 = 32, 33, *34*, 36, 39
     // GPIO32 = ADC1_CH4
@@ -34,6 +35,10 @@ ADC::ADC(gpio_num_t gpio) {
     } else {
         ESP_LOGI(tag, "Characterized using Default Vref");
     }
+
+    gpio_set_pull_mode(gpio, GPIO_FLOATING);
+    gpio_set_intr_type(gpio, GPIO_INTR_DISABLE);
+    gpio_set_direction(gpio, GPIO_MODE_INPUT);
 
     mChannel = GpioToChannel(gpio);
     adc1_config_width(ADC_WIDTH_BIT_12);
@@ -68,9 +73,6 @@ adc1_channel_t ADC::GpioToChannel(gpio_num_t gpio) {
 }
 
 unsigned int ADC::Measure() {
-    //int val = adc1_get_raw(mChannel);
-    //esp_adc_cal_raw_to_voltage(val);
-
     uint32_t adc_reading = 0;
     //Multisampling
     static int samples = 32;
@@ -80,7 +82,7 @@ unsigned int ADC::Measure() {
     adc_reading /= samples;
     //Convert adc_reading to voltage in mV
     uint32_t voltage = esp_adc_cal_raw_to_voltage(adc_reading, mpAdcChars);
-    ESP_LOGI(tag, "Raw: %d\tVoltage: %dmV", adc_reading, voltage);
+    ESP_LOGD(tag, "Raw: %d\tVoltage: %dmV", adc_reading, voltage);
     return voltage;
 }
 

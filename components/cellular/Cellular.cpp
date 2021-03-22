@@ -157,7 +157,7 @@ void Cellular::Start() {
                                                                 // +IPR: (0,300,600,1200,2400,4800,9600,19200,38400,57600,115200,230400,460800,921600,3000000,3200000,3686400)
 //    ESP_LOGD(tag, "Baud Rates: %s", response.c_str());
 
-    #ifdef SIM800_____
+    #ifdef SIM800
         if (Command("AT+IPR=460800", "OK", &response,  "Set 460800 baud rate. Default = 115200.")) {
             if (ESP_OK == uart_set_baudrate(muiUartNo, 460800)) {
                 ESP_LOGI(tag, "Switched to 460800 baud");
@@ -740,78 +740,22 @@ bool Cellular::Command(const char* sCommand, const char *sSuccess, String *spRes
 
 bool Cellular::TurnOn(void)
 {
-
     #ifdef CONFIG_LILYGO_TTGO_TCALL14_SIM800
-        gpio_config_t io_conf;
-        io_conf.mode = GPIO_MODE_OUTPUT;
-        io_conf.pin_bit_mask = (1<<CELLULAR_GPIO_PWKEY)+(1<<CELLULAR_GPIO_RST)+(1<<CELLULAR_GPIO_POWER);
-        io_conf.pull_down_en = GPIO_PULLDOWN_DISABLE;
-        io_conf.pull_up_en = GPIO_PULLUP_DISABLE;
-        io_conf.intr_type = GPIO_INTR_DISABLE;
-        gpio_config(& io_conf);
-
-        ESP_LOGI(tag, "shutdown...");
-        gpio_set_level(CELLULAR_GPIO_PWKEY, 0);
-        gpio_set_level(CELLULAR_GPIO_RST, 0);
-        gpio_set_level(CELLULAR_GPIO_POWER, 0);
-        vTaskDelay(1000/portTICK_PERIOD_MS);
-
-        ESP_LOGI(tag, "init...");
-        vTaskDelay(1000/portTICK_PERIOD_MS);
-        gpio_set_level(CELLULAR_GPIO_POWER, 1);
-        vTaskDelay(1000/portTICK_PERIOD_MS);
-        gpio_set_level(CELLULAR_GPIO_PWKEY, 1);
-        gpio_set_level(CELLULAR_GPIO_RST, 1);
-        vTaskDelay(1000/portTICK_PERIOD_MS);
-        gpio_set_level(CELLULAR_GPIO_RST, 0);
-        vTaskDelay(1000/portTICK_PERIOD_MS);
-        gpio_set_level(CELLULAR_GPIO_RST, 1);
-        vTaskDelay(3000/portTICK_PERIOD_MS);
-        ESP_LOGI(tag, "modem turned on.");    
-        return true;
-    #endif
-
-
-
-
-
-    #ifdef CONFIG_LILYGO_TTGO_TCALL14_SIM800___________
         gpio_set_direction(CELLULAR_GPIO_PWKEY, GPIO_MODE_OUTPUT);
         gpio_set_direction(CELLULAR_GPIO_POWER, GPIO_MODE_OUTPUT);
-  //      gpio_set_direction(CELLULAR_GPIO_STATUS, GPIO_MODE_INPUT);  ///######### TODO GPIO CONSTANT
-
 
         ESP_LOGI(tag, "initializing modem...");
-        //ESP_LOGI(tag, "shutdown...");
         gpio_set_level(CELLULAR_GPIO_PWKEY, 1);
         //gpio_set_level(CELLULAR_GPIO_RST, 0);
         gpio_set_level(CELLULAR_GPIO_POWER, 0);
-        //gpio_set_level(CELLULAR_GPIO_PWKEY, 0);
         vTaskDelay(500/portTICK_PERIOD_MS);
-
-//        vTaskDelay(1000/portTICK_PERIOD_MS);
         gpio_set_level(CELLULAR_GPIO_POWER, 1);
         vTaskDelay(500/portTICK_PERIOD_MS);
         gpio_set_level(CELLULAR_GPIO_PWKEY, 0);
         vTaskDelay(1000/portTICK_PERIOD_MS); // Power-Key must be down for at least 1 second
         gpio_set_level(CELLULAR_GPIO_PWKEY, 1);
-    //gpio_set_level(CELLULAR_GPIO_RST, 1);
-        //vTaskDelay(1000/portTICK_PERIOD_MS);
-        //gpio_set_level(CELLULAR_GPIO_RST, 0);
-        //vTaskDelay(1000/portTICK_PERIOD_MS);
-        //gpio_set_level(CELLULAR_GPIO_RST, 1);
 
-        // wait at least 3 seconds for SIM800 to get ready
-/*        int maxModemUartReadyTime = 30; // seconds
-        while (maxModemUartReadyTime--) {
-            if (gpio_get_level(CELLULAR_GPIO_STATUS)) {
-                ESP_LOGI(tag, "Modem turned on.");
-                return true;
-            }
-            vTaskDelay(1000/portTICK_PERIOD_MS);
-            ESP_LOGD(tag, "still booting modem.... %d", maxModemUartReadyTime);
-        } */
-
+        // wait at least 5 seconds for SIM800 to get ready
         vTaskDelay(5000/portTICK_PERIOD_MS); 
         ESP_LOGI(tag, "modem turned on.");
         return true;
