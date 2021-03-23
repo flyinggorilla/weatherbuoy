@@ -21,6 +21,7 @@
         "random": "cpp",
         "future": "cpp",
         "optional": "cpp",
-        "streambuf": "cpp"
+        "streambuf": "cpp",
+        "array": "cpp"
     }
 }

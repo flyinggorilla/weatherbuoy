@@ -153,6 +153,8 @@ void SendData::PerformHttpPost(const char *postData) {
         mPostData += mrCellular.msSubscriber;
         mPostData += ",";
         mPostData += mrCellular.msHardware;
+        mPostData += ",";
+        mPostData += mrCellular.msNetworkmode;
         mPostData += "\r\n";
         mPostData += "battery: ";
         mPostData += muiPowerVoltage;
@@ -246,24 +248,20 @@ void SendData::PerformHttpPost(const char *postData) {
             value = ReadMessageValue("set-intervalhealth:");
             if (value.length() && ((value.toInt() >= 1) && (value.toInt() < 60*60*24*7))) { mrConfig.miSendDataIntervalHealth = value.toInt(); updateConfig = true; };
 
-            bool restart = false;
+            mbRestart = false;
             if (command.equals("restart") || command.equals("config") || command.equals("udpate")) {
                 if (updateConfig) {
                     updateConfig = mrConfig.Save();
                     ESP_LOGI(tag, "New configuration received and SAVED.");
                 }
-                restart = true;
+                mbRestart = true;
             } else if (command.equals("diagnose")) {
                 mbSendDiagnostics = true;
             }
 
             // Optionally Execute OTA Update command
             if (command.equals("update")) {
-
-
-// ************* TODO TURN OFF MAXIMET SERIAL *****************
-///                mrReadMaximet.  OR SHUT DOWN UART DIRECTLY???
-
+                mbRestart = true;
                 const String &pem = ReadMessagePemValue("set-cert-pem:");
                 mEspHttpClientConfig.method = HTTP_METHOD_GET; 
                 if (!mrConfig.msTargetUrl.endsWith("/")) {
@@ -285,10 +283,9 @@ void SendData::PerformHttpPost(const char *postData) {
                 } else {
                     ESP_LOGE(tag, "Error reading response %s", esp_err_to_name(err));
                 }
-                restart = true;
             }
 
-            if (restart) {
+            if (mbRestart) {
                 ESP_LOGI(tag, "***** RESTARTING in 1 Second *****.");
                 vTaskDelay(1000 / portTICK_PERIOD_MS);
                 esp_restart();
@@ -304,6 +301,8 @@ void SendData::PerformHttpPost(const char *postData) {
         }
         mbOtaAppValidated = true;
     } 
+
+    mrWatchdog.clear();
 
     if (HTTP_KEEP_ALIVE_ENABLED)
         return;
@@ -324,11 +323,11 @@ void SendData::EventHandler(int32_t id, void* event_data) {
 
 }
 
-SendData::SendData(Config &config, Cellular &cellular) : mrConfig(config), mrCellular(cellular) {
+SendData::SendData(Config &config, Cellular &cellular, Watchdog &watchdog) : mrConfig(config), mrCellular(cellular), mrWatchdog(watchdog) {
     esp_event_loop_args_t loop_args = {
         .queue_size = SENDDATA_QUEUE_SIZE,
         .task_name = "SendData",
-        .task_priority = ESP_TASK_MAIN_PRIO,
+        .task_priority = ESP_TASKD_EVENT_PRIO,
         .task_stack_size = 8192,
         .task_core_id = tskNO_AFFINITY //CORE_ID_REGVAL_APP
     };

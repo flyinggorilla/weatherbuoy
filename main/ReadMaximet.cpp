@@ -62,6 +62,12 @@ bool bDayTime = true; /////////////////////////////// TODO *********************
         if (!serial.ReadLine(line)) {
             ESP_LOGE(tag, "Could not read line from serial");
         }
+
+        if (mrSendData.isRestart()) {
+            serial.Release();
+            ESP_LOGI(tag, "System entered OTA, stopping Maximet Data Collection.");
+            return;
+        }
         
         int dataStart = line.indexOf(STX);
         int dataEnd = line.lastIndexOf(ETX);

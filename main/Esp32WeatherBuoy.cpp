@@ -6,6 +6,7 @@
 #include "Config.h"
 #include "SendData.h"
 #include "ReadMaximet.h"
+#include "Watchdog.h"
 #include "Wifi.h"
 #include "Cellular.h"
 #include "Max471Meter.h"
@@ -93,7 +94,8 @@ void Esp32WeatherBuoy::Start() {
     //TestATCommands();
     //TestHttp();
 
-    SendData sendData(config, cellular);
+    Watchdog watchdog(60*10);
+    SendData sendData(config, cellular, watchdog);
 
     ReadMaximet readMaximet(config, sendData);
     readMaximet.Start();

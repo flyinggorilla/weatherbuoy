@@ -34,6 +34,7 @@ public:
     String msOperator;
     String msHardware;
     String msSubscriber;
+    String msNetworkmode;
 
 private:
     bool TurnOn();
