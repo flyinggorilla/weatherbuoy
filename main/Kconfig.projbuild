@@ -42,19 +42,29 @@ menu "Weatherbuoy"
         string "Network provider PASS (Leave blank for Yesss network)."
         default ""
 
-    config WEATHERBUOY_READMAXIMET_RX_PIN
-        int "RX serial GPIO port to receive Maximet data. Defaults to 13 on TTGO"
-        help
-            dont use default RX/TX GPIO as it is needed for console output.
-            dont use conflicting internal flash and boot-blocking GPIO 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12 
-        default 13
+    config WEATHERBUOY_CELLULAR_OPERATOR
+        string "Preferred network operator. Default = A1"
+        default "A1"
 
-    config WEATHERBUOY_READMAXIMET_TX_PIN
-        int "TX serial GPIO port to send Maximet data. 16 on Huzzah32, 1 or 12 on TTGO"
-        help
-            dont use default RX/TX GPIO as it is needed for console output.
-            dont use conflicting internal flash and boot-blocking GPIO 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12 
-        default 14
-                
-
+    config WEATHERBUOY_CELLULAR_NETWORK
+        int "Preferred network mode. Default = 2 (automatic)"
+        help  
+              2 - Automatic
+              9 - CDMA Only
+              13 - GSM Only
+              14 - WCDMA Only
+              38 – LTE Only
+              59 – TDS-CDMA Only
+              10 – EVDO Only
+              19 – GSM+WCDMA Only
+              22 – CDMA+EVDO Only
+              48 – Any but LTE
+              60 – GSM+TDSCDMA Only
+              63 – GSM+WCDMA+TDSCDMA Only
+              67 – CDMA+EVDO+GSM+WCDMA+TDSCDMA Only
+              39 – GSM+WCDMA+LTE Only
+              51 – GSM+LTE Only
+              54 – WCDMA+LTE Only
+        default 2
+            
 endmenu

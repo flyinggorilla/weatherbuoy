@@ -12,7 +12,7 @@ public:
 	virtual ~ReadMaximet();
 
     //start the task
-    void Start();
+    void Start(int gpioRX, int gpioTX);
 
 private:
     //main loop run by the task
@@ -21,6 +21,8 @@ private:
 
     Config &mrConfig;
     SendData &mrSendData;
+    int mgpioRX;
+    int mgpioTX;
 };
 
 #endif 

@@ -24,12 +24,24 @@ static const char tag[] = "WeatherBuoy";
     // Using ADC1 with possible GPIO: 32, 34, 35, 36, 39 
     #define CONFIG_MAX471METER_GPIO_VOLTAGE 35 
     #define CONFIG_MAX471METER_GPIO_CURRENT 34
+
+    // MAXIMET Serial
+    // dont use default RX/TX GPIO as it is needed for console output.
+    // dont use conflicting internal flash and boot-blocking GPIO 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12 
+    #define CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN 13 
+    #define CONFIG_WEATHERBUOY_READMAXIMET_TX_PIN 14 
 #elif CONFIG_LILYGO_TTGO_TPCIE_SIM7600
     // LILYGO® TTGO T-PCIE SIM7600
     // ADC ----------------------------
-    // Using ADC1 with possible GPIO: 32, 33, 34, 35, 39 
-    #define CONFIG_MAX471METER_GPIO_VOLTAGE 33 
+    // Using ADC1 with possible GPIO: 32, 34, 35, 39 (note GPIO 33 did not work)
+    #define CONFIG_MAX471METER_GPIO_VOLTAGE 39 
     #define CONFIG_MAX471METER_GPIO_CURRENT 34
+
+    // MAXIMET Serial
+    // dont use default RX/TX GPIO as it is needed for console output.
+    // dont use conflicting internal flash and boot-blocking GPIO 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12 
+    #define CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN 13 
+    #define CONFIG_WEATHERBUOY_READMAXIMET_TX_PIN 14 
 #endif
 
 
@@ -71,8 +83,8 @@ void Esp32WeatherBuoy::Start() {
     OnlineMode onlineMode = MODE_CELLULAR;
     switch(onlineMode) {
         case MODE_CELLULAR: 
-            cellular.InitModem(config.msCellularApn, config.msCellularUser, config.msCellularPass);
-            cellular.Start();
+            cellular.InitModem();
+            cellular.Start(config.msCellularApn, config.msCellularUser, config.msCellularPass, config.msCellularOperator, config.miCellularNetwork);
             cellular.SwitchToPppMode();
             break;
         case MODE_WIFISTA:
@@ -94,11 +106,11 @@ void Esp32WeatherBuoy::Start() {
     //TestATCommands();
     //TestHttp();
 
-    Watchdog watchdog(60*10);
+    Watchdog watchdog(60*15);
     SendData sendData(config, cellular, watchdog);
 
     ReadMaximet readMaximet(config, sendData);
-    readMaximet.Start();
+    readMaximet.Start(CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN, CONFIG_WEATHERBUOY_READMAXIMET_TX_PIN);
 
     while (true) {
         if (!sendData.PostHealth(max471Meter.Voltage(), max471Meter.Current())) {
@@ -225,5 +237,27 @@ void TestATCommands(Cellular &cellular) {
     // cellular.Command("AT+CREG=?", "OK", nullptr,  "List of Network Registration Information States"); // +CREG: (0-2)
     // cellular.Command("AT+CREG=1", "OK", nullptr,  "Register on home network");  // OK
     // cellular.Command("AT+CGATT=?", "OK", nullptr,  "Attach/Detach to GPRS. List of supported states"); // +CGATT: (0,1)
+
+
+        //Command("AT+CNMP=?", "OK", nullptr, "List of preferred modes"); // +CNMP: (2,9,10,13,14,19,22,38,39,48,51,54,59,60,63,67)
+        //Command("AT+CNMP?", "OK", nullptr, "Preferred mode"); 
+            //Command("AT+CNMP=13", "OK", &response, "Preferred mode"); // +CNMP: 2 // 2 = automatic
+            //  Command("AT+CNMP=38", "OK", &response, "Preferred mode"); // +CNMP: 2 // 2 = automatic
+            //        Command("AT+CNSMOD=2", "OK", nullptr, "Set GPRS mode"); 
+
+        //Command("AT+CEREG=?", "OK", nullptr, "List of EPS registration stati");
+        //Command("AT+CEREG?", "OK", nullptr, "EPS registration status"); // +CEREG: 0,4
+                                                // 4 – unknown (e.g. out of E-UTRAN coverage)
+                                                // 5 - roaming
+
+
+        //Command("AT+NETMODE?", "OK", nullptr, "EPS registration status"); // 2 – WCDMA mode(default)
+        //Command("AT+CPOL?", "OK", nullptr, "Preferred operator list"); // 
+        //Command("AT+COPN", "OK", nullptr, "Read operator names"); // ... +COPN: "23201","A1" ... // list of thousands!!!!!
+
+        //Command("AT+CGDATA=?", "OK", nullptr, "Read operator names"); // 
+//    Command("AT+IPR=?", "OK", &response,  "Operator Selection"); // AT+IPR=?
+                                                                // +IPR: (0,300,600,1200,2400,4800,9600,19200,38400,57600,115200,230400,460800,921600,3000000,3200000,3686400)
+
 
 }

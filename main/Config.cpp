@@ -19,6 +19,8 @@ Config::Config() {
     msCellularApn = CONFIG_WEATHERBUOY_CELLULAR_APN;
     msCellularUser = CONFIG_WEATHERBUOY_CELLULAR_USER;
     msCellularPass = CONFIG_WEATHERBUOY_CELLULAR_PASS;
+	msCellularOperator = CONFIG_WEATHERBUOY_CELLULAR_OPERATOR;
+	miCellularNetwork = CONFIG_WEATHERBUOY_CELLULAR_NETWORK;
 }
 
 Config::~Config() {
@@ -46,6 +48,8 @@ bool Config::Load(){
 	ReadString(h, "CellularApn", msCellularApn);
 	ReadString(h, "CellularUser", msCellularUser);
 	ReadString(h, "CellularPass", msCellularPass);
+	ReadString(h, "CellularOperator", msCellularOperator);
+	ReadInt(h, "CellularNetwork", miCellularNetwork);
 
 	nvs_close(h);
 	return true;

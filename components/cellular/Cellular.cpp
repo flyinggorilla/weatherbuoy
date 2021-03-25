@@ -23,9 +23,10 @@ static const char tag[] = "Cellular";
     #define CELLULAR_GPIO_RX GPIO_NUM_26
     #define CELLULAR_GPIO_STATUS GPIO_NUM_32
     #define CELLULAR_DEFAULT_BAUD_RATE 115200
-    #define CELLULAR_ACCELERATED_BAUD_RATE 460800 // alt: 230400
+    #define CELLULAR_ACCELERATED_BAUD_RATE 115200*2 // alt: 230400
     #define CELLULAR_UART_EVENT_QUEUE_SIZE 8
     #define CELLULAR_UART_RX_RECEIVE_BUFFER_SIZE 1024*4
+    #define CELLULAR_UART_SEND_BUFFER_SIZE 1024*2
 #elif CONFIG_LILYGO_TTGO_TPCIE_SIM7600
     // LILYGO® TTGO T-PCIE SIM7600
     #define CELLULAR_GPIO_PWKEY GPIO_NUM_4
@@ -36,9 +37,21 @@ static const char tag[] = "Cellular";
     #define CELLULAR_GPIO_STATUS GPIO_NUM_36
     #define CELLULAR_DEFAULT_BAUD_RATE 115200
     #define CELLULAR_ACCELERATED_BAUD_RATE 115200*8
-    #define CELLULAR_UART_EVENT_QUEUE_SIZE 256
-    #define CELLULAR_UART_RX_RECEIVE_BUFFER_SIZE 1024
+    #define CELLULAR_UART_EVENT_QUEUE_SIZE 16
+    #define CELLULAR_UART_RX_RECEIVE_BUFFER_SIZE 1024*16
+    #define CELLULAR_UART_SEND_BUFFER_SIZE 1024*2
 #endif
+
+
+/* TODO to keep up with buffer performance issues? intterrupt handler and copy buffer myself?
+
+Create a proper ISR and mark it IRAM_ATTR so that it's always in the cache.
+
+In the ISR, copy the data from uart_read_bytes into a queue (xQueueSendFromISR) and don't do any other work, to keep the ISR small and fast.
+
+Definitely don't call printf or log from an ISR. Create another (user) task and call xQueueReceive in a loop there, where you can print the data and do any other work.
+
+*/
 
 void cellularEventHandler(void* ctx, esp_event_base_t base, int32_t id, void* event_data)
 {
@@ -48,11 +61,7 @@ void cellularEventHandler(void* ctx, esp_event_base_t base, int32_t id, void* ev
 Cellular::Cellular() {
 }
 
-bool Cellular::InitModem(String apn, String user, String pass) {
-    msApn = apn;
-    msUser = user;
-    msPass = pass;
-
+bool Cellular::InitModem() {
     uart_config_t uart_config = {
         .baud_rate = CELLULAR_DEFAULT_BAUD_RATE,  // default baud rate, use AT+IPR command to set higher speeds 460800 is max of CONFIG_LILYGO_TTGO_TCALL14_SIM800
         .data_bits = UART_DATA_8_BITS,
@@ -65,10 +74,10 @@ bool Cellular::InitModem(String apn, String user, String pass) {
     muiUartNo = UART_NUM_2; // UART_NUM_1 is reserved for Maximet reading
     int bufferSize = CELLULAR_UART_RX_RECEIVE_BUFFER_SIZE;
     static int iUartEventQueueSize = CELLULAR_UART_EVENT_QUEUE_SIZE; 
-    ESP_ERROR_CHECK(uart_driver_install(muiUartNo, bufferSize, 0, iUartEventQueueSize, &mhUartEventQueueHandle, 0));
+    ESP_ERROR_CHECK(uart_driver_install(muiUartNo, bufferSize, CELLULAR_UART_SEND_BUFFER_SIZE, iUartEventQueueSize, &mhUartEventQueueHandle, 0));
     ESP_ERROR_CHECK(uart_param_config(muiUartNo, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(muiUartNo, CELLULAR_GPIO_TX, CELLULAR_GPIO_RX, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
-    muiBufferSize = bufferSize;
+    muiBufferSize = bufferSize/2;
     muiBufferPos = 0;
     muiBufferLen = 0;
     mpBuffer = (uint8_t *) malloc(muiBufferSize+16);
@@ -192,7 +201,15 @@ bool Cellular::TurnOn(void)
 
 
 
-void Cellular::Start() {
+void Cellular::Start(String apn, String user, String pass, String preferredOperator, int preferredNetwork) {
+    msApn = apn;
+    msUser = user;
+    msPass = pass;
+    msPreferredOperator = preferredOperator;
+    miPreferredNetwork = preferredNetwork;
+
+
+
     String response;
     String command;
 
@@ -221,10 +238,6 @@ void Cellular::Start() {
         ESP_LOGE(tag, "Error, PIN required: %s", response.c_str());
     }
 
-
-//    Command("AT+IPR=?", "OK", &response,  "Operator Selection"); // AT+IPR=?
-                                                                // +IPR: (0,300,600,1200,2400,4800,9600,19200,38400,57600,115200,230400,460800,921600,3000000,3200000,3686400)
-//    ESP_LOGD(tag, "Baud Rates: %s", response.c_str());
 
     #ifdef CONFIG_LILYGO_TTGO_TCALL14_SIM800
         if (Command("AT+IPR=460800", "OK", &response,  "Set 460800 baud rate. Default = 115200.")) {
@@ -265,63 +278,26 @@ void Cellular::Start() {
 
 
 //##########**************** THATS THE DEAL!!
-Command("AT+COPS=0,0,\"A1\"", "OK", nullptr, "Set operator to A1");
+        command = "AT+COPS=0,0,\"";
+        command += msPreferredOperator;
+        command += "\"";
+        if(Command(command.c_str(), "OK", &response, "Set preferred operator")) {
+            ESP_LOGI(tag, "Set preferred operator to '%s'", msPreferredOperator.c_str());
+        } else {
+            ESP_LOGW(tag, "Could not set preferred operator to '%s': %s", msPreferredOperator.c_str(), response.c_str());
+        }
 
-        Command("AT+CNMP=?", "OK", nullptr, "List of preferred modes"); // +CNMP: (2,9,10,13,14,19,22,38,39,48,51,54,59,60,63,67)
-        Command("AT+CNMP?", "OK", nullptr, "Preferred mode"); // +CNMP: 2 // 2 = automatic
-                                                                //  2 – Automatic
-                                                                // 13 – GSM Only
-                                                                // 14 – WCDMA Only
-                                                                // 38 – LTE Only
-                                                                // 59 – TDS-CDMA Only
-                                                                // 9 – CDMA Only
-                                                                // 10 – EVDO Only
-                                                                // 19 – GSM+WCDMA Only
-                                                                // 22 – CDMA+EVDO Only
-                                                                // 48 – Any but LTE 
-                                                                // 60 – GSM+TDSCDMA Only
-                                                                // 63 – GSM+WCDMA+TDSCDMA Only
-                                                                // 67 – CDMA+EVDO+GSM+WCDMA+TDSCDMA Only
-                                                                // 39 – GSM+WCDMA+LTE Only
-                                                                // 51 – GSM+LTE Only
-                                                                // 54 – WCDMA+LTE Only
-
-
-//ESP_LOGW(tag, "Setting to GSM");
-        Command("AT+CNMP=2", "OK", &response, "Preferred mode"); // +CNMP: 2 // 2 = automatic
-//ESP_LOGW(tag, "Set to GSM: %s", response.c_str());
-
-
-//        Command("AT+CNSMOD=2", "OK", nullptr, "Set GPRS mode"); 
-
-        Command("AT+CEREG=?", "OK", nullptr, "List of EPS registration stati");
-        Command("AT+CEREG?", "OK", nullptr, "EPS registration status"); // +CEREG: 0,4
-                                                // 4 – unknown (e.g. out of E-UTRAN coverage)
-                                                // 5 - roaming
-
-
-        //Command("AT+NETMODE?", "OK", nullptr, "EPS registration status"); // 2 – WCDMA mode(default)
-        //Command("AT+CPOL?", "OK", nullptr, "Preferred operator list"); // 
-        //Command("AT+COPN", "OK", nullptr, "Read operator names"); // ... +COPN: "23201","A1" ... // list of thousands!!!!!
-
-        Command("AT+CGDATA=?", "OK", nullptr, "Read operator names"); // 
+        command = "AT+CNMP=";
+        command += miPreferredNetwork;
+        if(Command(command.c_str(), "OK", &response, "Set preferred network")) {
+            ESP_LOGI(tag, "Set preferred network to '%d'", miPreferredNetwork);
+        } else {
+            ESP_LOGW(tag, "Could not set preferred network to %i: %s", miPreferredNetwork, response.c_str());
+        }
 
 
         int maxWaitForNetworkRegistration = 120;
         while (maxWaitForNetworkRegistration--) {
-            if (Command("AT+CEREG?", "OK", &response, "Network Registration Information States ")) { // +CREG: 0,2 // +CREG: 1,5
-                if (response.indexOf("+CEREG: ") >= 0 && response.indexOf(",5") >= 0)
-                    break;
-            }
-                                                                                            // 0 – not registered, MT is not currently searching an operator to register to
-                                                                                            // 1 – registered, home network 
-                                                                                            // 2 – not registered, but MT is currently trying to attach or searching an operator to register to 
-                                                                                            // 3 – registration denied
-                                                                                            // 4 – unknown (e.g. out of E-UTRAN coverage)
-                                                                                            // 5 – registered, roaming 
-                                                                                            // 6 – registered for "SMS only", home network (not applicable) 
-                                                                                            // 7 – registered for "SMS only", roaming (not applicable) 
-                                                                                            // 8 – attached for emergency bearer services only (See NOTE 2)
             if (Command("AT+CREG?", "OK", &response, "Network Registration Information States ")) { // +CREG: 0,2 // +CREG: 1,5
                 if (response.indexOf("+CREG: ") >= 0 && ((response.indexOf(",5") >= 0) || (response.indexOf(",1") >= 0)))
                     break;
@@ -337,9 +313,6 @@ Command("AT+COPS=0,0,\"A1\"", "OK", nullptr, "Set operator to A1");
             vTaskDelay(1000/portTICK_PERIOD_MS);
         } 
     #endif
-    //vTaskDelay(10000/portTICK_PERIOD_MS);
-
-    Command("AT+CNSMOD=?", "OK", nullptr, "List of network system modes"); // +CNSMOD: (0-1)
 
     msNetworkmode = "";
     if(Command("AT+CNSMOD?", "OK", &response, "Current network system mode")) { // +CNSMOD: 0,4
@@ -421,7 +394,11 @@ void Cellular::ReceiverTask() {
         // ppp mode
         bool read = ReadIntoBuffer();
         if (read) {
-            esp_netif_receive(mModemNetifDriver.base.netif, mpBuffer, muiBufferLen, NULL);
+            if(muiBufferLen) {
+                esp_netif_receive(mModemNetifDriver.base.netif, mpBuffer, muiBufferLen, NULL);
+            }
+            //else
+            //    ESP_LOGI(tag, ".");
             //ESP_LOGD(tag, "ReceiverTask() received %d bytes", muiBufferLen);
         } else {
             ESP_LOGE(tag, "ReceiverTask() ReadIntoBuffer return false");
@@ -464,9 +441,9 @@ bool Cellular::ReadIntoBuffer() {
             other types of events. If we take too much time on data event, the queue might
             be full.*/
             case UART_DATA: {
-                    int length = 0;
-                    ESP_ERROR_CHECK(uart_get_buffered_data_len(muiUartNo, (size_t*)&length));        
-                    int len = uart_read_bytes(muiUartNo, mpBuffer, muiBufferSize, 0); //100 / portTICK_RATE_MS); // wait 100ms to fill buffer
+                    //int length = 0;
+                    //ESP_ERROR_CHECK(uart_get_buffered_data_len(muiUartNo, (size_t*)&length));        
+                    int len = uart_read_bytes(muiUartNo, mpBuffer, muiBufferSize, 100 / portTICK_RATE_MS); 
                     if (len < 0) {
                         ESP_LOGE(tag, "Error reading from serial interface #%d", muiUartNo);
                         return false;
@@ -482,12 +459,12 @@ bool Cellular::ReadIntoBuffer() {
                 }
             //Event of HW FIFO overflow detected
             case UART_FIFO_OVF:
-                //ESP_LOGW(tag, "hw fifo overflow");
+                ESP_LOGW(tag, "hw fifo overflow");
                 // If fifo overflow happened, you should consider adding flow control for your application.
                 // The ISR has already reset the rx FIFO,
                 // As an example, we directly flush the rx buffer here in order to read more data.
-                uart_flush_input(muiUartNo);
-                xQueueReset(mhUartEventQueueHandle);
+                //uart_flush_input(muiUartNo);
+                //xQueueReset(mhUartEventQueueHandle);
                 break;
             //Event of UART ring buffer full
             case UART_BUFFER_FULL:

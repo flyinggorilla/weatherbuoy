@@ -11,7 +11,7 @@
 #include "esputil.h"
 
 static const char tag[] = "SendData";
-static const int SENDDATA_QUEUE_SIZE = (5); 
+static const int SENDDATA_QUEUE_SIZE = (3); 
 static const unsigned int MAX_ACCEPTABLE_RESPONSE_BODY_LENGTH = 16*1024;
 static const bool HTTP_KEEP_ALIVE_ENABLED = true;  // enabling doesnt work on local test system, SSL connections abort
 
@@ -89,6 +89,7 @@ void SendData::PerformHttpPost(const char *postData) {
         mEspHttpClientConfig.keep_alive_interval = 15; */
         mhEspHttpClient = esp_http_client_init(&mEspHttpClientConfig);
         //ESP_LOGD(tag, "Initializing new connection (keep-alive might have failed)");
+        //mEspHttpClientConfig.timeout_ms
     }
 
     // POST message
@@ -147,13 +148,16 @@ void SendData::PerformHttpPost(const char *postData) {
         mPostData += ",";
         mPostData += (unsigned long)(mrCellular.getDataReceived()/1024); // convert to kB
         mPostData += "\r\n";
-        mPostData += "cellularstatus: ";
+        mPostData += "cellularoperator: ";
         mPostData += mrCellular.msOperator;
-        mPostData += ",";
+        mPostData += "\r\n";
+        mPostData += "cellularsubscriber: ";
         mPostData += mrCellular.msSubscriber;
-        mPostData += ",";
+        mPostData += "\r\n";
+        mPostData += "cellularhardware: ";
         mPostData += mrCellular.msHardware;
-        mPostData += ",";
+        mPostData += "\r\n";
+        mPostData += "cellularnetworkmode: ";
         mPostData += mrCellular.msNetworkmode;
         mPostData += "\r\n";
         mPostData += "battery: ";
@@ -262,6 +266,8 @@ void SendData::PerformHttpPost(const char *postData) {
             // Optionally Execute OTA Update command
             if (command.equals("update")) {
                 mbRestart = true;
+                Cleanup();
+
                 const String &pem = ReadMessagePemValue("set-cert-pem:");
                 mEspHttpClientConfig.method = HTTP_METHOD_GET; 
                 if (!mrConfig.msTargetUrl.endsWith("/")) {

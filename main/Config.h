@@ -36,6 +36,8 @@ public:
 	String msCellularApn;
 	String msCellularUser;
 	String msCellularPass;
+	String msCellularOperator;
+	int miCellularNetwork;
 	int miSendDataIntervalDaytime; // seconds
 	int miSendDataIntervalNighttime; // seconds
 	int miSendDataIntervalHealth; // seconds

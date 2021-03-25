@@ -1,7 +1,6 @@
 #ifndef MAIN_CELLULAR_H_
 #define MAIN_CELLULAR_H_
 
-#include "Config.h"
 #include "EspString.h"
 #include "driver/uart.h"
 #include "driver/gpio.h"
@@ -21,15 +20,18 @@ typedef struct esp_cellular_netif_driver_s {
 class Cellular {
 public:
     Cellular();
-	bool InitModem(String apn, String user, String pass); // call before Start()
+	bool InitModem(); // call before Start()
 	virtual ~Cellular();
-    void Start(); // call after Init()
+    void Start(String apn, String user, String pass, String preferredOperator, int preferredNetwork); // call after Init()
     bool Command(const char *sCommand,const char *sSuccess, String *sResponse = nullptr, const char *sInfo = nullptr, unsigned short maxLines = 100);
     bool SwitchToCommandMode(); // todo, move to private
     bool SwitchToPppMode(); // can be moved to private
 
     unsigned long long getDataSent() { return mullSentTotal; };
     unsigned long long getDataReceived() { return mullReceivedTotal; };
+
+    String msPreferredOperator;
+    int miPreferredNetwork;
 
     String msOperator;
     String msHardware;

@@ -18,7 +18,9 @@ void fReadMaximetTask(void *pvParameter) {
 	vTaskDelete(NULL);
 }
 
-void ReadMaximet::Start() {
+void ReadMaximet::Start(int gpioRX, int gpioTX) {
+    mgpioRX = gpioRX;
+    mgpioTX = gpioTX;
 	xTaskCreate(&fReadMaximetTask, "ReadMaximet", 8192, this, ESP_TASK_MAIN_PRIO, NULL);
 } 
 
@@ -33,7 +35,7 @@ void ReadMaximet::ReadMaximetTask() {
 
     // Cannot use GPIO 12, as it will prevent to boot when pulled high.
     // Change ports from default RX/TX to not conflict with Console
-    Serial serial(UART_NUM_1, CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN, CONFIG_WEATHERBUOY_READMAXIMET_TX_PIN, SERIAL_BAUD_RATE, SERIAL_BUFFER_SIZE);
+    Serial serial(UART_NUM_1, mgpioRX, mgpioTX, SERIAL_BAUD_RATE, SERIAL_BUFFER_SIZE);
 
     ESP_LOGI(tag, "ReadMaximet task started. Waiting 30seconds for attaching to serial interface.");
     vTaskDelay(30*1000/portTICK_PERIOD_MS);
