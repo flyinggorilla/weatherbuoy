@@ -16,7 +16,7 @@ public:
 
     // post string data to a message queue for sending. Data is copied into queue
     bool PostData(String &data);
-    bool PostHealth(unsigned int powerVoltage, unsigned int powerCurrent);
+    bool PostHealth(unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature);
     bool isRestart() { return mbRestart; };
 private:
     esp_event_loop_handle_t mhLoopHandle = nullptr;
@@ -42,6 +42,8 @@ private: // esp http client
 private: // health data
     unsigned int muiPowerVoltage = 0;
     unsigned int muiPowerCurrent = 0;
+    float mfBoardTemperature = 0;
+    float mfWaterTemperature = 0;
 
 };
 

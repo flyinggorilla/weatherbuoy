@@ -10,6 +10,7 @@
 #include "Wifi.h"
 #include "Cellular.h"
 #include "Max471Meter.h"
+#include "TemperatureSensors.h"
 #include "nvs_flash.h"
 #include "esp_ota_ops.h"
 
@@ -42,7 +43,17 @@ static const char tag[] = "WeatherBuoy";
     // dont use conflicting internal flash and boot-blocking GPIO 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12 
     #define CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN 13 
     #define CONFIG_WEATHERBUOY_READMAXIMET_TX_PIN 14 
+
+    // OneWire protocol for temperature sensors DS18B20
+    #define CONFIG_TEMPERATURESENSOR_GPIO_ONEWIRE 15 
+    // Test setup DS18B20:
+    // Breadboard TOS ROM code: "303c01e076e5f528" 
+    // Waterproof sensor ROM code: "220120639e26f028"
 #endif
+
+
+
+
 
 
 Esp32WeatherBuoy esp32WeatherBuoy;
@@ -72,6 +83,9 @@ void Esp32WeatherBuoy::Start() {
     if (!config.Load()) {
         ESP_LOGE(tag, "Error, could not load configuration.");
     }
+
+    TemperatureSensors tempSensors(config);
+    tempSensors.Init(CONFIG_TEMPERATURESENSOR_GPIO_ONEWIRE);
 
     ESP_LOGI(tag, "Hostname: %s", config.msHostname.c_str());
     ESP_LOGI(tag, "Target URL: %s", config.msTargetUrl.c_str());
@@ -113,7 +127,8 @@ void Esp32WeatherBuoy::Start() {
     readMaximet.Start(CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN, CONFIG_WEATHERBUOY_READMAXIMET_TX_PIN);
 
     while (true) {
-        if (!sendData.PostHealth(max471Meter.Voltage(), max471Meter.Current())) {
+        tempSensors.Read();
+        if (!sendData.PostHealth(max471Meter.Voltage(), max471Meter.Current(), tempSensors.BoardTemp(), tempSensors.WaterTemp())) {
                 ESP_LOGE(tag, "Could not post data, likely due to a full queue");
         }
         vTaskDelay(config.miSendDataIntervalHealth*1000 / portTICK_PERIOD_MS);

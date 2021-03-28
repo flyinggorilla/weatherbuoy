@@ -5,6 +5,8 @@
 
 #define NVS_NAME "Config"
 
+// NOTE: Keys are limited to 15 characters
+
 Config::Config() {
 	mbAPMode = true;
 	msAPSsid = CONFIG_WEATHERBUOY_HOSTNAME;
@@ -39,8 +41,8 @@ bool Config::Load(){
 	ReadString(h, "STASsid", msSTASsid);
 	ReadString(h, "STAPass", msSTAPass);
 	ReadString(h, "Hostname", msHostname);
-	ReadInt(h, "IntervalDaytime", miSendDataIntervalDaytime);
-	ReadInt(h, "IntervalNighttime", miSendDataIntervalNighttime);
+	ReadInt(h, "IntervalDay", miSendDataIntervalDaytime);
+	ReadInt(h, "IntervalNight", miSendDataIntervalNighttime);
 	ReadInt(h, "IntervalHealth", miSendDataIntervalHealth);
 	ReadString(h, "TargetUrl", msTargetUrl);
 	ReadString(h, "MaximetColumns", msMaximetColumns);
@@ -50,6 +52,8 @@ bool Config::Load(){
 	ReadString(h, "CellularPass", msCellularPass);
 	ReadString(h, "CellularOperator", msCellularOperator);
 	ReadInt(h, "CellularNetwork", miCellularNetwork);
+	ReadString(h, "BoardSensorId", msBoardTempSensorId);
+	ReadString(h, "WaterSensorId", msWaterTempSensorId);
 
 	nvs_close(h);
 	return true;
@@ -81,9 +85,9 @@ bool Config::Save()
 		return nvs_close(h), false;
 	if (!WriteString(h, "TargetUrl", msTargetUrl))
 		return nvs_close(h), false;
-	if (!WriteInt(h, "IntervalDaytime", miSendDataIntervalDaytime))
+	if (!WriteInt(h, "IntervalDay", miSendDataIntervalDaytime))
 		return nvs_close(h), false;
-	if (!WriteInt(h, "IntervalNighttime", miSendDataIntervalNighttime))
+	if (!WriteInt(h, "IntervalNight", miSendDataIntervalNighttime))
 		return nvs_close(h), false;
 	if (!WriteInt(h, "IntervalHealth", miSendDataIntervalHealth))
 		return nvs_close(h), false;
@@ -97,6 +101,11 @@ bool Config::Save()
 	if (!WriteString(h, "CellularUser", msCellularUser))
 		return nvs_close(h), false;
 	if (!WriteString(h, "CellularPass", msCellularPass))
+		return nvs_close(h), false;
+
+	if (!WriteString(h, "BoardSensorId", msBoardTempSensorId))
+		return nvs_close(h), false;
+	if (!WriteString(h, "WaterSensorId", msWaterTempSensorId))
 		return nvs_close(h), false;
 
 	nvs_commit(h);

@@ -43,6 +43,8 @@ public:
 	int miSendDataIntervalHealth; // seconds
     String msMaximetColumns; 
     String msMaximetUnits; 
+	String msBoardTempSensorId;
+	String msWaterTempSensorId;
 
 };
 

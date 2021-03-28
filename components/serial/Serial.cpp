@@ -41,7 +41,7 @@ bool Serial::Attach() {
     } 
 
     if (muiUartNo == UART_NUM_1) {
-        ESP_LOGW(tag, "UART1 is used by flash memory. Be aware that you cannot use flash memory at the same time."); 
+        ESP_LOGD(tag, "UART1 is used by flash memory. Be aware that you cannot use flash memory at the same time."); 
         //https://www.lucadentella.it/en/2017/11/06/esp32-26-uart/
     }
     ESP_ERROR_CHECK(uart_driver_install(muiUartNo, muiBufferSize, 0, 0, NULL, 0));

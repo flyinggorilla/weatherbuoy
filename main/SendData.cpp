@@ -160,6 +160,15 @@ void SendData::PerformHttpPost(const char *postData) {
         mPostData += "cellularnetworkmode: ";
         mPostData += mrCellular.msNetworkmode;
         mPostData += "\r\n";
+        mPostData += "boardtemp: ";
+        mPostData += mfBoardTemperature;
+        mPostData += "\r\n";
+        mPostData += "watertemp: ";
+        mPostData += mfBoardTemperature;
+        mPostData += "\r\n";
+        mPostData += "cputemp: ";
+        mPostData += esp32_temperature();
+        mPostData += "\r\n";
         mPostData += "battery: ";
         mPostData += muiPowerVoltage;
         mPostData += ",";
@@ -353,9 +362,11 @@ bool SendData::PostData(String &data) {
     return false;
 }
 
-bool SendData::PostHealth(unsigned int powerVoltage, unsigned int powerCurrent) {
+bool SendData::PostHealth(unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature) {
     muiPowerVoltage = powerVoltage;
     muiPowerCurrent = powerCurrent;
+    mfBoardTemperature = boardTemperature;
+    mfWaterTemperature = waterTemperature;
     if (ESP_OK == esp_event_post_to(mhLoopHandle, SENDDATA_EVENT_BASE, SENDDATA_EVENT_POSTHEALTH, (void*)"", 0, 1000 / portTICK_PERIOD_MS))
         return true;
   
