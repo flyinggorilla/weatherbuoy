@@ -23,5 +23,6 @@
         "optional": "cpp",
         "streambuf": "cpp",
         "array": "cpp"
-    }
+    },
+    "C_Cpp.dimInactiveRegions": true
 }

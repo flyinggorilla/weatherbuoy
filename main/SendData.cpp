@@ -92,6 +92,10 @@ void SendData::PerformHttpPost(const char *postData) {
         //mEspHttpClientConfig.timeout_ms
     }
 
+    //##############################################
+    //######## TODO SEND as YAML?????? or JSON??? how much extra payload?
+    // there is a yaml to json parser, this should allow to send lighterweight yaml instead of full blown json data; https://www.npmjs.com/package/js-yaml 
+
     // POST message
     unsigned int uptime = (unsigned int) (esp_timer_get_time()/1000000); // seconds since start
     if(postData) {
@@ -148,8 +152,11 @@ void SendData::PerformHttpPost(const char *postData) {
         mPostData += ",";
         mPostData += (unsigned long)(mrCellular.getDataReceived()/1024); // convert to kB
         mPostData += "\r\n";
+        mPostData += "cellularnetwork: ";
+        mPostData += mrConfig.msCellularOperator;   
+        mPostData += "\r\n";
         mPostData += "cellularoperator: ";
-        mPostData += mrCellular.msOperator;
+        mPostData += mrCellular.msOperator;   
         mPostData += "\r\n";
         mPostData += "cellularsubscriber: ";
         mPostData += mrCellular.msSubscriber;
@@ -164,15 +171,15 @@ void SendData::PerformHttpPost(const char *postData) {
         mPostData += mfBoardTemperature;
         mPostData += "\r\n";
         mPostData += "watertemp: ";
-        mPostData += mfBoardTemperature;
+        mPostData += mfWaterTemperature;
         mPostData += "\r\n";
         mPostData += "cputemp: ";
         mPostData += esp32_temperature();
         mPostData += "\r\n";
         mPostData += "battery: ";
-        mPostData += muiPowerVoltage;
+        mPostData += (float)muiPowerVoltage/1000;
         mPostData += ",";
-        mPostData += muiPowerCurrent;
+        mPostData += (float)muiPowerCurrent/1000;
         mPostData += "\r\n";
         mbSendDiagnostics = false;
     }

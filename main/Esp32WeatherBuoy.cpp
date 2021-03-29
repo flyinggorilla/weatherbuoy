@@ -51,7 +51,8 @@ static const char tag[] = "WeatherBuoy";
     // Waterproof sensor ROM code: "220120639e26f028"
 #endif
 
-
+// Restart ESP32 if there is not data being successfully sent within a 15min period.
+#define CONFIG_WATCHDOG_SECONDS (60*15)
 
 
 
@@ -120,7 +121,7 @@ void Esp32WeatherBuoy::Start() {
     //TestATCommands();
     //TestHttp();
 
-    Watchdog watchdog(60*15);
+    Watchdog watchdog(CONFIG_WATCHDOG_SECONDS);
     SendData sendData(config, cellular, watchdog);
 
     ReadMaximet readMaximet(config, sendData);

@@ -44,8 +44,6 @@ public:
     String msMaximetColumns; 
     String msMaximetUnits; 
 	String msBoardTempSensorId;
-	String msWaterTempSensorId;
-
 };
 
 #endif /* MAIN_CONFIG_H_ */

@@ -53,7 +53,6 @@ bool Config::Load(){
 	ReadString(h, "CellularOperator", msCellularOperator);
 	ReadInt(h, "CellularNetwork", miCellularNetwork);
 	ReadString(h, "BoardSensorId", msBoardTempSensorId);
-	ReadString(h, "WaterSensorId", msWaterTempSensorId);
 
 	nvs_close(h);
 	return true;
@@ -104,8 +103,6 @@ bool Config::Save()
 		return nvs_close(h), false;
 
 	if (!WriteString(h, "BoardSensorId", msBoardTempSensorId))
-		return nvs_close(h), false;
-	if (!WriteString(h, "WaterSensorId", msWaterTempSensorId))
 		return nvs_close(h), false;
 
 	nvs_commit(h);
