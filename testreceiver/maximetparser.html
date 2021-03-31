@@ -1,0 +1,71 @@
+<html>
+<body>
+    <script>
+        // GMX501 Full data
+        // -------------------------------
+        // NODE,DIR,SPEED,CDIR,AVGDIR,AVGSPEED,GDIR,GSPEED,AVGCDIR,WINDSTAT,PRESS,PASL,PSTN,RH,TEMP,DEWPOINT,AH,COMPASSH,SOLARRAD,SOLARHOURS,WCHILL,HEATIDX,AIRDENS,WBTEMP,SUNR,SNOON,SUNS,SUNP,TWIC,TWIN,TWIA,XTILT,YTILT,ZORIENT,USERINF,TIME,VOLT,STATUS,CHECK
+        // -,DEG,MS,DEG,DEG,MS,DEG,MS,DEG,-,HPA,HPA,HPA,%,C,C,G/M3,DEG,WM2,HRS,C,C,KG/M3,C,-,-,-,DEG,-,-,-,DEG,DEG,-,-,-,V,-,-
+
+        // \x02Q,168,000.02,213,000,000.00,053,000.05,000,0000,0991.1,1046.2,0991.4,035,+023.2,+007.1,07.42,045,0000,00.00,,,1.2,+014.2,04:55,11:11,17:27,325:-33,04:22,03:45,03:06,-34,+55,+1,,2021-03-27T21:19:31.7,+04.6,0000,\x030F
+        // \x02Q,160,000.02,205,000,000.00,053,000.05,000,0000,0991.0,1046.1,0991.3,035,+023.2,+007.1,07.40,045,0000,00.00,,,1.2,+014.2,04:55,11:11,17:27,325:-33,04:22,03:45,03:06,-34,+55,+1,,2021-03-27T21:19:32.7,+04.6,0000,\x0304
+        // \x02Q,156,000.02,201,000,000.00,053,000.05,000,0000,0991.0,1046.1,0991.3,035,+023.2,+007.0,07.38,045,0000,00.00,,,1.2,+014.2,04:55,11:11,17:27,325:-33,04:22,03:45,03:06,-34,+55,+1,,2021-03-27T21:19:33.7,+04.6,0000,\x030A        
+
+        let columnsCsv = "NODE,DIR,SPEED,CDIR,AVGDIR,AVGSPEED,GDIR,GSPEED,AVGCDIR,WINDSTAT,PRESS,PASL,PSTN,RH,TEMP,DEWPOINT,AH,COMPASSH,SOLARRAD,SOLARHOURS,WCHILL,HEATIDX,AIRDENS,WBTEMP,SUNR,SNOON,SUNS,SUNP,TWIC,TWIN,TWIA,XTILT,YTILT,ZORIENT,USERINF,TIME,VOLT,STATUS,CHECK";
+        let unitsCsv = "-,DEG,MS,DEG,DEG,MS,DEG,MS,DEG,-,HPA,HPA,HPA,%,C,C,G/M3,DEG,WM2,HRS,C,C,KG/M3,C,-,-,-,DEG,-,-,-,DEG,DEG,-,-,-,V,-,-";
+
+        let columns = columnsCsv.split(",");
+        let units = unitsCsv.split(",");
+
+        const STX = "\x02";
+        const ETX = "\x03";
+
+        let dataSet = [];
+        dataSet.push("\x02Q,168,000.02,213,000,000.00,053,000.05,000,0000,0991.1,1046.2,0991.4,035,+023.2,+007.1,07.42,045,0000,00.00,,,1.2,+014.2,04:55,11:11,17:27,325:-33,04:22,03:45,03:06,-34,+55,+1,,2021-03-27T21:19:31.7,+04.6,0000,\x030F");
+        dataSet.push("\x02Q,160,000.02,205,000,000.00,053,000.05,000,0000,0991.0,1046.1,0991.3,035,+023.2,+007.1,07.40,045,0000,00.00,,,1.2,+014.2,04:55,11:11,17:27,325:-33,04:22,03:45,03:06,-34,+55,+1,,2021-03-27T21:19:32.7,+04.6,0000,\x0304");
+        dataSet.push("\x02Q,156,000.02,201,000,000.00,053,000.05,000,0000,0991.0,1046.1,0991.3,035,+023.2,+007.0,07.38,045,0000,00.00,,,1.2,+014.2,04:55,11:11,17:27,325:-33,04:22,03:45,03:06,-34,+55,+1,,2021-03-27T21:19:33.7,+04.6,0000,\x030A");        
+
+        //console.log(columns.length == units.length);
+
+        for (let i in dataSet) {
+            let measurement = processMaximet(dataSet[i], columns, units);
+            console.log(measurement);
+        }
+
+        function processMaximet(data, columns, units) {
+            //console.log(data);
+            let stxPos = data.indexOf("\x02");
+            let etxPos = data.lastIndexOf("\x03");
+            if (stxPos != 0 || etxPos <= 2) {
+                console.log("invalid data");
+                return;
+            }
+
+            let dataPoints = data.substring(stxPos+1, etxPos-1).split(",");
+            //console.log(dataPoints);
+
+            const unitsFloat = ["MS", "HPA", "%", "C", "G/M3", "WM2", "KG/M3", "V"];
+            const unitsText = ["-", ];
+            const unitsInt = ["DEG", "HRS"];
+
+            measurement = {};
+
+            for (p in dataPoints) {
+                if (unitsFloat.includes(units[p])) {
+                    dataPoints[p] = parseFloat(dataPoints[p]);
+                } else if (unitsInt.includes(units[p])) {
+                    dataPoints[p] = parseInt(dataPoints[p]);
+                } else {
+                }
+                measurement[columns[p]] = dataPoints[p];
+            }
+        
+            // console.log(dataPoints);
+            // console.log(measurement);
+            return measurement;
+        }
+
+
+
+    </script>
+</body>    
+</html>

@@ -72,7 +72,7 @@ bool Serial::ReadIntoBuffer() {
     muiBufferPos = 0;
     muiBufferLen = 0;
     while (!muiBufferLen) {
-        int len = uart_read_bytes(muiUartNo, mpBuffer, muiBufferSize, 1000 / portTICK_RATE_MS);
+        int len = uart_read_bytes(muiUartNo, mpBuffer, muiBufferSize, 250 / portTICK_RATE_MS);
         if (len < 0) {
             ESP_LOGE(tag, "Error reading from serial interface #%d", muiUartNo);
             return false;

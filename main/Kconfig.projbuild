@@ -8,7 +8,7 @@ menu "Weatherbuoy"
 
     config WEATHERBUOY_HOSTNAME
         string "Default Hostname and AP SSID. Max 32 char."
-        default "test.weatherbuoy"
+        default "buoytest"
         help
             Default Hostname. Will be also used for Wifi AP SSID. Max 32 char.
 

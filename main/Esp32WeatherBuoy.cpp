@@ -95,7 +95,9 @@ void Esp32WeatherBuoy::Start() {
     Max471Meter max471Meter(CONFIG_MAX471METER_GPIO_VOLTAGE, CONFIG_MAX471METER_GPIO_CURRENT);
     ESP_LOGI(tag, "Max471Meter: voltage %d mV, current %d mA??", max471Meter.Voltage(), max471Meter.Current());
 
-    OnlineMode onlineMode = MODE_CELLULAR;
+//    OnlineMode onlineMode = MODE_CELLULAR;
+    OnlineMode onlineMode = MODE_WIFISTA;
+
     switch(onlineMode) {
         case MODE_CELLULAR: 
             cellular.InitModem();

@@ -45,6 +45,7 @@ void ReadMaximet::ReadMaximetTask() {
     unsigned int uptimeMs = 0;
     unsigned int lastSendMs = 0; 
     unsigned int intervalMs = 0;
+    int skipped = 0;
 
     enum MaximetStates {
         UNDEFINED,
@@ -83,10 +84,12 @@ bool bDayTime = true; /////////////////////////////// TODO *********************
             }
             uptimeMs = (unsigned int)(esp_timer_get_time()/1000); // milliseconds since start
             if (intervalMs > uptimeMs - lastSendMs) {
-                ESP_LOGI(tag, "Skipping measurement data'%s' as %d ms < %d ms", line.c_str(), uptimeMs - lastSendMs, intervalMs);
+                ESP_LOGD(tag, "Skipping measurement data'%s' as %d ms < %d ms", line.c_str(), uptimeMs - lastSendMs, intervalMs);
+                skipped++;
             } else {
-                ESP_LOGI(tag, "Sending measurement data'%s' after %d ms", line.c_str(), uptimeMs - lastSendMs);
+                ESP_LOGI(tag, "Sending measurement data'%s' after %d ms (skipped %d)", line.c_str(), uptimeMs - lastSendMs, skipped);
                 lastSendMs = uptimeMs;
+                skipped = 0;
                 if (!mrSendData.PostData(line)) {
                     ESP_LOGE(tag, "Could not post data, likely due to a full queue");
                 }
