@@ -241,6 +241,7 @@ void SendData::PerformHttpPost(const char *postData) {
     int len = esp_http_client_read_response(mhEspHttpClient, (char*)mResponseData.c_str(), iContentLength);
     if ((len == iContentLength) && len) {
         ESP_LOGD(tag, "HTTP POST Response \r\n--->\r\n%s<---", mResponseData.c_str());
+ESP_LOGW(tag, "HTTP POST Response \r\n--->\r\n%s<---", mResponseData.c_str());
 
         // Interpret the Weatherbuoy messages
         String command = ReadMessageValue("command:");
