@@ -105,6 +105,16 @@ bool bDayTime = true; /////////////////////////////// TODO *********************
                     break;
                 }
             }
+
+            //TODO: add configuration mode and read columns/units after every startup:
+            // TX: *<CRLF>
+            // RX: SETUP MODE
+            // TX: REPORT<CRLF>
+            // RX: REPORT = NODE,DIR,SPEED,CDIR,AVGDIR,AVGSPEED,GDIR,GSPEED,AVGCDIR,WINDSTAT,PRESS,PASL,PSTN,RH,TEMP,DEWPOINT,AH,COMPASSH,SOLARRAD,SOLARHOURS,WCHILL,HEATIDX,AIRDENS,WBTEMP,SUNR,SNOON,SUNS,SUNP,TWIC,TWIN,TWIA,XTILT,YTILT,ZORIENT,USERINF,TIME,VOLT,STATUS,CHECK
+            // TX: UNITS<CRLF>
+            // RX: UNITS = -,DEG,MS,DEG,DEG,MS,DEG,MS,DEG,-,HPA,HPA,HPA,%,C,C,G/M3,DEG,WM2,HRS,C,C,KG/M3,C,-,-,-,DEG,-,-,-,DEG,DEG,-,-,-,V,-,-
+            // TX: EXIT<CRLF>
+
             if (ok) {
                 if (line.startsWith("STARTUP: OK")) {
                     maximetState = STARTUP;
