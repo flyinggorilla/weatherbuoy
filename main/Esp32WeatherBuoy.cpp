@@ -96,12 +96,13 @@ void Esp32WeatherBuoy::Start() {
     ESP_LOGI(tag, "Max471Meter: voltage %d mV, current %d mA??", max471Meter.Voltage(), max471Meter.Current());
 
 //    OnlineMode onlineMode = MODE_CELLULAR;
-    OnlineMode onlineMode = MODE_WIFISTA;
+    OnlineMode onlineMode = MODE_CELLULAR;
 
     switch(onlineMode) {
         case MODE_CELLULAR: 
             cellular.InitModem();
             cellular.Start(config.msCellularApn, config.msCellularUser, config.msCellularPass, config.msCellularOperator, config.miCellularNetwork);
+            // cellular.ReadSMS(); use only during firmware setup to receive a SIM based code 
             cellular.SwitchToPppMode();
             break;
         case MODE_WIFISTA:

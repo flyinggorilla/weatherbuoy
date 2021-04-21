@@ -23,6 +23,7 @@ public:
 	bool InitModem(); // call before Start()
 	virtual ~Cellular();
     void Start(String apn, String user, String pass, String preferredOperator, int preferredNetwork); // call after Init()
+    void ReadSMS();
     bool Command(const char *sCommand,const char *sSuccess, String *sResponse = nullptr, const char *sInfo = nullptr, unsigned short maxLines = 100);
     bool SwitchToCommandMode(); // todo, move to private
     bool SwitchToPppMode(); // can be moved to private

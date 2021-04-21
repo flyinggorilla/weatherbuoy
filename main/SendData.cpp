@@ -15,11 +15,12 @@ static const int SENDDATA_QUEUE_SIZE = (3);
 static const unsigned int MAX_ACCEPTABLE_RESPONSE_BODY_LENGTH = 16*1024;
 static const bool HTTP_KEEP_ALIVE_ENABLED = false;  // enabling doesnt work on local test system, SSL connections abort
 
+/*
 extern const unsigned char certificate_pem_start[] asm("_binary_certificate_pem_start");
 extern const unsigned char certificate_pem_end[]   asm("_binary_certificate_pem_end");
 unsigned int uWsCertLength = certificate_pem_end - certificate_pem_start;
 const char* sWsCert = (const char*)certificate_pem_start;
-
+*/
 
 //ESP_EVENT_DECLARE_BASE(SENDDATA_EVENT_BASE);
 ESP_EVENT_DEFINE_BASE(SENDDATA_EVENT_BASE);
@@ -118,6 +119,10 @@ void SendData::PerformHttpPost(const char *postData) {
     mPostData += esp_get_free_heap_size();
     mPostData += ",";
     mPostData += esp_get_minimum_free_heap_size();
+    mPostData += ",";
+    mPostData += muiPowerVoltage;
+    mPostData += ",";
+    mPostData += muiPowerCurrent;
     mPostData += "\r\n";
     if (mbSendDiagnostics) {
         mPostData += "esp-idf-version: ";
@@ -177,9 +182,9 @@ void SendData::PerformHttpPost(const char *postData) {
         mPostData += esp32_temperature();
         mPostData += "\r\n";
         mPostData += "battery: ";
-        mPostData += (float)muiPowerVoltage/1000;
+        mPostData += muiPowerVoltage;
         mPostData += ",";
-        mPostData += (float)muiPowerCurrent/1000;
+        mPostData += muiPowerCurrent;
         mPostData += "\r\n";
         mbSendDiagnostics = false;
     }
@@ -241,7 +246,6 @@ void SendData::PerformHttpPost(const char *postData) {
     int len = esp_http_client_read_response(mhEspHttpClient, (char*)mResponseData.c_str(), iContentLength);
     if ((len == iContentLength) && len) {
         ESP_LOGD(tag, "HTTP POST Response \r\n--->\r\n%s<---", mResponseData.c_str());
-ESP_LOGW(tag, "HTTP POST Response \r\n--->\r\n%s<---", mResponseData.c_str());
 
         // Interpret the Weatherbuoy messages
         String command = ReadMessageValue("command:");
@@ -284,6 +288,7 @@ ESP_LOGW(tag, "HTTP POST Response \r\n--->\r\n%s<---", mResponseData.c_str());
             if (command.equals("update")) {
                 mbRestart = true;
                 Cleanup();
+                memset(&mEspHttpClientConfig, 0, sizeof(esp_http_client_config_t));
 
                 const String &pem = ReadMessagePemValue("set-cert-pem:");
                 mEspHttpClientConfig.method = HTTP_METHOD_GET; 
@@ -292,10 +297,8 @@ ESP_LOGW(tag, "HTTP POST Response \r\n--->\r\n%s<---", mResponseData.c_str());
                 } 
                 mrConfig.msTargetUrl += "firmware.bin"; 
                 mEspHttpClientConfig.url = mrConfig.msTargetUrl.c_str();
-                mEspHttpClientConfig.skip_cert_common_name_check = false;
-                mEspHttpClientConfig.cert_pem = sWsCert;
+                mEspHttpClientConfig.skip_cert_common_name_check = false; // dont touch!!
                 if (pem.length()) {
-                    mEspHttpClientConfig.skip_cert_common_name_check = true;
                     mEspHttpClientConfig.cert_pem = pem.c_str();
                 } 
                 ESP_LOGI(tag, "OTA Url: %s", mEspHttpClientConfig.url);

@@ -36,7 +36,7 @@ static const char tag[] = "Cellular";
     #define CELLULAR_GPIO_RX GPIO_NUM_26
     #define CELLULAR_GPIO_STATUS GPIO_NUM_36
     #define CELLULAR_DEFAULT_BAUD_RATE 115200
-    #define CELLULAR_ACCELERATED_BAUD_RATE 115200*8
+    #define CELLULAR_ACCELERATED_BAUD_RATE 115200*4
     #define CELLULAR_UART_EVENT_QUEUE_SIZE 16
     #define CELLULAR_UART_RX_RECEIVE_BUFFER_SIZE 1024*16
     #define CELLULAR_UART_SEND_BUFFER_SIZE 1024*2
@@ -377,9 +377,15 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
     }
     ESP_LOGI(tag, "Subscriber: %s", msSubscriber.c_str());
 
-    
-
 } 
+
+void Cellular::ReadSMS() {
+    // READ SMS
+    String response;
+    Command("AT+CMGF=1", "OK", nullptr, "If the modem reponds with OK this SMS mode is supported"); 
+    Command("AT+CMGL=\"ALL\"", "OK", &response, "dump unread SMS", 1000); //
+    ESP_LOGI(tag, "SMS '%s'", response.c_str());    
+}
 
 void Cellular::ReceiverTask() {
     ESP_LOGD(tag, "Started Modem Receiver task");
@@ -586,7 +592,7 @@ bool Cellular::SwitchToPppMode() {
 
     #ifdef CONFIG_LILYGO_TTGO_TPCIE_SIM7600
         String response;
-        Command("AT+CGDCONT=?", "OK", &response, "blablabla");
+        Command("AT+CGDCONT=?", "OK", &response, "check PDP context");
 
         String command = "AT+CGDCONT=1,\"IP\",\"";   //#################### PPP or IP ?????
         command += msApn;
@@ -597,7 +603,7 @@ bool Cellular::SwitchToPppMode() {
             return false;
         }
 
-        Command("AT+CGDATA=?", "OK", &response, "blablabla");
+        Command("AT+CGDATA=?", "OK", &response, "check PPP switching");
 
         if (Command("AT+CGDATA=\"PPP\",1", "CONNECT", &response, "Connect for data connection.")) {
 //        if (Command("AT+CGDATA=\"PPP\",1", "CONNECT", &response, "Connect for data connection.")) {

@@ -4,12 +4,23 @@ import time
 from machine import UART
 import ds18x20
 import onewire
+import wifimgr
+import webrepl
 
 print("Gill Maximet simulator.")
 
+wlan = wifimgr.get_connection()
+if wlan is None:
+    print("Could not initialize the network connection.")
+#    while True:
+#        pass  # you shall not pass :D
+
+#webrepl.start(password="")
+
 led = Pin(0, Pin.OUT)
 uart = UART(2, baudrate=19200)
-ow = onewire.OneWire(Pin(15)) # create a OneWire bus on GPIO12
+owpin = Pin(15, Pin.OUT, Pin.PULL_UP)
+ow = onewire.OneWire(owpin) # create a OneWire bus on GPIO12
 ds = ds18x20.DS18X20(ow)
 roms = ds.scan()
 
@@ -73,8 +84,11 @@ while(True):
             sendline("SETUP MODE")
             print("ENTERING COMMAND STATE")
         else:
-            readTempAndSend()
-            sleep(0.1)
+            try:
+                readTempAndSend()
+            except:
+                print("exception reading temperature") # catch CRC errors
+            sleep(0.2)
     
     elif state == STATE_COMMAND:
         if rx:

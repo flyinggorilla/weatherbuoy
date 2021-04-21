@@ -75,3 +75,4 @@ coredump.dat
 
 
 *.out.log
+maximetsimulator/secureboot.py
