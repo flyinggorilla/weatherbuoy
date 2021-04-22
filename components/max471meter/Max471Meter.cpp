@@ -4,6 +4,8 @@
 #include "esp_system.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
+#include "esp_task.h"
+#include "freertos/task.h"
 
     // ADC1 = 32, 33, *34*, 36, 39
     // GPIO32 = ADC1_CH4
@@ -24,7 +26,28 @@ static char tag[] = "Max471Meter";
 
 #define DEFAULT_VREF    1100        //Use adc2_vref_to_gpio() to obtain a better estimate
 
-ADC::ADC(gpio_num_t gpio) {
+
+void fMeterTask(void *pvParameter) {
+	((Max471Meter*) pvParameter)->Max471MeterTask();
+	vTaskDelete(NULL);
+}
+
+void Max471Meter::Max471MeterTask() {
+    while(true) {
+        vTaskDelay(1*1000/portTICK_PERIOD_MS);
+        unsigned int measurement = mCurrent.Measure(5);
+        taskENTER_CRITICAL(&mCriticalSection);
+        if (muiCurrentCount > 3600) { // prevent overflow
+            muiCurrentCount = 0;
+            muiCurrentSum = 0;
+        }
+        muiCurrentSum += measurement;
+        muiCurrentCount++;
+        taskEXIT_CRITICAL(&mCriticalSection);
+    }
+}
+
+ADC::ADC(gpio_num_t gpio, adc_atten_t attenuation) {
     mpAdcChars = (esp_adc_cal_characteristics_t*) calloc(1, sizeof(esp_adc_cal_characteristics_t));
 
     esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_12Bit, DEFAULT_VREF, mpAdcChars);
@@ -42,7 +65,7 @@ ADC::ADC(gpio_num_t gpio) {
 
     mChannel = GpioToChannel(gpio);
     adc1_config_width(ADC_WIDTH_BIT_12);
-    adc1_config_channel_atten(mChannel, ADC_ATTEN_DB_11);
+    adc1_config_channel_atten(mChannel, attenuation);
 };
 
 adc1_channel_t ADC::GpioToChannel(gpio_num_t gpio) {
@@ -72,10 +95,9 @@ adc1_channel_t ADC::GpioToChannel(gpio_num_t gpio) {
     }
 }
 
-unsigned int ADC::Measure() {
+unsigned int ADC::Measure(unsigned int samples) {
     uint32_t adc_reading = 0;
     //Multisampling
-    static int samples = 32;
     for (int i = 0; i < samples; i++) {
         adc_reading += adc1_get_raw(mChannel);
     }
@@ -91,11 +113,31 @@ ADC::~ADC() {
     free(mpAdcChars);
 };
 
-
-Max471Meter::Max471Meter(int gpioPinVoltage, int gpioPinCurrent) : mVoltage{(gpio_num_t)gpioPinVoltage}, mCurrent{(gpio_num_t)gpioPinCurrent} {
+//    ADC_ATTEN_DB_0   = No input attenumation, ADC can measure up to approx. 800 mV. 
+//    ADC_ATTEN_DB_2_5 = The input voltage of ADC will be attenuated, extending the range of measurement to up to approx. 1100 mV. 
+//    ADC_ATTEN_DB_6   = The input voltage of ADC will be attenuated, extending the range of measurement to up to  approx. 1350 mV. 
+//    ADC_ATTEN_DB_11  = The input voltage of ADC will be attenuated, extending the range of measurement to up to  approx. 2600 mV. 
+Max471Meter::Max471Meter(int gpioPinVoltage, int gpioPinCurrent) : mVoltage{(gpio_num_t)gpioPinVoltage, ADC_ATTEN_DB_11}, mCurrent{(gpio_num_t)gpioPinCurrent, ADC_ATTEN_DB_2_5} {
 
 }
 
 Max471Meter::~Max471Meter() {
 
 }
+
+
+unsigned int Max471Meter::Voltage() { 
+    return mVoltage.Measure() * 5; 
+}; // take default number of samples
+
+unsigned int Max471Meter::Current() { 
+    unsigned int avgCurrent;
+
+    taskENTER_CRITICAL(&mCriticalSection);
+    avgCurrent = muiCurrentSum / muiCurrentCount;
+    muiCurrentSum = 0;
+    muiCurrentCount = 0;
+    taskEXIT_CRITICAL(&mCriticalSection);
+
+    return avgCurrent; 
+}; // take fewer samples per measurement, but measure more often

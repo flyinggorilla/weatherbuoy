@@ -4,6 +4,7 @@
 #include "esp_system.h"
 #include "driver/adc.h"
 #include "esp_adc_cal.h"
+#include "esp_task.h"
 
     //example GPIO34 if ADC1, GPIO14 if ADC2
 
@@ -18,9 +19,9 @@
 // will ALWAYS USE UNIT 1!!
 class ADC {
     public:
-        ADC(gpio_num_t gpio);
+        ADC(gpio_num_t gpio, adc_atten_t attenuation = ADC_ATTEN_DB_11);
         ~ADC();
-        unsigned int Measure(); // returns mV
+        unsigned int Measure(unsigned int samples = 32); // returns mV
 
     private:
         esp_adc_cal_characteristics_t *mpAdcChars = nullptr;
@@ -33,12 +34,18 @@ class Max471Meter {
         Max471Meter(int gpioPinVoltage, int gpioPinCurrent);
         virtual ~Max471Meter();
 
-        unsigned int Voltage() { return mVoltage.Measure() * 5; };
-        unsigned int Current() { return mCurrent.Measure(); };
+        unsigned int Voltage();
+        unsigned int Current();
 
     private:
         ADC mVoltage;
         ADC mCurrent;
+
+        void Max471MeterTask();
+        friend void fMeterTask(void *pvParameter);
+        unsigned int muiCurrentSum = 0;
+        unsigned int muiCurrentCount = 0;
+        portMUX_TYPE mCriticalSection = portMUX_INITIALIZER_UNLOCKED;
 };
 
 #endif
