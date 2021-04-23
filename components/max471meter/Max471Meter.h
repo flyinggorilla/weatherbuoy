@@ -36,6 +36,9 @@ class Max471Meter {
 
         unsigned int Voltage();
         unsigned int Current();
+        unsigned int CurrentMin() { return muiCurrentMin; };
+        unsigned int CurrentMax() { return muiCurrentMax; };
+
 
     private:
         ADC mVoltage;
@@ -45,6 +48,9 @@ class Max471Meter {
         friend void fMeterTask(void *pvParameter);
         unsigned int muiCurrentSum = 0;
         unsigned int muiCurrentCount = 0;
+        unsigned int muiCurrentAvg = 0;
+        unsigned int muiCurrentMin = 0;
+        unsigned int muiCurrentMax = 0;
         portMUX_TYPE mCriticalSection = portMUX_INITIALIZER_UNLOCKED;
 };
 

@@ -37,13 +37,23 @@ void Max471Meter::Max471MeterTask() {
         vTaskDelay(1*1000/portTICK_PERIOD_MS);
         unsigned int measurement = mCurrent.Measure(5);
         taskENTER_CRITICAL(&mCriticalSection);
-        if (muiCurrentCount > 3600) { // prevent overflow
+        if (muiCurrentCount > 60*15) { // reset every 15min
             muiCurrentCount = 0;
             muiCurrentSum = 0;
+            muiCurrentMin = 0;
+            muiCurrentMax = 0;
         }
+
         muiCurrentSum += measurement;
+        if (!muiCurrentMin || muiCurrentMin > measurement) {
+            muiCurrentMin = measurement;
+        }
+        if (muiCurrentMax < measurement) {
+            muiCurrentMax = measurement;
+        }
         muiCurrentCount++;
         taskEXIT_CRITICAL(&mCriticalSection);
+        ESP_LOGI(tag, "Current %d mA", measurement);
     }
 }
 
@@ -118,7 +128,7 @@ ADC::~ADC() {
 //    ADC_ATTEN_DB_6   = The input voltage of ADC will be attenuated, extending the range of measurement to up to  approx. 1350 mV. 
 //    ADC_ATTEN_DB_11  = The input voltage of ADC will be attenuated, extending the range of measurement to up to  approx. 2600 mV. 
 Max471Meter::Max471Meter(int gpioPinVoltage, int gpioPinCurrent) : mVoltage{(gpio_num_t)gpioPinVoltage, ADC_ATTEN_DB_11}, mCurrent{(gpio_num_t)gpioPinCurrent, ADC_ATTEN_DB_2_5} {
-
+	xTaskCreate(&fMeterTask, "Max471Meter", 2048, this, ESP_TASK_PRIO_MIN, NULL); 
 }
 
 Max471Meter::~Max471Meter() {
@@ -131,13 +141,11 @@ unsigned int Max471Meter::Voltage() {
 }; // take default number of samples
 
 unsigned int Max471Meter::Current() { 
-    unsigned int avgCurrent;
-
     taskENTER_CRITICAL(&mCriticalSection);
-    avgCurrent = muiCurrentSum / muiCurrentCount;
-    muiCurrentSum = 0;
-    muiCurrentCount = 0;
+    if (muiCurrentCount) {
+        muiCurrentAvg = muiCurrentSum / muiCurrentCount;
+    }
     taskEXIT_CRITICAL(&mCriticalSection);
 
-    return avgCurrent; 
+    return muiCurrentAvg; 
 }; // take fewer samples per measurement, but measure more often
