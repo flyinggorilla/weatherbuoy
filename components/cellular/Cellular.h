@@ -27,6 +27,8 @@ public:
     bool Command(const char *sCommand,const char *sSuccess, String *sResponse = nullptr, const char *sInfo = nullptr, unsigned short maxLines = 100);
     bool SwitchToCommandMode(); // todo, move to private
     bool SwitchToPppMode(); // can be moved to private
+    bool SwitchToLowPowerMode();
+    bool SwitchToFullPowerMode();
 
     unsigned long long getDataSent() { return mullSentTotal; };
     unsigned long long getDataReceived() { return mullReceivedTotal; };
@@ -40,7 +42,7 @@ public:
     String msNetworkmode;
 
 private:
-    bool TurnOn();
+    bool PowerOn();
     void InitNetwork();
 
     friend esp_err_t esp_cellular_post_attach_start(esp_netif_t * esp_netif, void * args);
@@ -63,6 +65,7 @@ private:
     friend esp_err_t esp_cellular_transmit(void *h, void *buffer, size_t len);
 
     bool ReadIntoBuffer();
+    void ResetInputBuffers();
     unsigned char *mpBuffer;
     unsigned int muiBufferSize;
     unsigned int muiBufferPos;
@@ -81,6 +84,7 @@ private:
 
     bool mbConnected = false;
     bool mbCommandMode = true;
+    bool mbPowerSaverActive = false;
 
     esp_cellular_netif_driver_t mModemNetifDriver;
     esp_netif_t *mpEspNetif = nullptr;

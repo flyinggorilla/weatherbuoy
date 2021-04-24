@@ -30,6 +30,7 @@ bool Serial::Attach() {
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .rx_flow_ctrl_thresh = 0,  
         .source_clk = UART_SCLK_APB
+        //.source_clk = UART_SCLK_REF_TICK // this should still work even when reducing power consumption with lowering clock speed (see power management docu)
     };
 
     // defaults are....

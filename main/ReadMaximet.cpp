@@ -8,6 +8,7 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esputil.h"
+//#include <string>
 
 static const char tag[] = "ReadMaximet";
 #define SERIAL_BUFFER_SIZE (1024)
@@ -72,10 +73,42 @@ bool bDayTime = true; /////////////////////////////// TODO *********************
             return;
         }
         
-        int dataStart = line.indexOf(STX);
+        // check for STX and ETX limiter
+        ESP_LOGD(tag, "THE LINE: %s", line.c_str());
+        int dataStart = line.lastIndexOf(STX);
         int dataEnd = line.lastIndexOf(ETX);
+        int dataLen = dataEnd - dataStart;
+        ESP_LOGD(tag, "datastart %d dataend %d", dataStart, dataEnd);
 
-        if (dataStart >= 0 && dataEnd > 0) {
+        // the length must be at minimum STX, ETX and 2 digit checksum
+        if (dataStart >= 0 && dataLen > 3) {
+            //unsigned int checksum = std::stoi(line.substring(dataEnd+1, dataEnd+3).c_str());
+            String checksumString = line.substring(dataEnd+1, dataEnd+3);
+            //unsigned int checksum = std::stoi(checksumString.c_str(), 0, 16); // use strtol instead?
+            unsigned int checksum = strtoimax(checksumString.c_str(), 0, 16); // convert hex string like "FF" to integer
+            String maximetline = line.substring(dataStart+1, dataEnd-1);
+//maximetline = "Q,168,000.02,213,000,000.00,053,000.05,000,0000,0991.1,1046.2,0991.4,035,+023.2,+007.1,07.42,045,0000,00.00,,,1.2,+014.2,04:55,11:11,17:27,325:-33,04:22,03:45,03:06,-34,+55,+1,,2021-03-27T21:19:31.7,+04.6,0000,";
+            ESP_LOGD(tag, "checksumstring %s, valuehex %0X, value %d", checksumString.c_str(), checksum, checksum);
+            ESP_LOGD(tag, "maximetline %s", maximetline.c_str());
+
+            // parse out solar radiation
+            const int solarradiationColumn = 19-1;
+            int solarradiationPosStart = 0;
+            int solarradiationPosEnd = 0;
+            for (int i = 0; i < solarradiationColumn; i++) {
+                solarradiationPosStart = maximetline.indexOf(',', solarradiationPosStart);
+            }
+            solarradiationPosEnd = maximetline.indexOf(',');
+            float solarradiation = maximetline.substring(solarradiationPosStart, solarradiationPosEnd).toFloat();
+            ESP_LOGD(tag, "solarradiation %f", solarradiation);
+
+            // Checksum, the 2 digit Hex Checksum sum figure is calculated from the Exclusive OR of the bytes between (and not including) the STX and ETX characters
+            unsigned char calculatedChecksum = 0;
+            for (int i = 0; i < maximetline.length(); i++) {
+                calculatedChecksum ^= (unsigned char)maximetline[i];
+            }
+            ESP_LOGD(tag, "calculated checksum %0X", calculatedChecksum);
+
             maximetState = SENDINGDATA;
             if (bDayTime) {
                 intervalMs = mrConfig.miSendDataIntervalDaytime * 1000; //ms;

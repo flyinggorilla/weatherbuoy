@@ -1,4 +1,4 @@
-//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "sdkconfig.h"
 #include "Cellular.h"
 #include "EspString.h"
@@ -69,6 +69,7 @@ bool Cellular::InitModem() {
         .stop_bits = UART_STOP_BITS_1,
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .rx_flow_ctrl_thresh = 0,  
+        //.source_clk = UART_SCLK_REF_TICK
         .source_clk = UART_SCLK_APB
     };
     muiUartNo = UART_NUM_2; // UART_NUM_1 is reserved for Maximet reading
@@ -82,7 +83,7 @@ bool Cellular::InitModem() {
     muiBufferLen = 0;
     mpBuffer = (uint8_t *) malloc(muiBufferSize+16);
 
-    TurnOn();
+    PowerOn();
     InitNetwork();
     return true;
 }
@@ -142,7 +143,7 @@ void fReceiverTask(void *pvParameter) {
 }
 
 
-bool Cellular::TurnOn(void)
+bool Cellular::PowerOn(void)
 {
     #ifdef CONFIG_LILYGO_TTGO_TCALL14_SIM800
         gpio_set_direction(CELLULAR_GPIO_PWKEY, GPIO_MODE_OUTPUT);
@@ -213,12 +214,25 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
     String response;
     String command;
 
+    esp_log_level_set(tag, ESP_LOG_DEBUG);
+
     ESP_LOGD(tag, "Starting receiver task....");
     xTaskCreate(&fReceiverTask, "ModemReceiver", 8192, this, ESP_TASKD_EVENT_PRIO, NULL); 
     // #define ESP_TASK_TIMER_PRIO           (ESP_TASK_PRIO_MAX - 3)
     // #define ESP_TASKD_EVENT_PRIO          (ESP_TASK_PRIO_MAX - 5)
     // #define ESP_TASK_TCPIP_PRIO           (ESP_TASK_PRIO_MAX - 7)
     // #define ESP_TASK_MAIN_PRIO            (ESP_TASK_PRIO_MIN + 1)
+
+
+
+/*
+//EXPERIMENTING WITH POWER
+if (!Command("AT+CPOF", "OK", nullptr, "Turn OFF")) {
+    ESP_LOGW(tag, "Turning off modem");
+};
+
+return; */
+
 
 
     if (!Command("AT", "OK", nullptr, "ATtention")) {
@@ -434,6 +448,12 @@ void Cellular::InitNetwork() {
     }
 }
 
+void Cellular::ResetInputBuffers() {
+    uart_flush_input(muiUartNo);
+    muiBufferLen = 0;
+    muiBufferPos = 0;
+}
+
 
 bool Cellular::ReadIntoBuffer() {
     muiBufferPos = 0;
@@ -485,7 +505,7 @@ bool Cellular::ReadIntoBuffer() {
                 if (event.timeout_flag && event.size == 0) {
                     mbCommandMode = true;
                 } else {
-                    uart_flush_input(muiUartNo);
+                    ResetInputBuffers();
                     ESP_LOGD(tag, "uart rx break");
                 }
                 break;
@@ -510,6 +530,142 @@ bool Cellular::ReadIntoBuffer() {
     return false; 
 }
 
+bool Cellular::SwitchToLowPowerMode() {
+    SwitchToCommandMode();
+
+    String response;
+    if (Command("ATH", "+PPPD: DISCONNECTED", &response, "Disconnect data call.")) { 
+        ESP_LOGI(tag, "Disconnected data call.");
+    }  
+    /*
+    if (ModemWriteLine("ATH")) {
+        if (ModemReadResponse(response, "OK", 5)) {
+            ESP_LOGI(tag, "**ATH**:\r\n%s",response.c_str());
+        }
+        ModemReadLine(response);
+        ESP_LOGW(tag, "EXTRA LINE: %s",  response.c_str());
+    } */
+
+
+Command("AT+CNSMOD?", "OK", &response, "Current network system mode");
+ESP_LOGW(tag, "network system mode: %s", response.c_str());
+Command("AT+CGDCONT=?", "OK", &response, "check PDP context");
+ESP_LOGW(tag, "PDP context: %s", response.c_str());
+Command("AT+CGDATA=?", "OK", &response, "check PPP switching");
+ESP_LOGW(tag, "data mode check: %s", response.c_str());
+
+    
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    if (Command("AT+CFUN=0", "OK", &response, "Set modem to minimum functionality.")) { // mode 4 would shut down RF entirely to "flight-mode"; mode 0 still keeps SMS receiption intact
+        ESP_LOGI(tag, "Switched to power saving mode.");
+        mbPowerSaverActive = true;
+        return true;
+    } 
+
+    ESP_LOGE(tag, "Switching to low power mode failed.");
+    return false;
+}
+
+bool Cellular::SwitchToFullPowerMode() {
+    String response;
+    String command;
+    if (Command("AT+CFUN=1", "OK", &response, "Set modem to full power mode and reset it too.")) { // mode 4 would shut down RF entirely to "flight-mode"; mode 0 still keeps SMS receiption intact
+        ESP_LOGI(tag, "Switched to full power mode.");
+        mbPowerSaverActive = false;
+    } 
+
+    ESP_LOGD(tag, "Switching back to full power....");
+
+    //---------------
+
+
+    if (!Command("AT", "OK", &response, "ATtention")) {
+        ESP_LOGE(tag, "Severe problem, no connection to Modem");
+    };
+
+
+/*    command = "AT+COPS=0,0,\"";
+    command += msPreferredOperator;
+    command += "\"";
+    if(Command(command.c_str(), "OK", &response, "Set preferred operator")) {
+        ESP_LOGW(tag, "Set preferred operator to '%s'", msPreferredOperator.c_str());
+    } else {
+        ESP_LOGW(tag, "Could not set preferred operator to '%s': %s", msPreferredOperator.c_str(), response.c_str());
+    }
+
+    command = "AT+CNMP=";
+    command += miPreferredNetwork;
+    if(Command(command.c_str(), "OK", &response, "Set preferred network")) {
+        ESP_LOGW(tag, "Set preferred network to '%d'", miPreferredNetwork);
+    } else {
+        ESP_LOGW(tag, "Could not set preferred network to %i: %s", miPreferredNetwork, response.c_str());
+    }
+    */
+
+    int maxWaitForNetworkRegistration = 120;
+    while (maxWaitForNetworkRegistration--) {
+        if (Command("AT+CREG?", "OK", &response, "Network Registration Information States ")) { // +CREG: 0,2 // +CREG: 1,5
+            if (response.indexOf("+CREG: ") >= 0 && ((response.indexOf(",5") >= 0) || (response.indexOf(",1") >= 0)))
+                break;
+        }
+                                                                                        // 0 – not registered, ME is not currently searching a new operator to register to
+                                                                                        // 1 – registered, home network 
+                                                                                        // 2 – not registered, but ME is currently searching a new operator to register to 
+                                                                                        // 3 – registration denied 
+                                                                                        // 4 – unknown 
+                                                                                        // 5 – registered, roaming
+
+        ESP_LOGI(tag, "Waiting for network %d", maxWaitForNetworkRegistration);
+        vTaskDelay(1000/portTICK_PERIOD_MS);
+    } 
+
+    msNetworkmode = "";
+    if(Command("AT+CNSMOD?", "OK", &response, "Current network system mode")) { // +CNSMOD: 0,4
+                                                                    // 0 – no service
+                                                                    // 1 – GSM
+                                                                    // 2 – GPRS
+                                                                    // 3 – EGPRS (EDGE)
+                                                                    // 4 – WCDMA
+                                                                    // 5 – HSDPA only(WCDMA)
+                                                                    // 6 – HSUPA only(WCDMA)
+                                                                    // 7 – HSPA (HSDPA and HSUPA, WCDMA)
+                                                                    // 8 – LTE
+                                                                    // 9 – TDS-CDMA
+                                                                    // 10 – TDS-HSDPA only
+                                                                    // 11 – TDS- HSUPA onl
+                                                                    // 12 – TDS- HSPA (HSDPA and HSUPA)
+                                                                    // 13 – CDMA
+                                                                    // 14 – EVDO
+                                                                    // 15 – HYBRID (CDMA and EVDO)
+                                                                    // 16 – 1XLTE(CDMA and LTE)
+                                                                    // 23 – eHRPD
+                                                                    // 24 – HYBRID(CDMA and eHRPD)
+        msNetworkmode = response.substring(response.indexOf(",")+1, response.lastIndexOf("\""));
+        int iMode = msNetworkmode.toInt();
+        const char *modes[25] = {  "no service", "GSM", "GPRS", "EGPRS (EDGE)", "WCDMA", "HSDPA only(WCDMA)", 
+                                   "HSUPA only(WCDMA)", "HSPA (HSDPA and HSUPA, WCDMA)", "LTE", 
+                                   "TDS-CDMA", "TDS-HSDPA only", "TDS- HSUPA only", "TDS- HSPA (HSDPA and HSUPA)",
+                                   "CDMA", "EVDO", "HYBRID (CDMA and EVDO)", "1XLTE(CDMA and LTE)", 
+                                   "eHRPD", "HYBRID(CDMA and eHRPD)"  };
+
+        if (iMode >= 0 && iMode < (sizeof(modes)/sizeof(modes[0]))) {
+            msNetworkmode = modes[iMode];
+        }       
+    }
+    ESP_LOGI(tag, "Network mode: %s", msNetworkmode.c_str());
+
+    Command("AT+COPS?", "OK", &response,  "Operator Selection"); // +COPS: 0,0,"A1" // CONFIG_LILYGO_TTGO_TCALL14_SIM800
+                                                                // +COPS: 0,0,"yesss!",2 // SIM7600
+    ESP_LOGI(tag, "Operator: %s", response.c_str());
+
+    Command("AT+CSQ", "OK", &response,  "Signal Quality Report"); // +CSQ: 13,0
+    ESP_LOGI(tag, "Signal Quality: %s", response.substring(6).c_str());
+    ESP_LOGE(tag, "Switching to full power mode failed.");
+    return false;
+}
+
+
 bool Cellular::SwitchToCommandMode() {
     uart_event_t uartSwitchToPppEvent = {
         .type = UART_BREAK,
@@ -518,7 +674,12 @@ bool Cellular::SwitchToCommandMode() {
     };
 
     //Waiting for UART event.
-    // before xending the new message, run xQueueReset(????????????????)
+    // before sending the new message, run xQueueReset(????????????????)
+mbCommandMode = true; //TODO race conditions???
+//esp_netif_action_stop(void *esp_netif, esp_event_base_t base, int32_t event_id, void *data)
+esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
+ResetInputBuffers();
+    xQueueReset(mhUartEventQueueHandle);
     if(xQueueSend(mhUartEventQueueHandle, (void * )&uartSwitchToPppEvent, (portTickType)portMAX_DELAY)) {
 
         uart_flush(muiUartNo);
@@ -538,10 +699,9 @@ bool Cellular::SwitchToCommandMode() {
         String write("+++");
         vTaskDelay(1000/portTICK_PERIOD_MS); // spec: 1s delay for the modem to recognize the escape sequence
         int iWriteLen = ModemWriteData(write.c_str(), write.length());
-        vTaskDelay(2000/portTICK_PERIOD_MS);
+        vTaskDelay(2000/portTICK_PERIOD_MS); //TODO ######################## REDUCE TO 1100ms??
         if (iWriteLen == write.length()) {
-            ESP_LOGD(tag, "SwitchToCommandMode(%s):", write.c_str());
-            //uart_flush(muiUartNo);
+            ESP_LOGI(tag, "SwitchToCommandMode(%s):", write.c_str());
         } else {
             ESP_LOGE(tag, "Error SwitchToCommandMode(%s): ", write.c_str());
             return false;
@@ -549,11 +709,9 @@ bool Cellular::SwitchToCommandMode() {
         String response;
         if (ModemReadResponse(response, "OK", 5)) {
             ESP_LOGI(tag, "Switched to command mode.");
+ResetInputBuffers();
             return true;
         } 
-
-// 
-
     }
 
     ESP_LOGE(tag, "Error switching to command mode.");

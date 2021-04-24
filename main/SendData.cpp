@@ -1,3 +1,4 @@
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "SendData.h"
 #include "EspString.h"
 #include "freertos/FreeRTOS.h"

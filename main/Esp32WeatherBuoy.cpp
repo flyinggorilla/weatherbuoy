@@ -95,16 +95,31 @@ void Esp32WeatherBuoy::Start() {
     Max471Meter max471Meter(CONFIG_MAX471METER_GPIO_VOLTAGE, CONFIG_MAX471METER_GPIO_CURRENT);
     ESP_LOGI(tag, "Max471Meter: voltage %d mV, current %d mA??", max471Meter.Voltage(), max471Meter.Current());
 
-//    OnlineMode onlineMode = MODE_CELLULAR;
     OnlineMode onlineMode = MODE_CELLULAR;
 
+    //ESP_LOGW(tag, "OFFLINE MODE")
+    //onlineMode = MODE_OFFLINE;
+
     switch(onlineMode) {
-        case MODE_CELLULAR: 
+        case MODE_CELLULAR: {
             cellular.InitModem();
             cellular.Start(config.msCellularApn, config.msCellularUser, config.msCellularPass, config.msCellularOperator, config.miCellularNetwork);
             // cellular.ReadSMS(); use only during firmware setup to receive a SIM based code 
             cellular.SwitchToPppMode();
-            break;
+vTaskDelay(1000 / portTICK_PERIOD_MS);
+ESP_LOGW(tag, "switching to low power mode...");
+cellular.SwitchToLowPowerMode();            
+vTaskDelay(1000 / portTICK_PERIOD_MS);
+ESP_LOGW(tag, "switching to full power mode next...");
+cellular.SwitchToFullPowerMode();         
+vTaskDelay(1000 / portTICK_PERIOD_MS);
+String response;
+ESP_LOGW(tag, "switching to PPP mode next...");
+cellular.SwitchToPppMode();
+
+ESP_LOGW(tag, "PPP again");
+
+            break; }
         case MODE_WIFISTA:
             //config.msSTASsid = "";
             //config.msSTAPass = "";
