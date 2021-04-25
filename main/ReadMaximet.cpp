@@ -1,5 +1,5 @@
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "ReadMaximet.h"
-#include "SendData.h"
 #include "Serial.h"
 #include "EspString.h"
 #include "freertos/FreeRTOS.h"
@@ -22,6 +22,14 @@ void fReadMaximetTask(void *pvParameter) {
 void ReadMaximet::Start(int gpioRX, int gpioTX) {
     mgpioRX = gpioRX;
     mgpioTX = gpioTX;
+
+    // Create a queue capable of containing 10 uint32_t values.
+    mxDataQueue = xQueueCreate( 60, sizeof( Data* ) );
+    if( !mxDataQueue )
+    {
+        ESP_LOGE(tag, "Could not create Data queue. Data collection not initialized.");
+    }
+
 	xTaskCreate(&fReadMaximetTask, "ReadMaximet", 8192, this, ESP_TASK_MAIN_PRIO, NULL);
 } 
 
@@ -38,8 +46,8 @@ void ReadMaximet::ReadMaximetTask() {
     // Change ports from default RX/TX to not conflict with Console
     Serial serial(UART_NUM_1, mgpioRX, mgpioTX, SERIAL_BAUD_RATE, SERIAL_BUFFER_SIZE);
 
-    ESP_LOGI(tag, "ReadMaximet task started. Waiting 30seconds for attaching to serial interface.");
-    vTaskDelay(30*1000/portTICK_PERIOD_MS);
+    //ESP_LOGI(tag, "ReadMaximet task started. Waiting 30seconds for attaching to serial interface.");
+    //vTaskDelay(30*1000/portTICK_PERIOD_MS);
     serial.Attach();
 
     String line;
@@ -62,16 +70,12 @@ void ReadMaximet::ReadMaximetTask() {
 bool bDayTime = true; /////////////////////////////// TODO *****************************
 
     ESP_LOGI(tag, "ReadMaximet task started and ready to receive data.");
-    while (true) {
+    while (mbRun) {
         if (!serial.ReadLine(line)) {
             ESP_LOGE(tag, "Could not read line from serial");
         }
 
-        if (mrSendData.isRestart()) {
-            serial.Release();
-            ESP_LOGI(tag, "System entered OTA, stopping Maximet Data Collection.");
-            return;
-        }
+        Data* pData = new Data();
         
         // check for STX and ETX limiter
         ESP_LOGD(tag, "THE LINE: %s", line.c_str());
@@ -86,26 +90,26 @@ bool bDayTime = true; /////////////////////////////// TODO *********************
             String checksumString = line.substring(dataEnd+1, dataEnd+3);
             //unsigned int checksum = std::stoi(checksumString.c_str(), 0, 16); // use strtol instead?
             unsigned int checksum = strtoimax(checksumString.c_str(), 0, 16); // convert hex string like "FF" to integer
-            String maximetline = line.substring(dataStart+1, dataEnd-1);
+            pData->msMaximet = line.substring(dataStart+1, dataEnd-1);
 //maximetline = "Q,168,000.02,213,000,000.00,053,000.05,000,0000,0991.1,1046.2,0991.4,035,+023.2,+007.1,07.42,045,0000,00.00,,,1.2,+014.2,04:55,11:11,17:27,325:-33,04:22,03:45,03:06,-34,+55,+1,,2021-03-27T21:19:31.7,+04.6,0000,";
             ESP_LOGD(tag, "checksumstring %s, valuehex %0X, value %d", checksumString.c_str(), checksum, checksum);
-            ESP_LOGD(tag, "maximetline %s", maximetline.c_str());
+            ESP_LOGD(tag, "maximetline %s", pData->msMaximet.c_str());
 
             // parse out solar radiation
             const int solarradiationColumn = 19-1;
             int solarradiationPosStart = 0;
             int solarradiationPosEnd = 0;
             for (int i = 0; i < solarradiationColumn; i++) {
-                solarradiationPosStart = maximetline.indexOf(',', solarradiationPosStart);
+                solarradiationPosStart = pData->msMaximet.indexOf(',', solarradiationPosStart);
             }
-            solarradiationPosEnd = maximetline.indexOf(',');
-            float solarradiation = maximetline.substring(solarradiationPosStart, solarradiationPosEnd).toFloat();
+            solarradiationPosEnd = pData->msMaximet.indexOf(',');
+            float solarradiation = pData->msMaximet.substring(solarradiationPosStart, solarradiationPosEnd).toFloat();
             ESP_LOGD(tag, "solarradiation %f", solarradiation);
 
             // Checksum, the 2 digit Hex Checksum sum figure is calculated from the Exclusive OR of the bytes between (and not including) the STX and ETX characters
             unsigned char calculatedChecksum = 0;
-            for (int i = 0; i < maximetline.length(); i++) {
-                calculatedChecksum ^= (unsigned char)maximetline[i];
+            for (int i = 0; i < pData->msMaximet.length(); i++) {
+                calculatedChecksum ^= (unsigned char)pData->msMaximet[i];
             }
             ESP_LOGD(tag, "calculated checksum %0X", calculatedChecksum);
 
@@ -123,9 +127,23 @@ bool bDayTime = true; /////////////////////////////// TODO *********************
                 ESP_LOGI(tag, "Sending measurement data'%s' after %d ms (skipped %d)", line.c_str(), uptimeMs - lastSendMs, skipped);
                 lastSendMs = uptimeMs;
                 skipped = 0;
-                if (!mrSendData.PostData(line)) {
-                    ESP_LOGE(tag, "Could not post data, likely due to a full queue");
+
+                if (uxQueueSpacesAvailable(mxDataQueue) == 0) {
+                    // queue is full, so remove an element
+                    ESP_LOGW(tag, "Queue is full, dropping unsent oldest data.");
+                    Data* pReceivedData = nullptr;
+                    xQueueReceive(mxDataQueue, &pReceivedData, 0);
+                    delete pReceivedData;
+                    pReceivedData = nullptr;
                 }
+
+                // PUT pData to queue
+                if (xQueueSend(mxDataQueue, pData, 0) != pdTRUE) {
+                    // data could not put to queue, so make sure to delete the data
+                    ESP_LOGE(tag, "Queue is full. We should never be here.");
+                    delete pData;
+                    pData = nullptr;
+                } 
             }
         } else {
             bool ok = true;
@@ -181,9 +199,23 @@ bool bDayTime = true; /////////////////////////////// TODO *********************
         }
 
     } 
+
+    serial.Release();
+    ESP_LOGI(tag, "Shut down data collection.");
+    return;
 }
 
-ReadMaximet::ReadMaximet(Config &config, SendData &sendData) : mrConfig(config), mrSendData(sendData) {
+Data* ReadMaximet::GetData() {
+    Data* pReceivedData = nullptr;
+    if (xQueueReceive(mxDataQueue, &pReceivedData, 0) == pdTRUE) {
+        ESP_LOGD(tag, "Received data from Queue.");
+        return pReceivedData;
+    }
+    ESP_LOGD(tag, "No data in Queue.");
+    return nullptr;
+}
+
+ReadMaximet::ReadMaximet(Config &config) : mrConfig(config) {
 }
 
 

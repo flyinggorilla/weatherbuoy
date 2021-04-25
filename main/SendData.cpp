@@ -14,7 +14,6 @@
 static const char tag[] = "SendData";
 static const int SENDDATA_QUEUE_SIZE = (3); 
 static const unsigned int MAX_ACCEPTABLE_RESPONSE_BODY_LENGTH = 16*1024;
-static const bool HTTP_KEEP_ALIVE_ENABLED = false;  // enabling doesnt work on local test system, SSL connections abort
 
 /*
 extern const unsigned char certificate_pem_start[] asm("_binary_certificate_pem_start");
@@ -33,12 +32,12 @@ enum {
 
 
 // 1. Define the event handler
-void fSendDataEventHandler(void* handler_arg, esp_event_base_t base, int32_t id, void* event_data)
+/*void fSendDataEventHandler(void* handler_arg, esp_event_base_t base, int32_t id, void* event_data)
 {
     if (base == SENDDATA_EVENT_BASE) {
         ((SendData*)handler_arg)->EventHandler(id, event_data);
     }
-}
+}*/
 
 String SendData::ReadMessageValue(const char* key) {
     int posKey = mResponseData.indexOf(key);
@@ -75,23 +74,17 @@ void SendData::Cleanup() {
     mhEspHttpClient = nullptr;
 }
 
-void SendData::PerformHttpPost(const char *postData) {
+bool SendData::PerformHttpPost(Data &data) {
     // Initialize URL and HTTP client
     if (!mhEspHttpClient) {
         if (!mrConfig.msTargetUrl.startsWith("http")) {
             ESP_LOGE(tag, "No proper target URL in form of'http(s)://server/' defined: url='%s'", mrConfig.msTargetUrl.c_str());
-            return;
+            return false;
         }
         memset(&mEspHttpClientConfig, 0, sizeof(esp_http_client_config_t));
         mEspHttpClientConfig.url = mrConfig.msTargetUrl.c_str();
         mEspHttpClientConfig.method = HTTP_METHOD_POST; 
-        /* TCP only !!
-        mEspHttpClientConfig.keep_alive_enable = true;
-        mEspHttpClientConfig.keep_alive_idle = 15;
-        mEspHttpClientConfig.keep_alive_interval = 15; */
         mhEspHttpClient = esp_http_client_init(&mEspHttpClientConfig);
-        //ESP_LOGD(tag, "Initializing new connection (keep-alive might have failed)");
-        //mEspHttpClientConfig.timeout_ms
     }
 
     //##############################################
@@ -100,11 +93,11 @@ void SendData::PerformHttpPost(const char *postData) {
 
     // POST message
     unsigned int uptime = (unsigned int) (esp_timer_get_time()/1000000); // seconds since start
-    if(postData) {
+    if(data.msMaximet) {
         mPostData = "maximet: ";
-        mPostData += postData;
+        mPostData += data.msMaximet;
     } 
-    if(!postData || mbSendDiagnostics) {
+    if(!data.msMaximet || mbSendDiagnostics) {
         mPostData = "health: ";
         mbSendDiagnostics = true;
         mPostData += "\r\nresetreason: ";
@@ -198,7 +191,7 @@ void SendData::PerformHttpPost(const char *postData) {
     if (err != ESP_OK) {
         ESP_LOGE(tag, "Error %s in esp_http_client_open(): %s", esp_err_to_name(err), mEspHttpClientConfig.url);
         Cleanup();
-        return;
+        return false; 
     }
 
     // write POST body message
@@ -208,7 +201,7 @@ void SendData::PerformHttpPost(const char *postData) {
     } else {
         ESP_LOGE(tag, "esp_http_client_write(): Could only send %d of %d bytes", sent, mPostData.length());
         Cleanup();
-        return;
+        return false;
     }
 
     // retreive HTTP response and headers
@@ -216,7 +209,7 @@ void SendData::PerformHttpPost(const char *postData) {
     if (iContentLength == ESP_FAIL) {
         ESP_LOGE(tag, "esp_http_client_fetch_headers(): could not receive HTTP response");
         Cleanup();
-        return;
+        return false;
     }
 
     // Check HTTP status code
@@ -226,21 +219,21 @@ void SendData::PerformHttpPost(const char *postData) {
     } else {
         ESP_LOGE(tag, "HTTP response was not OK with status %d", iHttpStatusCode);
         Cleanup();
-        return;
+        return false;
     }
 
     // Prevent overly memory allocation
     if (iContentLength > MAX_ACCEPTABLE_RESPONSE_BODY_LENGTH) {
         ESP_LOGE(tag, "Response body Content-length %d exceeds maximum of %d. Aborting.", iContentLength, MAX_ACCEPTABLE_RESPONSE_BODY_LENGTH);
         Cleanup();
-        return;
+        return false;
     }
 
     // Ensure enough memory is allocated
     if (!mResponseData.prepare(iContentLength)) {
         ESP_LOGE(tag, "Could not allocate %d memory for HTTP response.", iContentLength);
         Cleanup();
-        return;
+        return false;
     }
 
     // read the HTTP response body and process it
@@ -330,14 +323,11 @@ void SendData::PerformHttpPost(const char *postData) {
     } 
 
     mrWatchdog.clear();
-
-    if (HTTP_KEEP_ALIVE_ENABLED)
-        return;
-
     Cleanup();
+    return true;
 }
 
-
+/*
 void SendData::EventHandler(int32_t id, void* event_data) {
     if (id == SENDDATA_EVENT_POSTDATA) {
         ESP_LOGI(tag, "PostData: %s", (const char*)event_data);
@@ -349,9 +339,10 @@ void SendData::EventHandler(int32_t id, void* event_data) {
 
 
 }
+*/
 
 SendData::SendData(Config &config, Cellular &cellular, Watchdog &watchdog) : mrConfig(config), mrCellular(cellular), mrWatchdog(watchdog) {
-    esp_event_loop_args_t loop_args = {
+/*    esp_event_loop_args_t loop_args = {
         .queue_size = SENDDATA_QUEUE_SIZE,
         .task_name = "SendData",
         .task_priority = ESP_TASKD_EVENT_PRIO,
@@ -361,12 +352,12 @@ SendData::SendData(Config &config, Cellular &cellular, Watchdog &watchdog) : mrC
     ESP_ERROR_CHECK(esp_event_loop_create(&loop_args, &mhLoopHandle));
     assert(mhLoopHandle);
     ESP_ERROR_CHECK(esp_event_handler_instance_register_with(mhLoopHandle, SENDDATA_EVENT_BASE, ESP_EVENT_ANY_ID, fSendDataEventHandler, this, &mhEventHandlerInstance));
-
+*/
     // esp http client
     mhEspHttpClient = nullptr; 
 
 }
-
+/*
 bool SendData::PostData(String &data) {
     if (ESP_OK == esp_event_post_to(mhLoopHandle, SENDDATA_EVENT_BASE, SENDDATA_EVENT_POSTDATA, (void*)data.c_str(), data.length()+1, 1000 / portTICK_PERIOD_MS))
         return true;
@@ -385,11 +376,11 @@ bool SendData::PostHealth(unsigned int powerVoltage, unsigned int powerCurrent, 
     return false;
 }
 
-
+*/
 
 SendData::~SendData() {
-    esp_event_handler_instance_unregister_with(mhLoopHandle, SENDDATA_EVENT_BASE, ESP_EVENT_ANY_ID, mhEventHandlerInstance);
-    esp_event_loop_delete(mhLoopHandle);
+    //esp_event_handler_instance_unregister_with(mhLoopHandle, SENDDATA_EVENT_BASE, ESP_EVENT_ANY_ID, mhEventHandlerInstance);
+    //esp_event_loop_delete(mhLoopHandle);
 
     esp_http_client_cleanup(mhEspHttpClient);    
     mhEspHttpClient = nullptr;

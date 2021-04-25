@@ -105,20 +105,6 @@ void Esp32WeatherBuoy::Start() {
             cellular.InitModem();
             cellular.Start(config.msCellularApn, config.msCellularUser, config.msCellularPass, config.msCellularOperator, config.miCellularNetwork);
             // cellular.ReadSMS(); use only during firmware setup to receive a SIM based code 
-            cellular.SwitchToPppMode();
-vTaskDelay(1000 / portTICK_PERIOD_MS);
-ESP_LOGW(tag, "switching to low power mode...");
-cellular.SwitchToLowPowerMode();            
-vTaskDelay(1000 / portTICK_PERIOD_MS);
-ESP_LOGW(tag, "switching to full power mode next...");
-cellular.SwitchToFullPowerMode();         
-vTaskDelay(1000 / portTICK_PERIOD_MS);
-String response;
-ESP_LOGW(tag, "switching to PPP mode next...");
-cellular.SwitchToPppMode();
-
-ESP_LOGW(tag, "PPP again");
-
             break; }
         case MODE_WIFISTA:
             //config.msSTASsid = "";
@@ -142,13 +128,35 @@ ESP_LOGW(tag, "PPP again");
     Watchdog watchdog(CONFIG_WATCHDOG_SECONDS);
     SendData sendData(config, cellular, watchdog);
 
-    ReadMaximet readMaximet(config, sendData);
+    ReadMaximet readMaximet(config);
     readMaximet.Start(CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN, CONFIG_WEATHERBUOY_READMAXIMET_TX_PIN);
 
     while (true) {
         tempSensors.Read();
-        if (!sendData.PostHealth(max471Meter.Voltage(), max471Meter.Current(), tempSensors.BoardTemp(), tempSensors.WaterTemp())) {
+
+            cellular.SwitchToPppMode();
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            ESP_LOGW(tag, "switching to low power mode...");
+            cellular.SwitchToLowPowerMode();            
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            ESP_LOGW(tag, "switching to full power mode next...");
+            cellular.SwitchToFullPowerMode();         
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            String response;
+            ESP_LOGW(tag, "switching to PPP mode next...");
+            cellular.SwitchToPppMode();
+
+            ESP_LOGW(tag, "PPP again");
+
+/*        if (!sendData.PostHealth(max471Meter.Voltage(), max471Meter.Current(), tempSensors.BoardTemp(), tempSensors.WaterTemp())) {
                 ESP_LOGE(tag, "Could not post data, likely due to a full queue");
+        } */
+        Data* pData;
+        
+        while((pData = readMaximet.GetData())) {
+            if (pData) {
+                sendData.PerformHttpPost(*pData);
+            }
         }
         vTaskDelay(config.miSendDataIntervalHealth*1000 / portTICK_PERIOD_MS);
     }  
