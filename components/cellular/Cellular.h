@@ -86,6 +86,8 @@ private:
     bool mbCommandMode = true;
     bool mbPowerSaverActive = false;
 
+    SemaphoreHandle_t mxConnected;
+
     esp_cellular_netif_driver_t mModemNetifDriver;
     esp_netif_t *mpEspNetif = nullptr;
 

@@ -6,12 +6,12 @@
 class Data {
     public:
         String msMaximet;
-        unsigned int muiPowerVoltage;
+        /*unsigned int muiPowerVoltage;
         unsigned int muiPowerCurrent;
         unsigned int muiPowerCurrentMax;
         unsigned int muiWaterTemperature;
-        unsigned int muiBoardTemperature;
-        unsigned int muiTimestamp;
+        unsigned int muiBoardTemperature; 
+        unsigned int muiTimestamp;*/
 };
 
 #endif 

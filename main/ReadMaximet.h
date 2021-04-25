@@ -6,7 +6,6 @@
 #include "Config.h"
 #include "Data.h"
 
-
 class ReadMaximet {
 public:
 	ReadMaximet(Config &config);
@@ -22,6 +21,12 @@ public:
     // returns nullptr if no data available
     Data* GetData();
 
+    // peeks into queue, but doesnt return pointer to not accidentally delete data
+    bool WaitForData(unsigned int timeoutSeconds);
+
+    unsigned int SolarRadiation() { return muiSolarradiation; };
+
+
 private:
     //main loop run by the task
     void ReadMaximetTask();
@@ -34,6 +39,8 @@ private:
     
     QueueHandle_t mxDataQueue;
     bool mbRun = true;
+
+    unsigned int muiSolarradiation = 999;
 };
 
 #endif 

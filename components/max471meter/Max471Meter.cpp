@@ -53,7 +53,7 @@ void Max471Meter::Max471MeterTask() {
         }
         muiCurrentCount++;
         taskEXIT_CRITICAL(&mCriticalSection);
-        ESP_LOGI(tag, "Current %d mA", measurement);
+        //ESP_LOGD(tag, "Current %d mA", measurement);
     }
 }
 

@@ -8,13 +8,14 @@
 #include "Cellular.h"
 #include "Watchdog.h"
 #include "Data.h"
+#include "ReadMaximet.h"
 
 class SendData {
 public:
 	SendData(Config &config, Cellular &cellular, Watchdog &watchdog);
 	virtual ~SendData();
 	//void EventHandler(int32_t id, void* event_data);
-    bool PerformHttpPost(Data &data);
+    bool PerformHttpPost(ReadMaximet &readMaximet, unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics);
 
 
     // post string data to a message queue for sending. Data is copied into queue
@@ -37,15 +38,15 @@ private: // esp http client
     String ReadMessageValue(const char* key);
     String ReadMessagePemValue(const char* key);
     void Cleanup();
-    bool mbSendDiagnostics = false;
+    //bool mbSendDiagnostics = false;
     bool mbOtaAppValidated = false;
     bool mbRestart = false;
 
-private: // health data
+/*private: // health data
     unsigned int muiPowerVoltage = 0;
     unsigned int muiPowerCurrent = 0;
     float mfBoardTemperature = 0;
-    float mfWaterTemperature = 0;
+    float mfWaterTemperature = 0;*/
 
 };
 

@@ -10,6 +10,7 @@
 #include "esp_ota_ops.h"
 #include "esp_https_ota.h"
 #include "esputil.h"
+#include "ReadMaximet.h"
 
 static const char tag[] = "SendData";
 static const int SENDDATA_QUEUE_SIZE = (3); 
@@ -74,7 +75,7 @@ void SendData::Cleanup() {
     mhEspHttpClient = nullptr;
 }
 
-bool SendData::PerformHttpPost(Data &data) {
+bool SendData::PerformHttpPost(ReadMaximet &readMaximet, unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics) {
     // Initialize URL and HTTP client
     if (!mhEspHttpClient) {
         if (!mrConfig.msTargetUrl.startsWith("http")) {
@@ -87,19 +88,33 @@ bool SendData::PerformHttpPost(Data &data) {
         mhEspHttpClient = esp_http_client_init(&mEspHttpClientConfig);
     }
 
+    Data *pMaximetData = readMaximet.GetData();
+    if (pMaximetData) {
+        ESP_LOGW(tag, "DATA FROM QUEUE: %s", pMaximetData->msMaximet.c_str());
+    }
+
+    // DONT SEND THE REST OF THE QUEUE FOR NOW !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    while (true) {
+        Data *p = readMaximet.GetData();
+        if (!p)
+            break;
+        delete p;
+    }            
+
+
     //##############################################
     //######## TODO SEND as YAML?????? or JSON??? how much extra payload?
     // there is a yaml to json parser, this should allow to send lighterweight yaml instead of full blown json data; https://www.npmjs.com/package/js-yaml 
 
     // POST message
     unsigned int uptime = (unsigned int) (esp_timer_get_time()/1000000); // seconds since start
-    if(data.msMaximet) {
+    if(pMaximetData) {
         mPostData = "maximet: ";
-        mPostData += data.msMaximet;
+        mPostData += pMaximetData->msMaximet;
     } 
-    if(!data.msMaximet || mbSendDiagnostics) {
+    if(!pMaximetData || bSendDiagnostics) {
         mPostData = "health: ";
-        mbSendDiagnostics = true;
+        bSendDiagnostics = true;
         mPostData += "\r\nresetreason: ";
         mPostData += esp32_getresetreasontext(esp_reset_reason());
     }
@@ -114,11 +129,11 @@ bool SendData::PerformHttpPost(Data &data) {
     mPostData += ",";
     mPostData += esp_get_minimum_free_heap_size();
     mPostData += ",";
-    mPostData += muiPowerVoltage;
+    mPostData += powerVoltage;
     mPostData += ",";
-    mPostData += muiPowerCurrent;
+    mPostData += powerCurrent;
     mPostData += "\r\n";
-    if (mbSendDiagnostics) {
+    if (bSendDiagnostics) {
         mPostData += "esp-idf-version: ";
         mPostData += esp_ota_get_app_description()->idf_ver;  
         mPostData += "\r\n";
@@ -167,20 +182,25 @@ bool SendData::PerformHttpPost(Data &data) {
         mPostData += mrCellular.msNetworkmode;
         mPostData += "\r\n";
         mPostData += "boardtemp: ";
-        mPostData += mfBoardTemperature;
+        mPostData += boardTemperature;
         mPostData += "\r\n";
         mPostData += "watertemp: ";
-        mPostData += mfWaterTemperature;
+        mPostData += waterTemperature;
         mPostData += "\r\n";
         mPostData += "cputemp: ";
         mPostData += esp32_temperature();
         mPostData += "\r\n";
         mPostData += "battery: ";
-        mPostData += muiPowerVoltage;
+        mPostData += powerVoltage;
         mPostData += ",";
-        mPostData += muiPowerCurrent;
+        mPostData += powerCurrent;
         mPostData += "\r\n";
-        mbSendDiagnostics = false;
+        bSendDiagnostics = false;
+    }
+    
+    if (pMaximetData) {
+        delete pMaximetData;
+        pMaximetData = nullptr;
     }
 
     // prepare and send HTTP headers and content length
@@ -275,7 +295,7 @@ bool SendData::PerformHttpPost(Data &data) {
                 }
                 mbRestart = true;
             } else if (command.equals("diagnose")) {
-                mbSendDiagnostics = true;
+                bSendDiagnostics = true;
             }
 
             // Optionally Execute OTA Update command
@@ -283,6 +303,8 @@ bool SendData::PerformHttpPost(Data &data) {
                 mbRestart = true;
                 Cleanup();
                 memset(&mEspHttpClientConfig, 0, sizeof(esp_http_client_config_t));
+
+                readMaximet.Stop();
 
                 const String &pem = ReadMessagePemValue("set-cert-pem:");
                 mEspHttpClientConfig.method = HTTP_METHOD_GET; 

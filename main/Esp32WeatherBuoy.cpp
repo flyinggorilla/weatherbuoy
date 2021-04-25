@@ -85,6 +85,14 @@ void Esp32WeatherBuoy::Start() {
         ESP_LOGE(tag, "Error, could not load configuration.");
     }
 
+    int watchdogSeconds = CONFIG_WATCHDOG_SECONDS;
+    if (watchdogSeconds < config.miSendDataIntervalNighttime * 2) {
+        watchdogSeconds = config.miSendDataIntervalNighttime * 2;
+    }
+
+    Watchdog watchdog(watchdogSeconds);
+    ESP_LOGI(tag, "Watchdog started and adjusted to %d seconds.", watchdogSeconds);
+
     TemperatureSensors tempSensors(config);
     tempSensors.Init(CONFIG_TEMPERATURESENSOR_GPIO_ONEWIRE);
 
@@ -94,6 +102,9 @@ void Esp32WeatherBuoy::Start() {
 
     Max471Meter max471Meter(CONFIG_MAX471METER_GPIO_VOLTAGE, CONFIG_MAX471METER_GPIO_CURRENT);
     ESP_LOGI(tag, "Max471Meter: voltage %d mV, current %d mA??", max471Meter.Voltage(), max471Meter.Current());
+
+    ReadMaximet readMaximet(config);
+    readMaximet.Start(CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN, CONFIG_WEATHERBUOY_READMAXIMET_TX_PIN);
 
     OnlineMode onlineMode = MODE_CELLULAR;
 
@@ -121,44 +132,65 @@ void Esp32WeatherBuoy::Start() {
             ESP_LOGW(tag, "Staying offline.");
     }
 
-    ESP_LOGI(tag, "Starting maximet stuff");
     //TestATCommands();
     //TestHttp();
 
-    Watchdog watchdog(CONFIG_WATCHDOG_SECONDS);
     SendData sendData(config, cellular, watchdog);
 
-    ReadMaximet readMaximet(config);
-    readMaximet.Start(CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN, CONFIG_WEATHERBUOY_READMAXIMET_TX_PIN);
+    ESP_LOGI(tag, "Starting Weatherbuoy main task.");
+
+    bool bDiagnostics = false;
+    unsigned int lastSendTimestamp = 0;
+    unsigned int lastDiagnosticsTimestamp = 0;
 
     while (true) {
         tempSensors.Read();
+        bool isMaximetData = readMaximet.WaitForData(60);
 
-            cellular.SwitchToPppMode();
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-            ESP_LOGW(tag, "switching to low power mode...");
-            cellular.SwitchToLowPowerMode();            
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-            ESP_LOGW(tag, "switching to full power mode next...");
-            cellular.SwitchToFullPowerMode();         
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-            String response;
-            ESP_LOGW(tag, "switching to PPP mode next...");
-            cellular.SwitchToPppMode();
+        unsigned int currentTimestamp;
+        unsigned int secondsSinceLastSend;
+        unsigned int secondsSinceLastDiagnostics;
+        int secondsToSleep;
 
-            ESP_LOGW(tag, "PPP again");
+        ESP_LOGW(tag, "Solarradiation of %d", readMaximet.SolarRadiation());
 
-/*        if (!sendData.PostHealth(max471Meter.Voltage(), max471Meter.Current(), tempSensors.BoardTemp(), tempSensors.WaterTemp())) {
-                ESP_LOGE(tag, "Could not post data, likely due to a full queue");
-        } */
-        Data* pData;
-        
-        while((pData = readMaximet.GetData())) {
-            if (pData) {
-                sendData.PerformHttpPost(*pData);
-            }
+        // determine nighttime by low solar radiation
+        if (readMaximet.SolarRadiation() > 2) {
+            ESP_LOGI(tag, "Daytime due to Solarradiation of %d", readMaximet.SolarRadiation());
+            secondsToSleep = config.miSendDataIntervalDaytime; //s;
+        } else {
+            secondsToSleep = config.miSendDataIntervalNighttime; //s;
         }
-        vTaskDelay(config.miSendDataIntervalHealth*1000 / portTICK_PERIOD_MS);
+
+        // keep modem sleeping unless time to last send elapsed
+        currentTimestamp = (unsigned int)(esp_timer_get_time()/1000); // milliseconds since start
+        secondsSinceLastSend = (currentTimestamp - lastSendTimestamp)/1000;
+        if (!isMaximetData || (secondsToSleep < secondsSinceLastSend)) {
+            continue;
+        }
+        lastSendTimestamp = currentTimestamp;
+
+        // when sending, add diagnostics information after 300 seconds
+        secondsSinceLastDiagnostics = (currentTimestamp - lastDiagnosticsTimestamp)/1000;
+        if (secondsSinceLastDiagnostics > config.miSendDataIntervalHealth) {
+            bDiagnostics = true;
+            lastDiagnosticsTimestamp = currentTimestamp;
+        } else {
+            bDiagnostics = false;
+        }
+
+
+        ESP_LOGW(tag, "switching to full power mode next...");
+        cellular.SwitchToFullPowerMode();         
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        ESP_LOGW(tag, "switching to PPP mode next...");
+        cellular.SwitchToPppMode();
+        sendData.PerformHttpPost(readMaximet, max471Meter.Voltage(), max471Meter.Current(), tempSensors.BoardTemp(), tempSensors.WaterTemp(), bDiagnostics);
+        ESP_LOGI(tag, "switching to low power mode...");
+        cellular.SwitchToLowPowerMode();            
+        
+        //vTaskDelay(config.miSendDataIntervalHealth*1000 / portTICK_PERIOD_MS);
+        vTaskDelay(10*1000 / portTICK_PERIOD_MS);
     }  
 }
 

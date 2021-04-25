@@ -1,4 +1,4 @@
-#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "sdkconfig.h"
 #include "Cellular.h"
 #include "EspString.h"
@@ -8,6 +8,8 @@
 #include "esp_netif.h"
 #include "esp_event.h"
 #include "esp_netif_ppp.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 static const char tag[] = "Cellular";
 
@@ -59,6 +61,7 @@ void cellularEventHandler(void* ctx, esp_event_base_t base, int32_t id, void* ev
 }
 
 Cellular::Cellular() {
+   mxConnected = xSemaphoreCreateBinary();
 }
 
 bool Cellular::InitModem() {
@@ -391,6 +394,11 @@ return; */
     }
     ESP_LOGI(tag, "Subscriber: %s", msSubscriber.c_str());
 
+
+    Command("AT+CGNSSMODE=0,1", "OK", &response,  "Disable GPS mode"); 
+    ESP_LOGI(tag, "Disable GPS mode: %s", response.c_str());
+    
+
 } 
 
 void Cellular::ReadSMS() {
@@ -546,14 +554,14 @@ bool Cellular::SwitchToLowPowerMode() {
         ESP_LOGW(tag, "EXTRA LINE: %s",  response.c_str());
     } */
 
-
+/*
 Command("AT+CNSMOD?", "OK", &response, "Current network system mode");
 ESP_LOGW(tag, "network system mode: %s", response.c_str());
 Command("AT+CGDCONT=?", "OK", &response, "check PDP context");
 ESP_LOGW(tag, "PDP context: %s", response.c_str());
 Command("AT+CGDATA=?", "OK", &response, "check PPP switching");
 ESP_LOGW(tag, "data mode check: %s", response.c_str());
-
+*/
     
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 
@@ -584,24 +592,6 @@ bool Cellular::SwitchToFullPowerMode() {
         ESP_LOGE(tag, "Severe problem, no connection to Modem");
     };
 
-
-/*    command = "AT+COPS=0,0,\"";
-    command += msPreferredOperator;
-    command += "\"";
-    if(Command(command.c_str(), "OK", &response, "Set preferred operator")) {
-        ESP_LOGW(tag, "Set preferred operator to '%s'", msPreferredOperator.c_str());
-    } else {
-        ESP_LOGW(tag, "Could not set preferred operator to '%s': %s", msPreferredOperator.c_str(), response.c_str());
-    }
-
-    command = "AT+CNMP=";
-    command += miPreferredNetwork;
-    if(Command(command.c_str(), "OK", &response, "Set preferred network")) {
-        ESP_LOGW(tag, "Set preferred network to '%d'", miPreferredNetwork);
-    } else {
-        ESP_LOGW(tag, "Could not set preferred network to %i: %s", miPreferredNetwork, response.c_str());
-    }
-    */
 
     int maxWaitForNetworkRegistration = 120;
     while (maxWaitForNetworkRegistration--) {
@@ -661,7 +651,7 @@ bool Cellular::SwitchToFullPowerMode() {
 
     Command("AT+CSQ", "OK", &response,  "Signal Quality Report"); // +CSQ: 13,0
     ESP_LOGI(tag, "Signal Quality: %s", response.substring(6).c_str());
-    ESP_LOGE(tag, "Switching to full power mode failed.");
+    ESP_LOGI(tag, "Switching to full power mode completed.");
     return false;
 }
 
@@ -675,11 +665,7 @@ bool Cellular::SwitchToCommandMode() {
 
     //Waiting for UART event.
     // before sending the new message, run xQueueReset(????????????????)
-mbCommandMode = true; //TODO race conditions???
 //esp_netif_action_stop(void *esp_netif, esp_event_base_t base, int32_t event_id, void *data)
-esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
-ResetInputBuffers();
-    xQueueReset(mhUartEventQueueHandle);
     if(xQueueSend(mhUartEventQueueHandle, (void * )&uartSwitchToPppEvent, (portTickType)portMAX_DELAY)) {
 
         uart_flush(muiUartNo);
@@ -709,7 +695,11 @@ ResetInputBuffers();
         String response;
         if (ModemReadResponse(response, "OK", 5)) {
             ESP_LOGI(tag, "Switched to command mode.");
-ResetInputBuffers();
+            xQueueReset(mhUartEventQueueHandle);
+            mbCommandMode = true; //TODO race conditions???
+            esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
+            esp_netif_action_disconnected(mpEspNetif, 0, 0, nullptr);
+            ResetInputBuffers();
             return true;
         } 
     }
@@ -768,21 +758,38 @@ bool Cellular::SwitchToPppMode() {
             ESP_LOGI(tag, "SwitchToPppMode(NEW) CONNECTED");
             mbCommandMode = false;
             esp_netif_action_start(mpEspNetif, 0, 0, nullptr);
-            return true;
+
+            // WAIT FOR IP ADDRESS
+            ESP_LOGI(tag, "Waiting up to 60 seconds for getting IP address");
+            if (xSemaphoreTake(mxConnected, 60*1000 / portTICK_PERIOD_MS) == pdTRUE) {
+                mbConnected = true;
+                return true;
+            }
+
+            return false;
         } else {
-            ESP_LOGW(tag, "Not yet connected!! Later??"); //******************************************************
-            mbCommandMode = false;
-            esp_netif_action_start(mpEspNetif, 0, 0, nullptr);
-            return true;
+            //ESP_LOGW(tag, "Not yet connected!! Later??"); //******************************************************
+            //mbCommandMode = false;
+            //esp_netif_action_start(mpEspNetif, 0, 0, nullptr);
+            ESP_LOGW(tag, "Not yet connected!! Staying in command mode. Other action needed here????"); //******************************************************
+            return false;
         }
     #endif
 
-    Command("ATO", "CONNECT", &response, "resumes the connection and switches back from Command mode to data mode.");
-    if (response.equals("CONNECT")) {
-        ESP_LOGI(tag, "SwitchToPppMode(RESUME) CONNECTED");
-        mbCommandMode = false;
+/*        Command("ATO", "CONNECT", &response, "resumes the connection and switches back from Command mode to data mode.");
+        if (response.equals("CONNECT")) {
+            ESP_LOGI(tag, "SwitchToPppMode(RESUME) CONNECTED");
+            mbCommandMode = false;
+            return true;
+        } 
+
+    // WAIT FOR IP ADDRESS
+    ESP_LOGI(tag, "Waiting up to 60 seconds for getting IP address");
+    if (xSemaphoreTake(mxConnected, 60*1000 / portTICK_PERIOD_MS) == pdTRUE) {
+        mbConnected = true;
         return true;
-    }
+    } */
+ 
     return false;
 }
 
@@ -916,7 +923,7 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void* event_data)
             ESP_LOGI(tag, "Name Server2: " IPSTR, IP2STR(&dns_info.ip.u_addr.ip4));
             ESP_LOGI(tag, "~~~~~~~~~~~~~~");
             mbConnected = true;
-
+            xSemaphoreGive(mxConnected);
             ESP_LOGI(tag, "GOT ip event!!!");
             esp_netif_action_connected(mpEspNetif, 0, 0, nullptr);
         } else if (id == IP_EVENT_PPP_LOST_IP) {
