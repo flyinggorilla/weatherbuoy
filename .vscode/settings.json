@@ -1,5 +1,5 @@
 {
-    "idf.portWin": "COM3",
+    "idf.portWin": "COM15",
     "idf.flashType": "UART",
     "files.associations": {
         "esp_system.h": "c",

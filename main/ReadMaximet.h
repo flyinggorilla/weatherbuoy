@@ -4,7 +4,40 @@
 #include "esp_event.h"
 #include "EspString.h"
 #include "Config.h"
-#include "Data.h"
+
+class Data {
+    public:
+        String msMaximet; // DEBUG ONLY ############################
+
+        int timestamp;
+
+        float speed = 0; 
+        float gspeed = 0; 
+        float avgspeed = 0; 
+
+        int dir = 0;
+        int gdir = 0; 
+        int avgdir = 0; 
+
+        int compassh = 0;
+
+        int cdir = 0; 
+        int cgdir = 0; // CALCULATED!!!  (maximet["GDIR"]+maximet["COMPASSH"]) % 360;
+        int avgcdir = 0; 
+
+        float temp = 0;
+        float pasl = 0; 
+        float pstn = 0; 
+        float rh = 0;
+        float ah = 0;
+        int solarrad = 0;
+
+        float xtilt = 0;
+        float ytilt = 0;
+
+        String status;
+        String windstat; 
+};
 
 class ReadMaximet {
 public:

@@ -7,7 +7,6 @@
 #include "Config.h"
 #include "Cellular.h"
 #include "Watchdog.h"
-#include "Data.h"
 #include "ReadMaximet.h"
 
 class SendData {

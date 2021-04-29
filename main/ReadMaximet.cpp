@@ -8,7 +8,6 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esputil.h"
-//#include <string>
 
 static const char tag[] = "ReadMaximet";
 #define SERIAL_BUFFER_SIZE (1024)
@@ -51,13 +50,12 @@ void ReadMaximet::ReadMaximetTask() {
     serial.Attach();
 
     String line;
-    unsigned int uptimeMs = 0;
+/*     unsigned int uptimeMs = 0;
     unsigned int lastSendMs = 0; 
     unsigned int intervalMs = 0;
-    int skipped = 0;
+    int skipped = 0; */
 
     enum MaximetStates {
-        UNDEFINED,
         STARTUP,
         COLUMNS,
         UNITS,
@@ -65,15 +63,160 @@ void ReadMaximet::ReadMaximetTask() {
         SENDINGDATA
     };
 
-    MaximetStates maximetState = UNDEFINED;
+    enum ParsingStates {
+        SCANSTX,
+        READCOLUMN,
+        CHECKSUM,
+        GARBLED,
+        VALIDDATA
+    };
 
-bool bDayTime = true; /////////////////////////////// TODO *****************************
+
+    String column;
+    MaximetStates maximetState = SENDINGDATA;
 
     ESP_LOGI(tag, "ReadMaximet task started and ready to receive data.");
     while (mbRun) {
         if (!serial.ReadLine(line)) {
             ESP_LOGE(tag, "Could not read line from serial");
+            continue;
         }
+        ESP_LOGD(tag, "THE LINE: %s", line.c_str());
+
+
+        if (line.startsWith("STARTUP: OK")) {
+            maximetState = STARTUP;
+        }
+        switch (maximetState) {
+            case SENDINGDATA:
+                break;
+            case STARTUP : 
+                maximetState = COLUMNS;
+                continue;
+            case COLUMNS : 
+                maximetState = UNITS;
+                mrConfig.msMaximetColumns = line;
+                continue;
+            case UNITS : 
+                maximetState = ENDSTARTUP;
+                mrConfig.msMaximetUnits = line;
+                continue;
+            case ENDSTARTUP:
+                maximetState = SENDINGDATA;
+                continue;
+        }
+
+
+        int cpos = 0;
+        int len = line.length();
+        int col = 0;
+        int checksum = 0;
+        Data *pData = nullptr;
+        ParsingStates parsingState = SCANSTX;
+        while (cpos < len) {
+            char c = line.charAt(cpos++);
+            switch (parsingState) {
+                case SCANSTX: 
+                    if (c == STX) {
+                        parsingState = READCOLUMN;
+                        pData = new Data();
+                        column.setlength(0);
+                    }
+                    break;
+                case READCOLUMN: 
+                    if (c == ETX || c == ',') {
+                        col++;    
+                        ESP_LOGI(tag, "Column %d: '%s'", col, column.c_str());
+                        // SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,STATUS,WINDSTAT,CHECK
+                        // MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,HPA,HPA,%,G/M3,C,WM2,DEG,DEG,-,-,-
+                        switch (col) {
+                            case 1: pData->speed = column.toFloat(); break;
+                            case 2: pData->gspeed = column.toFloat(); break;
+                            case 3: pData->avgspeed = column.toFloat(); break;
+                            case 4: pData->dir = column.toInt(); break;
+                            case 5: pData->gdir = column.toInt(); break;
+                            case 6: pData->avgdir = column.toInt(); break;
+                            case 7: pData->cdir = column.toInt(); break;
+                            case 8: pData->avgcdir = column.toInt(); break;
+                            case 9: pData->compassh = column.toInt(); break;
+                            case 10: pData->pasl = column.toFloat(); break;
+                            case 11: pData->pstn = column.toFloat(); break;
+                            case 12: pData->rh = column.toFloat(); break;
+                            case 13: pData->ah = column.toFloat(); break;
+                            case 14: pData->temp = column.toFloat(); break;
+                            case 15: pData->solarrad = column.toFloat(); break;
+                            case 16: pData->xtilt = column.toFloat(); break;
+                            case 17: pData->ytilt = column.toFloat(); break;
+                            case 18: pData->status = column; break;
+                            case 19: pData->windstat = column; break;
+                        }
+                        column.setlength(0);
+                    } else if (c < 0x20 || c > 0x7E) {
+                        ESP_LOGE(tag, "Invalid characters in maximet string: %s.", column.c_str());
+                        parsingState = GARBLED;
+                    } else {
+                        column += c;
+                        if (column.length() > 128) {
+                            ESP_LOGE(tag, "Column data length exceeded maximum: %s.", column.c_str());
+                            parsingState = GARBLED;
+                        }
+                    }
+
+                    if (c == ETX) {
+                        parsingState = CHECKSUM;
+                        column.setlength(0);
+                    } else {
+                        checksum ^= c;
+                    }
+                    break;
+            
+                case CHECKSUM:
+                    column += c;
+                    ESP_LOGI(tag, "Checksum control area: '%s' =? %02X", column.c_str(), checksum);
+                    if (column.length() == 2) {
+                        int check = strtol(column.c_str(), 0, 16); // convert hex string like "FF" to integer
+                        if (check != checksum) {
+                            parsingState = GARBLED;
+                            ESP_LOGW(tag, "Invalid checksum %02X != %s, trashing data.", checksum, column.c_str());
+                        } else {
+                            parsingState = VALIDDATA;
+                            ESP_LOGI(tag, "Checksum validated");
+                        }
+                    }
+                    break;
+                case GARBLED:
+                    delete pData;
+                    pData = nullptr;
+                    continue;
+                case VALIDDATA:
+                    pData->timestamp = esp_timer_get_time()/1000; // seconds since start (good enough as int can store seconds over 68 years in 31 bits)
+                    ESP_LOGI(tag, "Pushing measurement data to queue: '%s', %d seconds since start", line.c_str(), pData->timestamp);
+                    if (uxQueueSpacesAvailable(mxDataQueue) == 0) {
+                        // queue is full, so remove an element
+                        ESP_LOGW(tag, "Queue is full, dropping unsent oldest data.");
+                        Data* pReceivedData = nullptr;
+                        xQueueReceive(mxDataQueue, &pReceivedData, 0);
+                        delete pReceivedData;
+                        pReceivedData = nullptr;
+                    }
+
+                    // PUT pData to queue
+                    if (xQueueSend(mxDataQueue, &pData, 0) != pdTRUE) {
+                        // data could not put to queue, so make sure to delete the data
+                        ESP_LOGE(tag, "Queue is full. We should never be here.");
+                        delete pData;
+                        pData = nullptr;
+                    } 
+                    continue;
+            }
+        }
+    }
+    serial.Release();
+    ESP_LOGI(tag, "Shut down data collection.");
+    return;
+}
+
+/*  
 
         // check for STX and ETX limiter
         ESP_LOGD(tag, "THE LINE: %s", line.c_str());
@@ -119,7 +262,7 @@ bool bDayTime = true; /////////////////////////////// TODO *********************
             }
             solarradiationPosEnd = pData->msMaximet.indexOf(',');
             muiSolarradiation = pData->msMaximet.substring(solarradiationPosStart, solarradiationPosEnd).toInt();
-            ESP_LOGD(tag, "solarradiation %d", muiSolarradiation);
+            ESP_LOGW(tag, "solarradiation %s <-> %d", pData->msMaximet.substring(solarradiationPosStart, solarradiationPosEnd).c_str(), muiSolarradiation);
 
             // Checksum, the 2 digit Hex Checksum sum figure is calculated from the Exclusive OR of the bytes between (and not including) the STX and ETX characters
             unsigned char calculatedChecksum = 0;
@@ -170,43 +313,11 @@ bool bDayTime = true; /////////////////////////////// TODO *********************
             // TX: EXIT<CRLF>
 
             if (ok) {
-                if (line.startsWith("STARTUP: OK")) {
-                    maximetState = STARTUP;
-                }
-                switch (maximetState) {
-                    case UNDEFINED:
-                        break;
-                    case STARTUP : 
-                        maximetState = COLUMNS;
-                        break;
-                    case COLUMNS : 
-                        maximetState = UNITS;
-                        mrConfig.msMaximetColumns = line;
-                        break;
-                    case UNITS : 
-                        maximetState = ENDSTARTUP;
-                        mrConfig.msMaximetUnits = line;
-                        if (mrConfig.msMaximetColumns && mrConfig.msMaximetUnits) {
-                            mrConfig.Save();    
-                            ESP_LOGI(tag, "Saving Maximet config");                        
-                        }
-                        break;
-                    case ENDSTARTUP:
-                        maximetState = SENDINGDATA;
-                        break;
-                    case SENDINGDATA:
-                        break;
-                }
-                ESP_LOGI(tag, "Metadata '%s'", line.c_str());
             }
         }
 
-    } 
+    }  */
 
-    serial.Release();
-    ESP_LOGI(tag, "Shut down data collection.");
-    return;
-}
 
 Data* ReadMaximet::GetData() {
     Data* pReceivedData = nullptr;
