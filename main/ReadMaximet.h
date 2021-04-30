@@ -7,36 +7,64 @@
 
 class Data {
     public:
-        String msMaximet; // DEBUG ONLY ############################
+
+        Data() {
+            init();
+        }
+
+        void init() {
+            timestamp = esp_timer_get_time()/1000;
+            speed = 0; 
+            gspeed = 0; 
+            avgspeed = 0; 
+            dir = 0;
+            gdir = 0; 
+            avgdir = 0; 
+            compassh = 0;
+            cdir = 0; 
+            cgdir = 0; // CALCULATED!!!  (maximet["GDIR"]+maximet["COMPASSH"]) % 360;
+            avgcdir = 0; 
+            temp = 0;
+            pasl = 0; 
+            pstn = 0; 
+            rh = 0;
+            ah = 0;
+            solarrad = 0;
+            xtilt = 0;
+            ytilt = 0;
+            status[0] = 0;
+            windstat[0] = 0; 
+        }
 
         int timestamp;
 
-        float speed = 0; 
-        float gspeed = 0; 
-        float avgspeed = 0; 
+        float speed; 
+        float gspeed; 
+        float avgspeed; 
 
-        int dir = 0;
-        int gdir = 0; 
-        int avgdir = 0; 
+        int dir;
+        int gdir; 
+        int avgdir; 
 
-        int compassh = 0;
+        int compassh;
 
-        int cdir = 0; 
-        int cgdir = 0; // CALCULATED!!!  (maximet["GDIR"]+maximet["COMPASSH"]) % 360;
-        int avgcdir = 0; 
+        int cdir; 
+        int cgdir; // CALCULATED!!!  (maximet["GDIR"]+maximet["COMPASSH"]) % 360;
+        int avgcdir; 
 
-        float temp = 0;
-        float pasl = 0; 
-        float pstn = 0; 
-        float rh = 0;
-        float ah = 0;
-        int solarrad = 0;
+        float temp;
+        float pasl; 
+        float pstn; 
+        float rh;
+        float ah;
+        int solarrad;
 
-        float xtilt = 0;
-        float ytilt = 0;
+        float xtilt;
+        float ytilt;
 
-        String status;
-        String windstat; 
+        static const int statuslen = 5;
+        char status[statuslen];
+        char windstat[statuslen]; 
 };
 
 class ReadMaximet {
@@ -51,8 +79,8 @@ public:
     void Stop() { mbRun = false; }; 
 
     // read data from queue; 
-    // returns nullptr if no data available
-    Data* GetData();
+    // returns false if no data available
+    bool GetData(Data &data);
 
     // peeks into queue, but doesnt return pointer to not accidentally delete data
     bool WaitForData(unsigned int timeoutSeconds);

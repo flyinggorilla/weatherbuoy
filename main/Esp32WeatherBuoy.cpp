@@ -166,6 +166,7 @@ void Esp32WeatherBuoy::Start() {
         currentTimestamp = (unsigned int)(esp_timer_get_time()/1000); // milliseconds since start
         secondsSinceLastSend = (currentTimestamp - lastSendTimestamp)/1000;
         if (!isMaximetData || (secondsToSleep < secondsSinceLastSend)) {
+            ESP_LOGI(tag, "skipping sending --- sleep: %d, maximetdata: %s", secondsToSleep - secondsSinceLastSend, isMaximetData ? "true" : "false");
             continue;
         }
         lastSendTimestamp = currentTimestamp;

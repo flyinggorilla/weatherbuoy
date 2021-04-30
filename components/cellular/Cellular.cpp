@@ -36,6 +36,8 @@ static const char tag[] = "Cellular";
     #define CELLULAR_GPIO_POWER GPIO_NUM_25 // Lilygo T-PCIE SIM7600
     #define CELLULAR_GPIO_TX GPIO_NUM_27
     #define CELLULAR_GPIO_RX GPIO_NUM_26
+    #define CELLULAR_GPIO_DTR GPIO_NUM_32 // Data Terminal Ready - used for sleep function
+    #define CELLULAR_GPIO_RI GPIO_NUM_33 // RING - used to wake
     #define CELLULAR_GPIO_STATUS GPIO_NUM_36
     #define CELLULAR_DEFAULT_BAUD_RATE 115200
     #define CELLULAR_ACCELERATED_BAUD_RATE 115200*4
@@ -172,9 +174,14 @@ bool Cellular::PowerOn(void)
     #ifdef CONFIG_LILYGO_TTGO_TPCIE_SIM7600
         gpio_set_direction(CELLULAR_GPIO_PWKEY, GPIO_MODE_OUTPUT);
         gpio_set_direction(CELLULAR_GPIO_POWER, GPIO_MODE_OUTPUT);
-        gpio_set_direction(CELLULAR_GPIO_STATUS, GPIO_MODE_INPUT);  ///######### TODO GPIO CONSTANT
+        gpio_set_direction(CELLULAR_GPIO_STATUS, GPIO_MODE_INPUT);
+        gpio_set_direction(CELLULAR_GPIO_DTR, GPIO_MODE_OUTPUT);
 
         ESP_LOGI(tag, "initializing LILYGO T-PCIE SIM7600 modem...");
+
+        // DTR : set high, to enter sleep mode
+        gpio_set_level(CELLULAR_GPIO_DTR, 0);
+
         // POWER_PIN : This pin controls the power supply of the SIM7600
         gpio_set_level(CELLULAR_GPIO_POWER, 0);
         gpio_set_level(CELLULAR_GPIO_PWKEY, 1);
@@ -185,6 +192,7 @@ bool Cellular::PowerOn(void)
         gpio_set_level(CELLULAR_GPIO_PWKEY, 0);
         vTaskDelay(500/portTICK_PERIOD_MS); // for SIM7600 it is minimum 100ms, typical 500ms LOW
         gpio_set_level(CELLULAR_GPIO_PWKEY, 1);
+
 
         // wait at least 12 seconds for SIM7600 bit....
         int maxModemUartReadyTime = 30; // seconds
@@ -397,6 +405,20 @@ return; */
 
     Command("AT+CGNSSMODE=0,1", "OK", &response,  "Disable GPS mode"); 
     ESP_LOGI(tag, "Disable GPS mode: %s", response.c_str());
+
+    /*Command("AT+CAPFOTA=?", "OK", &response,  "FOTA possibilities?"); 
+    ESP_LOGI(tag, "Fota possible?: %s", response.c_str());
+
+    Command("AT+CAPFOTA?", "OK", &response,  "FOTA service status"); 
+    ESP_LOGI(tag, "Fota service status: %s", response.c_str());
+    //Model": "SIMCOM_SIM7600E",
+    // "Revision": "SIM7600M21-A_V1.1",
+    Command("AT+CAPFOTA=1", "OK", &response,  "enable FOTA service"); 
+    ESP_LOGI(tag, "enable fota service: %s", response.c_str());
+
+    Command("AT+CSFOTA", "OK", &response,  "run fota"); 
+    ESP_LOGI(tag, "CSFOTA: %s", response.c_str()); */
+
     
 
 } 
@@ -570,6 +592,15 @@ ESP_LOGW(tag, "data mode check: %s", response.c_str());
         mbPowerSaverActive = true;
         return true;
     } 
+
+    gpio_set_level(CELLULAR_GPIO_DTR, 1);
+
+    if (Command("AT+CSCLK=1", "OK", &response, "Enable sleep via UART.")) { // mode 4 would shut down RF entirely to "flight-mode"; mode 0 still keeps SMS receiption intact
+        ESP_LOGI(tag, "Enabled sleep via UART.");
+        mbPowerSaverActive = true;
+        return true;
+    } 
+
 
     //////////////////////////
     //// AT+CSCLK=1    ----- AT+CSCLK Control UART Sleep

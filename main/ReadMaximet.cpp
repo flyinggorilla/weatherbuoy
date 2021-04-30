@@ -10,7 +10,7 @@
 #include "esputil.h"
 
 static const char tag[] = "ReadMaximet";
-#define SERIAL_BUFFER_SIZE (1024)
+#define SERIAL_BUFFER_SIZE (512)
 #define SERIAL_BAUD_RATE (19200)
 
 void fReadMaximetTask(void *pvParameter) {
@@ -23,7 +23,7 @@ void ReadMaximet::Start(int gpioRX, int gpioTX) {
     mgpioTX = gpioTX;
 
     // Create a queue capable of containing 10 uint32_t values.
-    mxDataQueue = xQueueCreate( 60, sizeof( Data* ) );
+    mxDataQueue = xQueueCreate( 60, sizeof( Data ) );
     if( !mxDataQueue )
     {
         ESP_LOGE(tag, "Could not create Data queue. Data collection not initialized.");
@@ -64,7 +64,7 @@ void ReadMaximet::ReadMaximetTask() {
     };
 
     enum ParsingStates {
-        SCANSTX,
+        START,
         READCOLUMN,
         CHECKSUM,
         GARBLED,
@@ -72,6 +72,7 @@ void ReadMaximet::ReadMaximetTask() {
     };
 
 
+    Data data;
     String column;
     MaximetStates maximetState = SENDINGDATA;
 
@@ -111,44 +112,44 @@ void ReadMaximet::ReadMaximetTask() {
         int len = line.length();
         int col = 0;
         int checksum = 0;
-        Data *pData = nullptr;
-        ParsingStates parsingState = SCANSTX;
-        while (cpos < len) {
+
+        ParsingStates parsingState = START;
+        while (cpos < len || parsingState == VALIDDATA) {
             char c = line.charAt(cpos++);
             switch (parsingState) {
-                case SCANSTX: 
+                case START: 
                     if (c == STX) {
                         parsingState = READCOLUMN;
-                        pData = new Data();
+                        data.init();
                         column.setlength(0);
                     }
                     break;
                 case READCOLUMN: 
                     if (c == ETX || c == ',') {
                         col++;    
-                        ESP_LOGI(tag, "Column %d: '%s'", col, column.c_str());
+                        ESP_LOGD(tag, "Column %d: '%s'", col, column.c_str());
                         // SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,STATUS,WINDSTAT,CHECK
                         // MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,HPA,HPA,%,G/M3,C,WM2,DEG,DEG,-,-,-
                         switch (col) {
-                            case 1: pData->speed = column.toFloat(); break;
-                            case 2: pData->gspeed = column.toFloat(); break;
-                            case 3: pData->avgspeed = column.toFloat(); break;
-                            case 4: pData->dir = column.toInt(); break;
-                            case 5: pData->gdir = column.toInt(); break;
-                            case 6: pData->avgdir = column.toInt(); break;
-                            case 7: pData->cdir = column.toInt(); break;
-                            case 8: pData->avgcdir = column.toInt(); break;
-                            case 9: pData->compassh = column.toInt(); break;
-                            case 10: pData->pasl = column.toFloat(); break;
-                            case 11: pData->pstn = column.toFloat(); break;
-                            case 12: pData->rh = column.toFloat(); break;
-                            case 13: pData->ah = column.toFloat(); break;
-                            case 14: pData->temp = column.toFloat(); break;
-                            case 15: pData->solarrad = column.toFloat(); break;
-                            case 16: pData->xtilt = column.toFloat(); break;
-                            case 17: pData->ytilt = column.toFloat(); break;
-                            case 18: pData->status = column; break;
-                            case 19: pData->windstat = column; break;
+                            case 1: data.speed = column.toFloat(); break;
+                            case 2: data.gspeed = column.toFloat(); break;
+                            case 3: data.avgspeed = column.toFloat(); break;
+                            case 4: data.dir = column.toInt(); break;
+                            case 5: data.gdir = column.toInt(); break;
+                            case 6: data.avgdir = column.toInt(); break;
+                            case 7: data.cdir = column.toInt(); break;
+                            case 8: data.avgcdir = column.toInt(); break;
+                            case 9: data.compassh = column.toInt(); break;
+                            case 10: data.pasl = column.toFloat(); break;
+                            case 11: data.pstn = column.toFloat(); break;
+                            case 12: data.rh = column.toFloat(); break;
+                            case 13: data.ah = column.toFloat(); break;
+                            case 14: data.temp = column.toFloat(); break;
+                            case 15: data.solarrad = muiSolarradiation = column.toInt(); break;
+                            case 16: data.xtilt = column.toFloat(); break;
+                            case 17: data.ytilt = column.toFloat(); break;
+                            case 18: column.toCharArray(data.status, data.statuslen); break;
+                            case 19: column.toCharArray(data.windstat, data.statuslen); break;
                         }
                         column.setlength(0);
                     } else if (c < 0x20 || c > 0x7E) {
@@ -185,29 +186,24 @@ void ReadMaximet::ReadMaximetTask() {
                     }
                     break;
                 case GARBLED:
-                    delete pData;
-                    pData = nullptr;
-                    continue;
+                    break;
                 case VALIDDATA:
-                    pData->timestamp = esp_timer_get_time()/1000; // seconds since start (good enough as int can store seconds over 68 years in 31 bits)
-                    ESP_LOGI(tag, "Pushing measurement data to queue: '%s', %d seconds since start", line.c_str(), pData->timestamp);
+                    parsingState = START;
+                    data.timestamp = esp_timer_get_time()/1000; // seconds since start (good enough as int can store seconds over 68 years in 31 bits)
+                    ESP_LOGI(tag, "Pushing measurement data to queue: '%s', %d seconds since start", line.c_str(), data.timestamp);
                     if (uxQueueSpacesAvailable(mxDataQueue) == 0) {
                         // queue is full, so remove an element
                         ESP_LOGW(tag, "Queue is full, dropping unsent oldest data.");
-                        Data* pReceivedData = nullptr;
-                        xQueueReceive(mxDataQueue, &pReceivedData, 0);
-                        delete pReceivedData;
-                        pReceivedData = nullptr;
+                        Data receivedData;
+                        xQueueReceive(mxDataQueue, &receivedData, 0);
                     }
 
                     // PUT pData to queue
-                    if (xQueueSend(mxDataQueue, &pData, 0) != pdTRUE) {
+                    if (xQueueSend(mxDataQueue, &data, 0) != pdTRUE) {
                         // data could not put to queue, so make sure to delete the data
                         ESP_LOGE(tag, "Queue is full. We should never be here.");
-                        delete pData;
-                        pData = nullptr;
                     } 
-                    continue;
+                    break;
             }
         }
     }
@@ -319,21 +315,20 @@ void ReadMaximet::ReadMaximetTask() {
     }  */
 
 
-Data* ReadMaximet::GetData() {
-    Data* pReceivedData = nullptr;
-    if (xQueueReceive(mxDataQueue, &pReceivedData, 0) == pdTRUE) {
+bool ReadMaximet::GetData(Data &data) {
+    if (xQueueReceive(mxDataQueue, &data, 0) == pdTRUE) {
         ESP_LOGD(tag, "Received data from Queue.");
-        return pReceivedData;
+        return true;
     }
     ESP_LOGD(tag, "No data in Queue.");
-    return nullptr;
+    return false;
 }
 
 bool ReadMaximet::WaitForData(unsigned int timeoutSeconds) {
-    Data* pReceivedData = nullptr;
-    if (xQueuePeek(mxDataQueue, &pReceivedData, timeoutSeconds * 1000 / portTICK_PERIOD_MS) == pdTRUE) {
+    Data receivedData;
+    if (xQueuePeek(mxDataQueue, &receivedData, timeoutSeconds * 1000 / portTICK_PERIOD_MS) == pdTRUE) {
         ESP_LOGD(tag, "Peeking into Queue.");
-        return pReceivedData;
+        return true;
     }
     ESP_LOGD(tag, "No data in Queue.");
     return false;

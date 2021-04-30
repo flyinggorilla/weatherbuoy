@@ -88,113 +88,141 @@ bool SendData::PerformHttpPost(ReadMaximet &readMaximet, unsigned int powerVolta
         mhEspHttpClient = esp_http_client_init(&mEspHttpClientConfig);
     }
 
-    Data *pMaximetData = readMaximet.GetData();
-    if (pMaximetData) {
-        ESP_LOGW(tag, "DATA FROM QUEUE: %s", pMaximetData->msMaximet.c_str());
-    }
-
-    // DONT SEND THE REST OF THE QUEUE FOR NOW !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    while (true) {
-        Data *p = readMaximet.GetData();
-        if (!p)
-            break;
-        delete p;
-    }            
-
-
     //##############################################
     //######## TODO SEND as YAML?????? or JSON??? how much extra payload?
     // there is a yaml to json parser, this should allow to send lighterweight yaml instead of full blown json data; https://www.npmjs.com/package/js-yaml 
 
     // POST message
     unsigned int uptime = (unsigned int) (esp_timer_get_time()/1000000); // seconds since start
-    if(pMaximetData) {
-        mPostData = "maximet: ";
-        mPostData += pMaximetData->msMaximet;
-    } 
-    if(!pMaximetData || bSendDiagnostics) {
-        mPostData = "health: ";
-        bSendDiagnostics = true;
-        mPostData += "\r\nresetreason: ";
-        mPostData += esp32_getresetreasontext(esp_reset_reason());
+
+
+    Data maximetData;
+    mPostData = '{maximet: [';
+    bool bComma = false;
+    while (readMaximet.GetData(maximetData)) {
+        // SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,STATUS,WINDSTAT,CHECK
+        mPostData += bComma ? ",{" :"{";
+        mPostData += '"speed": ';
+        mPostData += maximetData.speed;
+        mPostData += ',"gspeed": ';
+        mPostData += maximetData.gspeed;
+        mPostData += ',"avgspeed": ';
+        mPostData += maximetData.avgspeed;
+        mPostData += ',"dir": ';
+        mPostData += maximetData.dir;
+        mPostData += ',"gdir": ';
+        mPostData += maximetData.gdir;
+        mPostData += ',"avgdir": ';
+        mPostData += maximetData.avgdir;
+        mPostData += ',"compassh": ';
+        mPostData += maximetData.compassh;
+        mPostData += ',"pasl": ';
+        mPostData += maximetData.pasl;
+        mPostData += ',"pstn": ';
+        mPostData += maximetData.pstn;
+        mPostData += ',"rh": ';
+        mPostData += maximetData.rh;
+        mPostData += ',"ah": ';
+        mPostData += maximetData.ah;
+        mPostData += ',"temp": ';
+        mPostData += maximetData.temp;
+        mPostData += ',"solarrad": ';
+        mPostData += maximetData.solarrad;
+        mPostData += ',"xtilt": ';
+        mPostData += maximetData.xtilt;
+        mPostData += ',"ytilt": ';
+        mPostData += maximetData.ytilt;
+        mPostData += ',"status": ';
+        mPostData += maximetData.status;
+        mPostData += '","windstat": ';
+        mPostData += maximetData.windstat;
+        mPostData += '"}\r\n';
+        bComma = true;
     }
-    mPostData += "\r\nsystem: ";
+    mPostData += "]";
+
+    mPostData += ',"system": {"version":"';
     mPostData += esp_ota_get_app_description()->version;
-    mPostData += ",";
+    mPostData += '","hostname": "';
     mPostData += mrConfig.msHostname; 
-    mPostData += ",";
+    mPostData += '","uptime": ';
     mPostData += uptime;
-    mPostData += ",";
+    mPostData += ',"heapfree": ';
     mPostData += esp_get_free_heap_size();
-    mPostData += ",";
+    mPostData += ',"minheapfree": ';
     mPostData += esp_get_minimum_free_heap_size();
-    mPostData += ",";
+    mPostData += ',"voltage": ';
     mPostData += powerVoltage;
-    mPostData += ",";
+    mPostData += ',"current": ';
     mPostData += powerCurrent;
-    mPostData += "\r\n";
+    mPostData += '}\r\n';
+
     if (bSendDiagnostics) {
-        mPostData += "esp-idf-version: ";
+        mPostData = ',"diagnostics": {';
+        bSendDiagnostics = true;
+        mPostData += '"resetreason": "';
+        mPostData += esp32_getresetreasontext(esp_reset_reason());
+        mPostData += '"esp-idf-version": ';
         mPostData += esp_ota_get_app_description()->idf_ver;  
-        mPostData += "\r\n";
-        mPostData += "targeturl: " + mrConfig.msTargetUrl + "\r\n";
-        mPostData += "apssid: " + mrConfig.msAPSsid + "\r\n";
-        mPostData += "appass: " + mrConfig.msAPPass.length() ? "*****\r\n" : "\r\n";
-        mPostData += "stassid: " + mrConfig.msAPSsid + "\r\n";
-        mPostData += "stapass: " + mrConfig.msSTAPass.length() ? "*****\r\n" : "\r\n";
-        mPostData += "intervaldaytime: ";
+        mPostData += '"\r\n";
+        mPostData += '"targeturl": ' + mrConfig.msTargetUrl + "\r\n";
+        mPostData += '"apssid": ' + mrConfig.msAPSsid + "\r\n";
+        mPostData += '"appass": ' + mrConfig.msAPPass.length() ? "*****\r\n" ": '\r\n";
+        mPostData += '"stassid": ' + mrConfig.msAPSsid + "\r\n";
+        mPostData += '"stapass": ' + mrConfig.msSTAPass.length() ? "*****\r\n" ": '\r\n";
+        mPostData += '"intervaldaytime": ';
         mPostData += mrConfig.miSendDataIntervalDaytime;
-        mPostData += "\r\n";
-        mPostData += "intervalnighttime: ";
+        mPostData += '"\r\n";
+        mPostData += '"intervalnighttime": ';
         mPostData += mrConfig.miSendDataIntervalNighttime;
-        mPostData += "\r\n";
-        mPostData += "intervalhealth: ";
+        mPostData += '"\r\n";
+        mPostData += '"intervalhealth": ';
         mPostData += mrConfig.miSendDataIntervalHealth;
-        mPostData += "\r\n";
+        mPostData += '"\r\n";
         if (mrConfig.msMaximetColumns) {
-            mPostData += "maximetcolumns: ";
+            mPostData += '"maximetcolumns": ';
             mPostData += mrConfig.msMaximetColumns;
-            mPostData += "\r\n";
+            mPostData += '"\r\n";
         }
         if (mrConfig.msMaximetUnits) {
-            mPostData += "maximetunits: ";
+            mPostData += '"maximetunits": ';
             mPostData += mrConfig.msMaximetUnits;
-            mPostData += "\r\n";
+            mPostData += '"\r\n";
         }
-        mPostData += "cellulardata: ";
+        mPostData += '"cellulardata": ';
         mPostData += (unsigned long)(mrCellular.getDataSent()/1024); // convert to kB
-        mPostData += ",";
+        mPostData += '",";
         mPostData += (unsigned long)(mrCellular.getDataReceived()/1024); // convert to kB
-        mPostData += "\r\n";
-        mPostData += "cellularnetwork: ";
+        mPostData += '"\r\n";
+        mPostData += '"cellularnetwork": ';
         mPostData += mrConfig.msCellularOperator;   
-        mPostData += "\r\n";
-        mPostData += "cellularoperator: ";
+        mPostData += '"\r\n";
+        mPostData += '"cellularoperator": ';
         mPostData += mrCellular.msOperator;   
-        mPostData += "\r\n";
-        mPostData += "cellularsubscriber: ";
+        mPostData += '"\r\n";
+        mPostData += '"cellularsubscriber": ';
         mPostData += mrCellular.msSubscriber;
-        mPostData += "\r\n";
-        mPostData += "cellularhardware: ";
+        mPostData += '"\r\n";
+        mPostData += '"cellularhardware": ';
         mPostData += mrCellular.msHardware;
-        mPostData += "\r\n";
-        mPostData += "cellularnetworkmode: ";
+        mPostData += '"\r\n";
+        mPostData += '"cellularnetworkmode": ';
         mPostData += mrCellular.msNetworkmode;
-        mPostData += "\r\n";
-        mPostData += "boardtemp: ";
+        mPostData += '"\r\n";
+        mPostData += '"boardtemp": ';
         mPostData += boardTemperature;
-        mPostData += "\r\n";
-        mPostData += "watertemp: ";
+        mPostData += '"\r\n";
+        mPostData += '"watertemp": ';
         mPostData += waterTemperature;
-        mPostData += "\r\n";
-        mPostData += "cputemp: ";
+        mPostData += '"\r\n";
+        mPostData += '"cputemp": ';
         mPostData += esp32_temperature();
-        mPostData += "\r\n";
-        mPostData += "battery: ";
+        mPostData += '"\r\n";
+        mPostData += '"battery": ';
         mPostData += powerVoltage;
-        mPostData += ",";
+        mPostData += '",";
         mPostData += powerCurrent;
-        mPostData += "\r\n";
+        mPostData += '"\r\n";
         bSendDiagnostics = false;
     }
     
