@@ -13,7 +13,7 @@ class Data {
         }
 
         void init() {
-            timestamp = esp_timer_get_time()/1000;
+            uptime = esp_timer_get_time()/1000;
             speed = 0; 
             gspeed = 0; 
             avgspeed = 0; 
@@ -36,7 +36,7 @@ class Data {
             windstat[0] = 0; 
         }
 
-        int timestamp;
+        int uptime;
 
         float speed; 
         float gspeed; 

@@ -109,7 +109,7 @@ void Esp32WeatherBuoy::Start() {
     OnlineMode onlineMode = MODE_CELLULAR;
 
     //ESP_LOGW(tag, "OFFLINE MODE")
-    //onlineMode = MODE_OFFLINE;
+    //onlineMode = MODE_WIFISTA;
 
     switch(onlineMode) {
         case MODE_CELLULAR: {
@@ -118,8 +118,9 @@ void Esp32WeatherBuoy::Start() {
             // cellular.ReadSMS(); use only during firmware setup to receive a SIM based code 
             break; }
         case MODE_WIFISTA:
-            //config.msSTASsid = "";
+            //config.msSTASsid = """;
             //config.msSTAPass = "";
+            //config.msTargetUrl = "http://10.10.14.195:3000/weatherbuoy";
             //config.Save();
             ESP_LOGI(tag, "sssi %s pass %s host %s", config.msSTASsid.c_str(), config.msSTAPass.c_str(), config.msHostname.c_str());
             wifi.StartSTAMode(config.msSTASsid, config.msSTAPass, config.msHostname);
@@ -139,22 +140,54 @@ void Esp32WeatherBuoy::Start() {
 
     ESP_LOGI(tag, "Starting Weatherbuoy main task.");
 
-    bool bDiagnostics = false;
+    bool bDiagnostics = true;
     unsigned int lastSendTimestamp = 0;
     unsigned int lastDiagnosticsTimestamp = 0;
+    
+    int secondsToSleep = 0;
 
     while (true) {
         tempSensors.Read();
         bool isMaximetData = readMaximet.WaitForData(60);
 
-        unsigned int currentTimestamp;
         unsigned int secondsSinceLastSend;
         unsigned int secondsSinceLastDiagnostics;
-        int secondsToSleep;
 
-        ESP_LOGW(tag, "Solarradiation of %d", readMaximet.SolarRadiation());
+        // keep modem sleeping unless time to last send elapsed
+        unsigned int uptimeSeconds = (unsigned int)(esp_timer_get_time()/1000000); // seconds since start
+        secondsSinceLastSend = uptimeSeconds - lastSendTimestamp;
+        if (!isMaximetData && (secondsToSleep > secondsSinceLastSend)) {
+            ESP_LOGI(tag, "skipping sending --- sleep: %d, maximetdata: %s", secondsToSleep - secondsSinceLastSend, isMaximetData ? "true" : "false");
+            continue;
+        }
+        lastSendTimestamp = uptimeSeconds;
+
+        // when sending, add diagnostics information after 300 seconds
+        secondsSinceLastDiagnostics = uptimeSeconds - lastDiagnosticsTimestamp;
+        if (secondsSinceLastDiagnostics > config.miSendDataIntervalHealth) {
+            bDiagnostics = true;
+            lastDiagnosticsTimestamp = uptimeSeconds;
+        } else {
+            bDiagnostics = false;
+        }
+
+        if (onlineMode == MODE_CELLULAR) {
+            ESP_LOGW(tag, "switching to full power mode next...");
+            cellular.SwitchToFullPowerMode();         
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            ESP_LOGW(tag, "switching to PPP mode next...");
+            cellular.SwitchToPppMode(); 
+        }
+        
+        sendData.PerformHttpPost(readMaximet, max471Meter.Voltage(), max471Meter.Current(), tempSensors.BoardTemp(), tempSensors.WaterTemp(), bDiagnostics);
+        
+        if (onlineMode == MODE_CELLULAR) {
+            ESP_LOGI(tag, "switching to low power mode...");
+            cellular.SwitchToLowPowerMode();            
+        }
 
         // determine nighttime by low solar radiation
+        ESP_LOGI(tag, "Solarradiation of %d", readMaximet.SolarRadiation());
         if (readMaximet.SolarRadiation() > 2) {
             ESP_LOGI(tag, "Daytime due to Solarradiation of %d", readMaximet.SolarRadiation());
             secondsToSleep = config.miSendDataIntervalDaytime; //s;
@@ -162,34 +195,6 @@ void Esp32WeatherBuoy::Start() {
             secondsToSleep = config.miSendDataIntervalNighttime; //s;
         }
 
-        // keep modem sleeping unless time to last send elapsed
-        currentTimestamp = (unsigned int)(esp_timer_get_time()/1000); // milliseconds since start
-        secondsSinceLastSend = (currentTimestamp - lastSendTimestamp)/1000;
-        if (!isMaximetData || (secondsToSleep < secondsSinceLastSend)) {
-            ESP_LOGI(tag, "skipping sending --- sleep: %d, maximetdata: %s", secondsToSleep - secondsSinceLastSend, isMaximetData ? "true" : "false");
-            continue;
-        }
-        lastSendTimestamp = currentTimestamp;
-
-        // when sending, add diagnostics information after 300 seconds
-        secondsSinceLastDiagnostics = (currentTimestamp - lastDiagnosticsTimestamp)/1000;
-        if (secondsSinceLastDiagnostics > config.miSendDataIntervalHealth) {
-            bDiagnostics = true;
-            lastDiagnosticsTimestamp = currentTimestamp;
-        } else {
-            bDiagnostics = false;
-        }
-
-
-        ESP_LOGW(tag, "switching to full power mode next...");
-        cellular.SwitchToFullPowerMode();         
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-        ESP_LOGW(tag, "switching to PPP mode next...");
-        cellular.SwitchToPppMode();
-        sendData.PerformHttpPost(readMaximet, max471Meter.Voltage(), max471Meter.Current(), tempSensors.BoardTemp(), tempSensors.WaterTemp(), bDiagnostics);
-        ESP_LOGI(tag, "switching to low power mode...");
-        cellular.SwitchToLowPowerMode();            
-        
         //vTaskDelay(config.miSendDataIntervalHealth*1000 / portTICK_PERIOD_MS);
         vTaskDelay(10*1000 / portTICK_PERIOD_MS);
     }  

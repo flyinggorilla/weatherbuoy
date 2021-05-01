@@ -189,8 +189,8 @@ void ReadMaximet::ReadMaximetTask() {
                     break;
                 case VALIDDATA:
                     parsingState = START;
-                    data.timestamp = esp_timer_get_time()/1000; // seconds since start (good enough as int can store seconds over 68 years in 31 bits)
-                    ESP_LOGI(tag, "Pushing measurement data to queue: '%s', %d seconds since start", line.c_str(), data.timestamp);
+                    data.uptime = esp_timer_get_time()/1000000; // seconds since start (good enough as int can store seconds over 68 years in 31 bits)
+                    ESP_LOGI(tag, "Pushing measurement data to queue: '%s', %d seconds since start", line.c_str(), data.uptime);
                     if (uxQueueSpacesAvailable(mxDataQueue) == 0) {
                         // queue is full, so remove an element
                         ESP_LOGW(tag, "Queue is full, dropping unsent oldest data.");

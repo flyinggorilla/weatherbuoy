@@ -37,7 +37,7 @@ private: // esp http client
     String ReadMessageValue(const char* key);
     String ReadMessagePemValue(const char* key);
     void Cleanup();
-    //bool mbSendDiagnostics = false;
+    bool mbSendDiagnostics = false;
     bool mbOtaAppValidated = false;
     bool mbRestart = false;
 

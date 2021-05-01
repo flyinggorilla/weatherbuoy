@@ -88,6 +88,8 @@ bool SendData::PerformHttpPost(ReadMaximet &readMaximet, unsigned int powerVolta
         mhEspHttpClient = esp_http_client_init(&mEspHttpClientConfig);
     }
 
+    bSendDiagnostics = bSendDiagnostics || mbSendDiagnostics;
+
     //##############################################
     //######## TODO SEND as YAML?????? or JSON??? how much extra payload?
     // there is a yaml to json parser, this should allow to send lighterweight yaml instead of full blown json data; https://www.npmjs.com/package/js-yaml 
@@ -95,145 +97,122 @@ bool SendData::PerformHttpPost(ReadMaximet &readMaximet, unsigned int powerVolta
     // POST message
     unsigned int uptime = (unsigned int) (esp_timer_get_time()/1000000); // seconds since start
 
-
     Data maximetData;
-    mPostData = '{maximet: [';
+    mPostData = "{\"maximet\":[";
     bool bComma = false;
     while (readMaximet.GetData(maximetData)) {
         // SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,STATUS,WINDSTAT,CHECK
-        mPostData += bComma ? ",{" :"{";
-        mPostData += '"speed": ';
+        mPostData += bComma ? ",{" : "{";
+        mPostData += "\"uptime\":";
+        mPostData += maximetData.uptime;
+        mPostData += ",\"speed\":";
         mPostData += maximetData.speed;
-        mPostData += ',"gspeed": ';
+        mPostData += ",\"gspeed\":";
         mPostData += maximetData.gspeed;
-        mPostData += ',"avgspeed": ';
+        mPostData += ",\"avgspeed\":";
         mPostData += maximetData.avgspeed;
-        mPostData += ',"dir": ';
+        mPostData += ",\"dir\":";
         mPostData += maximetData.dir;
-        mPostData += ',"gdir": ';
+        mPostData += ",\"gdir\":";
         mPostData += maximetData.gdir;
-        mPostData += ',"avgdir": ';
+        mPostData += ",\"avgdir\":";
         mPostData += maximetData.avgdir;
-        mPostData += ',"compassh": ';
+        mPostData += ",\"compassh\":";
         mPostData += maximetData.compassh;
-        mPostData += ',"pasl": ';
+        mPostData += ",\"pasl\":";
         mPostData += maximetData.pasl;
-        mPostData += ',"pstn": ';
+        mPostData += ",\"pstn\":";
         mPostData += maximetData.pstn;
-        mPostData += ',"rh": ';
+        mPostData += ",\"rh\":";
         mPostData += maximetData.rh;
-        mPostData += ',"ah": ';
+        mPostData += ",\"ah\":";
         mPostData += maximetData.ah;
-        mPostData += ',"temp": ';
+        mPostData += ",\"temp\":";
         mPostData += maximetData.temp;
-        mPostData += ',"solarrad": ';
+        mPostData += ",\"solarrad\":";
         mPostData += maximetData.solarrad;
-        mPostData += ',"xtilt": ';
+        mPostData += ",\"xtilt\":";
         mPostData += maximetData.xtilt;
-        mPostData += ',"ytilt": ';
+        mPostData += ",\"ytilt\":";
         mPostData += maximetData.ytilt;
-        mPostData += ',"status": ';
+        mPostData += ",\"status\":\"";
         mPostData += maximetData.status;
-        mPostData += '","windstat": ';
+        mPostData += "\",\"windstat\":\"";
         mPostData += maximetData.windstat;
-        mPostData += '"}\r\n';
+        mPostData += "\"}";
         bComma = true;
     }
     mPostData += "]";
 
-    mPostData += ',"system": {"version":"';
+    mPostData += ",\"system\": {\"version\":\"";
     mPostData += esp_ota_get_app_description()->version;
-    mPostData += '","hostname": "';
+    mPostData += "\",\"hostname\": \"";
     mPostData += mrConfig.msHostname; 
-    mPostData += '","uptime": ';
+    mPostData += "\",\"uptime\":";
     mPostData += uptime;
-    mPostData += ',"heapfree": ';
+    mPostData += ",\"heapfree\":";
     mPostData += esp_get_free_heap_size();
-    mPostData += ',"minheapfree": ';
+    mPostData += ",\"minheapfree\":";
     mPostData += esp_get_minimum_free_heap_size();
-    mPostData += ',"voltage": ';
+    mPostData += ",\"voltage\":";
     mPostData += powerVoltage;
-    mPostData += ',"current": ';
+    mPostData += ",\"current\":";
     mPostData += powerCurrent;
-    mPostData += '}\r\n';
+    mPostData += ",\"boardtemp\":";
+    mPostData += boardTemperature;
+    mPostData += ",\"watertemp\":";
+    mPostData += waterTemperature;
+    mPostData += ",\"cputemp\":";
+    mPostData += esp32_temperature();
+    mPostData += "}";
 
     if (bSendDiagnostics) {
-        mPostData = ',"diagnostics": {';
-        bSendDiagnostics = true;
-        mPostData += '"resetreason": "';
+        mPostData += ",\"diagnostics\": {";
+        mPostData += "\"resetreason\": \"";
         mPostData += esp32_getresetreasontext(esp_reset_reason());
-        mPostData += '"esp-idf-version": ';
+        mPostData += "\", \"esp-idf-version\": \"";
         mPostData += esp_ota_get_app_description()->idf_ver;  
-        mPostData += '"\r\n";
-        mPostData += '"targeturl": ' + mrConfig.msTargetUrl + "\r\n";
-        mPostData += '"apssid": ' + mrConfig.msAPSsid + "\r\n";
-        mPostData += '"appass": ' + mrConfig.msAPPass.length() ? "*****\r\n" ": '\r\n";
-        mPostData += '"stassid": ' + mrConfig.msAPSsid + "\r\n";
-        mPostData += '"stapass": ' + mrConfig.msSTAPass.length() ? "*****\r\n" ": '\r\n";
-        mPostData += '"intervaldaytime": ';
+        mPostData += "\",\"targeturl\": \"";
+        mPostData += mrConfig.msTargetUrl;
+        mPostData += "\",\"apssid\": \"";
+        mPostData += mrConfig.msAPSsid;
+        mPostData += "\",\"appass\": \"";
+        mPostData += mrConfig.msAPPass.length() ? "*****" : "";
+        mPostData += "\",\"stassid\": \"";
+        mPostData += mrConfig.msAPSsid;
+        mPostData += "\",\"stapass\": \"";
+        mPostData += mrConfig.msSTAPass.length() ? "*****" : "";
+        mPostData += "\",\"intervaldaytime\":";
         mPostData += mrConfig.miSendDataIntervalDaytime;
-        mPostData += '"\r\n";
-        mPostData += '"intervalnighttime": ';
+        mPostData += ",\"intervalnighttime\":";
         mPostData += mrConfig.miSendDataIntervalNighttime;
-        mPostData += '"\r\n";
-        mPostData += '"intervalhealth": ';
+        mPostData += ",\"intervalhealth\":";
         mPostData += mrConfig.miSendDataIntervalHealth;
-        mPostData += '"\r\n";
-        if (mrConfig.msMaximetColumns) {
-            mPostData += '"maximetcolumns": ';
-            mPostData += mrConfig.msMaximetColumns;
-            mPostData += '"\r\n";
-        }
-        if (mrConfig.msMaximetUnits) {
-            mPostData += '"maximetunits": ';
-            mPostData += mrConfig.msMaximetUnits;
-            mPostData += '"\r\n";
-        }
-        mPostData += '"cellulardata": ';
+        mPostData += ",\"cellulardatasent\":";
         mPostData += (unsigned long)(mrCellular.getDataSent()/1024); // convert to kB
-        mPostData += '",";
+        mPostData += ",\"cellulardatareceived\":";
         mPostData += (unsigned long)(mrCellular.getDataReceived()/1024); // convert to kB
-        mPostData += '"\r\n";
-        mPostData += '"cellularnetwork": ';
+        mPostData += ",\"cellularnetwork\": \"";
         mPostData += mrConfig.msCellularOperator;   
-        mPostData += '"\r\n";
-        mPostData += '"cellularoperator": ';
+        mPostData += "\",\"cellularoperator\": \"";
         mPostData += mrCellular.msOperator;   
-        mPostData += '"\r\n";
-        mPostData += '"cellularsubscriber": ';
+        mPostData += "\",\"cellularsubscriber\": \"";
         mPostData += mrCellular.msSubscriber;
-        mPostData += '"\r\n";
-        mPostData += '"cellularhardware": ';
+        mPostData += "\",\"cellularhardware\": \"";
         mPostData += mrCellular.msHardware;
-        mPostData += '"\r\n";
-        mPostData += '"cellularnetworkmode": ';
+        mPostData += "\",\"cellularnetworkmode\": \"";
         mPostData += mrCellular.msNetworkmode;
-        mPostData += '"\r\n";
-        mPostData += '"boardtemp": ';
-        mPostData += boardTemperature;
-        mPostData += '"\r\n";
-        mPostData += '"watertemp": ';
-        mPostData += waterTemperature;
-        mPostData += '"\r\n";
-        mPostData += '"cputemp": ';
-        mPostData += esp32_temperature();
-        mPostData += '"\r\n";
-        mPostData += '"battery": ';
-        mPostData += powerVoltage;
-        mPostData += '",";
-        mPostData += powerCurrent;
-        mPostData += '"\r\n";
-        bSendDiagnostics = false;
+        mPostData += "\"}";
+        mbSendDiagnostics = false;
     }
-    
-    if (pMaximetData) {
-        delete pMaximetData;
-        pMaximetData = nullptr;
-    }
+    mPostData += "}";
 
+    ESP_LOGW(tag, "JSON: %s", mPostData.c_str());
+    
     // prepare and send HTTP headers and content length
     ESP_LOGI(tag, "Sending %d bytes to %s", mPostData.length(), mEspHttpClientConfig.url);
-    esp_http_client_set_header(mhEspHttpClient, "Content-Type", "text/plain");
+    //esp_http_client_set_header(mhEspHttpClient, "Content-Type", "text/plain");
+    esp_http_client_set_header(mhEspHttpClient, "Content-Type", "application/json");
     esp_err_t err;
     err = esp_http_client_open(mhEspHttpClient, mPostData.length());
     if (err != ESP_OK) {
@@ -323,7 +302,7 @@ bool SendData::PerformHttpPost(ReadMaximet &readMaximet, unsigned int powerVolta
                 }
                 mbRestart = true;
             } else if (command.equals("diagnose")) {
-                bSendDiagnostics = true;
+                mbSendDiagnostics = true;
             }
 
             // Optionally Execute OTA Update command

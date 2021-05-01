@@ -102,7 +102,8 @@ while(True):
             sendline("SETUP MODE")
             print("ENTERING COMMAND STATE")
         else:
-            if (ticks_ms() < lastsendms + 60*1000):
+            #if (ticks_ms() < lastsendms + 60*1000):
+            if (ticks_ms() < lastsendms + 10*1000):
                 continue
 
             try:
