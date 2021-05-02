@@ -118,7 +118,7 @@ void Esp32WeatherBuoy::Start() {
             // cellular.ReadSMS(); use only during firmware setup to receive a SIM based code 
             break; }
         case MODE_WIFISTA:
-            //config.msSTASsid = """;
+            //config.msSTASsid = "";
             //config.msSTAPass = "";
             //config.msTargetUrl = "http://10.10.14.195:3000/weatherbuoy";
             //config.Save();
@@ -140,7 +140,8 @@ void Esp32WeatherBuoy::Start() {
 
     ESP_LOGI(tag, "Starting Weatherbuoy main task.");
 
-    bool bDiagnostics = true;
+    bool bDiagnostics;
+    bool bDiagnosticsAtStartup = true;
     unsigned int lastSendTimestamp = 0;
     unsigned int lastDiagnosticsTimestamp = 0;
     
@@ -164,8 +165,9 @@ void Esp32WeatherBuoy::Start() {
 
         // when sending, add diagnostics information after 300 seconds
         secondsSinceLastDiagnostics = uptimeSeconds - lastDiagnosticsTimestamp;
-        if (secondsSinceLastDiagnostics > config.miSendDataIntervalHealth) {
+        if (secondsSinceLastDiagnostics > config.miSendDataIntervalHealth || bDiagnosticsAtStartup) {
             bDiagnostics = true;
+            bDiagnosticsAtStartup = false;
             lastDiagnosticsTimestamp = uptimeSeconds;
         } else {
             bDiagnostics = false;

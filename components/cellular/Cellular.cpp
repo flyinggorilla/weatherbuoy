@@ -256,8 +256,15 @@ return; */
         };
     #endif
 
-    Command("ATI", "OK", &msHardware, "Display Product Identification Information"); // CONFIG_LILYGO_TTGO_TCALL14_SIM800 R14.18
-                                                                                    // SIM7600M21-A_V1.1
+    Command("AT+CGMR", "OK", &response, "Display Firmware info"); // +CGMR: LE11B04SIM7600M21-A\r\nOK"
+    if(response.startsWith("+CGMR: ")) {
+        int end = response.indexOf("\r\n");
+        msHardware = response.substring(7, end);
+        ESP_LOGI(tag, "Modem firmware: %s", msHardware.c_str());
+    } else {
+        ESP_LOGE(tag, "Error, checking modem firmware : %s", response.c_str());
+    }
+
     Command("AT+CPIN?", "OK", &response, "Is a PIN needed?"); // +CPIN: READY
     if(!response.startsWith("+CPIN: READY")) {
         ESP_LOGE(tag, "Error, PIN required: %s", response.c_str());
@@ -589,8 +596,6 @@ ESP_LOGW(tag, "data mode check: %s", response.c_str());
 
     if (Command("AT+CFUN=0", "OK", &response, "Set modem to minimum functionality.")) { // mode 4 would shut down RF entirely to "flight-mode"; mode 0 still keeps SMS receiption intact
         ESP_LOGI(tag, "Switched to power saving mode.");
-        mbPowerSaverActive = true;
-        return true;
     } 
 
     gpio_set_level(CELLULAR_GPIO_DTR, 1);
@@ -648,6 +653,11 @@ ESP_LOGW(tag, "data mode check: %s", response.c_str());
 bool Cellular::SwitchToFullPowerMode() {
     String response;
     String command;
+
+    gpio_set_level(CELLULAR_GPIO_DTR, 0);
+    // simcom documentation: "Anytime host want send data to module, it must be pull down DTR then"
+    vTaskDelay(20/portTICK_PERIOD_MS);
+
     if (Command("AT+CFUN=1", "OK", &response, "Set modem to full power mode and reset it too.")) { // mode 4 would shut down RF entirely to "flight-mode"; mode 0 still keeps SMS receiption intact
         ESP_LOGI(tag, "Switched to full power mode.");
         mbPowerSaverActive = false;
