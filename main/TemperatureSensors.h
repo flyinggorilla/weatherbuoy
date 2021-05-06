@@ -13,8 +13,8 @@ class TemperatureSensors {
         TemperatureSensors(Config &config);
         virtual ~TemperatureSensors();
 
-        float WaterTemp() { return mfWaterTemp; };
-        float BoardTemp() { return mfBoardTemp; };
+        float GetWaterTemp() { return mfWaterTemp; };
+        float GetBoardTemp() { return mfBoardTemp; };
 
         void Init(int oneWireGpioNum);
         void Read();

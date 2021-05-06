@@ -15,7 +15,7 @@ void fWatchdogTask(void *pvParameter) {
 Watchdog::Watchdog(int seconds) {
     miSeconds = seconds;
     ESP_LOGD(tag, "Starting Watchdog Task");
-	xTaskCreate(&fWatchdogTask, "Watchdog", 1024, this, ESP_TASK_TIMER_PRIO, &mhTask); 
+	xTaskCreate(&fWatchdogTask, "Watchdog", 4096, this, ESP_TASK_TIMER_PRIO, &mhTask); 
 
 }
 

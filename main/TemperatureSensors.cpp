@@ -86,7 +86,7 @@ void TemperatureSensors::Init(int oneWireGpioNum) {
     }
 
     Read();
-    ESP_LOGI(tag, "Board temperature %.1f°C, Water temperature %.1f°C", BoardTemp(), WaterTemp());
+    ESP_LOGI(tag, "Board temperature %.1f°C, Water temperature %.1f°C", GetBoardTemp(), GetWaterTemp());
 }
 
 void TemperatureSensors::Read() {
@@ -115,7 +115,7 @@ void TemperatureSensors::Read() {
             ESP_LOGW(tag, "Error reading water temperature sensor %d", err);
         }
     }
-    ESP_LOGD(tag, "Board temperature %.1f°C, Water temperature %.1f°C", BoardTemp(), WaterTemp());
+    ESP_LOGD(tag, "Board temperature %.1f°C, Water temperature %.1f°C", GetBoardTemp(), GetWaterTemp());
 }
 
 TemperatureSensors::~TemperatureSensors() {

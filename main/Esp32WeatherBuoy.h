@@ -25,6 +25,9 @@ public:
 	Config& GetConfig() { return config; }
 
 private:
+	void WeatherBuoyTask();
+    friend void fWeatherBuoyTask(void *pvParameter);
+
 	Config config;
 	Wifi wifi;
 	Cellular cellular;

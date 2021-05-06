@@ -169,7 +169,7 @@ ADC::~ADC() {
 //    ADC_ATTEN_DB_6   = The input voltage of ADC will be attenuated, extending the range of measurement to up to  approx. 1350 mV. 
 //    ADC_ATTEN_DB_11  = The input voltage of ADC will be attenuated, extending the range of measurement to up to  approx. 2600 mV. 
 Max471Meter::Max471Meter(int gpioPinVoltage, int gpioPinCurrent) : mVoltage{(gpio_num_t)gpioPinVoltage}, mCurrent{(gpio_num_t)gpioPinCurrent} {
-	xTaskCreate(&fMeterTask, "Max471Meter", 2048, this, ESP_TASK_PRIO_MIN, NULL); 
+	xTaskCreate(&fMeterTask, "Max471Meter", 4096, this, ESP_TASK_PRIO_MIN, NULL); 
 }
 
 Max471Meter::~Max471Meter() {

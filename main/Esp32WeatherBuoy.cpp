@@ -59,15 +59,16 @@ static const char tag[] = "WeatherBuoy";
 #define CONFIG_SENDDATA_INTERVAL_LOWBATTERY 60*60 // hourly
 
 
-
-
-Esp32WeatherBuoy esp32WeatherBuoy;
-
 Esp32WeatherBuoy::Esp32WeatherBuoy() {
 
 }
 Esp32WeatherBuoy::~Esp32WeatherBuoy() {
 
+}
+
+void fWeatherBuoyTask(void *pvParameter) {
+	((Esp32WeatherBuoy*) pvParameter)->WeatherBuoyTask();
+	vTaskDelete(NULL);
 }
 
 extern "C" {
@@ -76,7 +77,13 @@ void app_main();
 
 void app_main() {
 	ESP_ERROR_CHECK(esp_netif_init()); 
-	esp32WeatherBuoy.Start();
+    Esp32WeatherBuoy *weatherBuoy = new Esp32WeatherBuoy();
+	xTaskCreate(&fWeatherBuoyTask, "Weatherbuoy", 8192, weatherBuoy, ESP_TASK_MAIN_PRIO, NULL); 
+}
+
+void Esp32WeatherBuoy::WeatherBuoyTask() {
+	Start();
+    esp_restart();
 }
 
 void TestHttp();
@@ -150,9 +157,12 @@ void Esp32WeatherBuoy::Start() {
     int logInfoSeconds = 0;
 
     while (true) {
-        tempSensors.Read();
+        //ESP_LOGI(tag, "--------------- START reading temperature sensor -----------------");
+        tempSensors.Read(); // note, this causes approx 700ms delay
+        //ESP_LOGI(tag, "--------------- END reading temperature sensor board %.2f water %.2f", tempSensors.GetBoardTemp(), tempSensors.GetWaterTemp());
+        //ESP_LOGI(tag, "--------------- WAIT FOR MAXIMET DATA -----------------");
         bool isMaximetData = readMaximet.WaitForData(60);
-
+        //ESP_LOGI(tag, "isMaximetData = %s", isMaximetData ? "YES" : "NO");
         unsigned int secondsSinceLastSend;
         unsigned int secondsSinceLastDiagnostics;
 
@@ -182,32 +192,44 @@ void Esp32WeatherBuoy::Start() {
 
         unsigned int voltage = max471Meter.Voltage();
         unsigned int current = max471Meter.Current();
-        float boardtemp = tempSensors.BoardTemp();
+        float boardtemp = tempSensors.GetBoardTemp();
+        float watertemp = tempSensors.GetWaterTemp();
 
         if (onlineMode == MODE_CELLULAR) {
-            ESP_LOGW(tag, "switching to full power mode next...");
-            cellular.SwitchToFullPowerMode();         
+            ESP_LOGI(tag, "switching to full power mode next...");
+            if (!cellular.SwitchToFullPowerMode()) {
+                ESP_LOGW(tag, "Retrying switching to full power mode ...");
+                if (!cellular.SwitchToFullPowerMode()) {
+                    ESP_LOGE(tag, "Switching to full power mode failed");
+                }
+            }         
+
             vTaskDelay(1000 / portTICK_PERIOD_MS);
-            ESP_LOGW(tag, "switching to PPP mode next...");
-            cellular.SwitchToPppMode(); 
-            sendData.PerformHttpPost(readMaximet, voltage, current, boardtemp, tempSensors.WaterTemp(), bDiagnostics);
+            ESP_LOGI(tag, "switching to PPP mode next...");
+            if (!cellular.SwitchToPppMode()) {
+                ESP_LOGW(tag, "Retrying switching to PPP mode next...");
+                if (!cellular.SwitchToPppMode()) {
+                    ESP_LOGE(tag, "Failed to switch to PPP mode.");
+                }
+            }; 
+        }
 
-//TODO RETRY ONCE ON ERROR             (or re)
-/*
-I (27166) SendData: Sending 866 bytes to https://atterwind.info/weatherbuoy
-E (40496) esp-tls: couldn't get hostname for :atterwind.info:
-E (40496) esp-tls: Failed to open new connection
-E (40496) TRANS_SSL: Failed to open a new connection
-E (40496) HTTP_CLIENT: Connection failed, sock < 0
-E (40506) SendData: Error ESP_ERR_HTTP_CONNECT in esp_http_client_open(): https://atterwind.info/weatherbuoy
-I (40516) WeatherBuoy: switching to low power mode...
-*/
+        if (onlineMode != MODE_OFFLINE) {
+            int tries = 2;
+            while(tries--) {
+                if(sendData.PerformHttpPost(readMaximet, voltage, current, boardtemp, watertemp, bDiagnostics)) {
+                    break;
+                }
+                if (tries) {
+                    ESP_LOGW(tag, "Retrying HTTP Post...");
+                }
+            }
+        }
 
+        if (onlineMode == MODE_CELLULAR) {
             ESP_LOGI(tag, "switching to low power mode...");
             cellular.SwitchToLowPowerMode();            
-        } else if (onlineMode == MODE_WIFISTA) {
-            sendData.PerformHttpPost(readMaximet, voltage, current, boardtemp, tempSensors.WaterTemp(), bDiagnostics);
-        }
+        } 
 
         // determine nighttime by low solar radiation
         ESP_LOGI(tag, "Solarradiation: %d  Voltage: %d", readMaximet.SolarRadiation(), voltage);
@@ -221,9 +243,6 @@ I (40516) WeatherBuoy: switching to low power mode...
             secondsToSleep = CONFIG_SENDDATA_INTERVAL_LOWBATTERY;
             ESP_LOGI(tag, "Sending data in low-battery mode every %d minutes", secondsToSleep/60);
         }
-
-        //vTaskDelay(config.miSendDataIntervalHealth*1000 / portTICK_PERIOD_MS);
-        vTaskDelay(10*1000 / portTICK_PERIOD_MS);
     }  
 }
 
