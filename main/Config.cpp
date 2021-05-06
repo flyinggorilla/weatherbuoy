@@ -15,9 +15,6 @@ Config::Config() {
 	msTargetUrl = CONFIG_WEATHERBUOY_TARGET_URL;
 	msSTASsid = CONFIG_WEATHERBUOY_WIFI_STA_SSID;
 	msSTAPass = CONFIG_WEATHERBUOY_WIFI_STA_PASS;
-	miSendDataIntervalDaytime = CONFIG_WEATHERBUOY_SENDDATA_INTERVAL_DAYTIME;
-	miSendDataIntervalNighttime = CONFIG_WEATHERBUOY_SENDDATA_INTERVAL_NIGHTTIME;
-	miSendDataIntervalHealth = CONFIG_WEATHERBUOY_SENDDATA_INTERVAL_HEALTH;	
     msCellularApn = CONFIG_WEATHERBUOY_CELLULAR_APN;
     msCellularUser = CONFIG_WEATHERBUOY_CELLULAR_USER;
     msCellularPass = CONFIG_WEATHERBUOY_CELLULAR_PASS;
@@ -41,12 +38,7 @@ bool Config::Load(){
 	ReadString(h, "STASsid", msSTASsid);
 	ReadString(h, "STAPass", msSTAPass);
 	ReadString(h, "Hostname", msHostname);
-	ReadInt(h, "IntervalDay", miSendDataIntervalDaytime);
-	ReadInt(h, "IntervalNight", miSendDataIntervalNighttime);
-	ReadInt(h, "IntervalHealth", miSendDataIntervalHealth);
 	ReadString(h, "TargetUrl", msTargetUrl);
-	ReadString(h, "MaximetColumns", msMaximetColumns);
-	ReadString(h, "MaximetUnits", msMaximetUnits);
 	ReadString(h, "CellularApn", msCellularApn);
 	ReadString(h, "CellularUser", msCellularUser);
 	ReadString(h, "CellularPass", msCellularPass);
@@ -84,24 +76,14 @@ bool Config::Save()
 		return nvs_close(h), false;
 	if (!WriteString(h, "TargetUrl", msTargetUrl))
 		return nvs_close(h), false;
-	if (!WriteInt(h, "IntervalDay", miSendDataIntervalDaytime))
-		return nvs_close(h), false;
-	if (!WriteInt(h, "IntervalNight", miSendDataIntervalNighttime))
-		return nvs_close(h), false;
-	if (!WriteInt(h, "IntervalHealth", miSendDataIntervalHealth))
-		return nvs_close(h), false;
-	if (!WriteString(h, "MaximetColumns", msMaximetColumns))
-		return nvs_close(h), false;
-	if (!WriteString(h, "MaximetUnits", msMaximetUnits))
-		return nvs_close(h), false;
-
 	if (!WriteString(h, "CellularApn", msCellularPass))
 		return nvs_close(h), false;
 	if (!WriteString(h, "CellularUser", msCellularUser))
 		return nvs_close(h), false;
 	if (!WriteString(h, "CellularPass", msCellularPass))
 		return nvs_close(h), false;
-
+	if (!WriteString(h, "CellularOperator", msCellularOperator))
+		return nvs_close(h), false;
 	if (!WriteString(h, "BoardSensorId", msBoardTempSensorId))
 		return nvs_close(h), false;
 

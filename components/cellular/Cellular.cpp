@@ -413,21 +413,9 @@ return; */
     Command("AT+CGNSSMODE=0,1", "OK", &response,  "Disable GPS mode"); 
     ESP_LOGI(tag, "Disable GPS mode: %s", response.c_str());
 
-    /*Command("AT+CAPFOTA=?", "OK", &response,  "FOTA possibilities?"); 
-    ESP_LOGI(tag, "Fota possible?: %s", response.c_str());
-
-    Command("AT+CAPFOTA?", "OK", &response,  "FOTA service status"); 
-    ESP_LOGI(tag, "Fota service status: %s", response.c_str());
-    //Model": "SIMCOM_SIM7600E",
-    // "Revision": "SIM7600M21-A_V1.1",
-    Command("AT+CAPFOTA=1", "OK", &response,  "enable FOTA service"); 
-    ESP_LOGI(tag, "enable fota service: %s", response.c_str());
-
-    Command("AT+CSFOTA", "OK", &response,  "run fota"); 
-    ESP_LOGI(tag, "CSFOTA: %s", response.c_str()); */
-
-    
-
+    if (Command("AT+CSCLK=1", "OK", &response, "Enable sleep via UART DTR.")) { // mode 4 would shut down RF entirely to "flight-mode"; mode 0 still keeps SMS receiption intact
+        ESP_LOGI(tag, "Enabled modem to sleep via UART DTR.");
+    } 
 } 
 
 void Cellular::ReadSMS() {
@@ -573,81 +561,37 @@ bool Cellular::SwitchToLowPowerMode() {
     String response;
     if (Command("ATH", "+PPPD: DISCONNECTED", &response, "Disconnect data call.")) { 
         ESP_LOGI(tag, "Disconnected data call.");
-    }  
-    /*
-    if (ModemWriteLine("ATH")) {
-        if (ModemReadResponse(response, "OK", 5)) {
-            ESP_LOGI(tag, "**ATH**:\r\n%s",response.c_str());
-        }
-        ModemReadLine(response);
-        ESP_LOGW(tag, "EXTRA LINE: %s",  response.c_str());
-    } */
-
-/*
-Command("AT+CNSMOD?", "OK", &response, "Current network system mode");
-ESP_LOGW(tag, "network system mode: %s", response.c_str());
-Command("AT+CGDCONT=?", "OK", &response, "check PDP context");
-ESP_LOGW(tag, "PDP context: %s", response.c_str());
-Command("AT+CGDATA=?", "OK", &response, "check PPP switching");
-ESP_LOGW(tag, "data mode check: %s", response.c_str());
-*/
-    
+    } else {
+        ESP_LOGE(tag, "Disconnecting data call failed.");
+    }
+  
     vTaskDelay(1000 / portTICK_PERIOD_MS);
 
     if (Command("AT+CFUN=0", "OK", &response, "Set modem to minimum functionality.")) { // mode 4 would shut down RF entirely to "flight-mode"; mode 0 still keeps SMS receiption intact
-        ESP_LOGI(tag, "Switched to power saving mode.");
-    } 
+        ESP_LOGI(tag, "Set modem to minimum functionality.");
+    } else {
+        ESP_LOGE(tag, "Setting modem to minimum functionality failed.");
+    }
 
+    ESP_LOGI(tag, "Switched to power saving mode via DTR.");
     gpio_set_level(CELLULAR_GPIO_DTR, 1);
-
-    if (Command("AT+CSCLK=1", "OK", &response, "Enable sleep via UART.")) { // mode 4 would shut down RF entirely to "flight-mode"; mode 0 still keeps SMS receiption intact
-        ESP_LOGI(tag, "Enabled sleep via UART.");
-        mbPowerSaverActive = true;
-        return true;
-    } 
-
-
-    //////////////////////////
-    //// AT+CSCLK=1    ----- AT+CSCLK Control UART Sleep
-    // This command is used to enable UART Sleep or always work,
- //if set to 1, UART can sleep when DTR pull high
-// if set to 0, UART always work
-
-//     3.1 UART condition
-// If TE do use UART interface, must take care of this condition, DTR pin can be used as UART sleep
-// indicator. Host device must be send AT+CSCLK=1 command to module for enable sleep function, add use DTR as
-// an indicator to let SIM7100/SIM7500/SIM7600/SIM7800 module enter into sleep mode or sleep mode. UART is ready to enter into sleep mode if DTR pin is pulled up. UART is ready to exit from sleep mode if DTR pin is pulled down.
-// If TE does not use UART interface, can be use AT+CUARTRM=1 disable UART function,and module will
-// be ignore UART condition when it going to sleep. So module default cannot enter sleep mode, if module need sleep, UART must be enter sleep mode
-// or 
-
-
-// SIM7100/SIM7500/SIM7600/SIM7800 module must in idle mode (no data transmission, no audio playing, no other at command running and so on) in order to let SIM7100/SIM7500/SIM7600/SIM7800 module enter
-// into sleep mode
-
-
-// .Wakeup Module
-// SIM7100/SIM7500/SIM7600/SIM7800 module can exit from sleep mode automatically when the following
-// events are satisfied:
-//  Receive a SMS.  Have an Incoming call. SIM7100/SIM7500/SIM7600/SIM7800 module can exit from sleep mode manually when the following
-// events are happened:
-//  UART event, DTR is pulled down if wants to wakeup module.  USB event
-// Host sends a command to module when in suspend mode or Host connects the USB interface when host
-// cuts off the USB_VBUS line
-//
-// wake through sleeping UART: continuously send AT+CSCLK=1\r\n  until  OK comes back
+    mbPowerSaverActive = true;
+    return true;
 
 
 
-// In UART SIM7100/SIM7500/SIM7600/SIM7800 uses RI pin to wake up the host only when incoming call
-// happened, SMS received, and URC reported. RI pin has same patterns to wakeup the host; the pin will stay high normally
+    // SIM7100/SIM7500/SIM7600/SIM7800 module must in idle mode (no data transmission, no audio playing, no other at command running and so on) in order to let SIM7100/SIM7500/SIM7600/SIM7800 module enter
+    // into sleep mode
 
 
-// If TE do use UART interface, must take care of this condition, 
-// ****** DTR pin can be used as UART sleep indicator ****************
+    // .Wakeup Module
+    // SIM7100/SIM7500/SIM7600/SIM7800 module can exit from sleep mode automatically when the following
+    // events are satisfied:
+    //  UART event, DTR is pulled down if wants to wakeup module.
+    // wake through sleeping UART: continuously send AT+CSCLK=1\r\n  until  OK comes back
 
-    ESP_LOGE(tag, "Switching to low power mode failed.");
-    return false;
+    //ESP_LOGE(tag, "Switching to low power mode failed.");
+    //return false;
 }
 
 bool Cellular::SwitchToFullPowerMode() {
@@ -655,8 +599,9 @@ bool Cellular::SwitchToFullPowerMode() {
     String command;
 
     gpio_set_level(CELLULAR_GPIO_DTR, 0);
-    // simcom documentation: "Anytime host want send data to module, it must be pull down DTR then"
+    // simcom documentation: "Anytime host want send data to module, it must be pull down DTR then wait 20ms"
     vTaskDelay(20/portTICK_PERIOD_MS);
+
 
     if (Command("AT+CFUN=1", "OK", &response, "Set modem to full power mode and reset it too.")) { // mode 4 would shut down RF entirely to "flight-mode"; mode 0 still keeps SMS receiption intact
         ESP_LOGI(tag, "Switched to full power mode.");
@@ -668,9 +613,9 @@ bool Cellular::SwitchToFullPowerMode() {
     //---------------
 
 
-    if (!Command("AT", "OK", &response, "ATtention")) {
+    /*if (!Command("AT", "OK", &response, "ATtention")) {
         ESP_LOGE(tag, "Severe problem, no connection to Modem");
-    };
+    };*/
 
 
     int maxWaitForNetworkRegistration = 120;
@@ -732,7 +677,7 @@ bool Cellular::SwitchToFullPowerMode() {
     Command("AT+CSQ", "OK", &response,  "Signal Quality Report"); // +CSQ: 13,0
     ESP_LOGI(tag, "Signal Quality: %s", response.substring(6).c_str());
     ESP_LOGI(tag, "Switching to full power mode completed.");
-    return false;
+    return true;
 }
 
 

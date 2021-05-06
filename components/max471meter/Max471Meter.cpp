@@ -35,7 +35,8 @@ void fMeterTask(void *pvParameter) {
 void Max471Meter::Max471MeterTask() {
     while(true) {
         vTaskDelay(1*1000/portTICK_PERIOD_MS);
-        unsigned int measurement = mCurrent.Measure(5);
+        //unsigned int measurement = mCurrent.Measure(5);
+        unsigned int measurement = mCurrent.AdaptiveMeasure(5);
         taskENTER_CRITICAL(&mCriticalSection);
         if (muiCurrentCount > 60*15) { // reset every 15min
             muiCurrentCount = 0;
@@ -53,28 +54,34 @@ void Max471Meter::Max471MeterTask() {
         }
         muiCurrentCount++;
         taskEXIT_CRITICAL(&mCriticalSection);
-        //ESP_LOGD(tag, "Current %d mA", measurement);
+        ESP_LOGD(tag, "Current %d mA", measurement);
     }
 }
 
-ADC::ADC(gpio_num_t gpio, adc_atten_t attenuation) {
-    mpAdcChars = (esp_adc_cal_characteristics_t*) calloc(1, sizeof(esp_adc_cal_characteristics_t));
+ADC::ADC(gpio_num_t gpio) {
+    mpAdcCharsNormal = (esp_adc_cal_characteristics_t*) calloc(1, sizeof(esp_adc_cal_characteristics_t));
+    mpAdcCharsSensitive = (esp_adc_cal_characteristics_t*) calloc(1, sizeof(esp_adc_cal_characteristics_t));
+    adc_bits_width_t bits = ADC_WIDTH_BIT_12;
+    adc_atten_t attenuation = ADC_ATTEN_DB_11;
 
-    esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_11, ADC_WIDTH_12Bit, DEFAULT_VREF, mpAdcChars);
+    esp_adc_cal_value_t val_type = esp_adc_cal_characterize(ADC_UNIT_1, attenuation, bits, DEFAULT_VREF, mpAdcCharsNormal);
     if (val_type == ESP_ADC_CAL_VAL_EFUSE_TP) {
         ESP_LOGI(tag, "Characterized using Two Point Value");
     } else if (val_type == ESP_ADC_CAL_VAL_EFUSE_VREF) {
-        ESP_LOGI(tag, "Characterized using eFuse Vref");
+        //mpAdcChars->coeff_b = 0; // overriding coeff-B from 142mV or 75mV (depending on attenuation) to 0 for correct reading.
+        ESP_LOGI(tag, "Characterized using eFuse Vref %d mV, low %s, high %s, coeffA %d, coeffB %d", mpAdcCharsNormal->vref, mpAdcCharsNormal->low_curve ? "yes" : "-", mpAdcCharsNormal->high_curve ? "yes" : "-", mpAdcCharsNormal->coeff_a, mpAdcCharsNormal->coeff_b);
     } else {
         ESP_LOGI(tag, "Characterized using Default Vref");
     }
+    val_type = esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_0, bits, DEFAULT_VREF, mpAdcCharsSensitive);
+    ESP_LOGI(tag, "Sensitive mode: Characterized using eFuse Vref %d mV, low %s, high %s, coeffA %d, coeffB %d", mpAdcCharsSensitive->vref, mpAdcCharsSensitive->low_curve ? "yes" : "-", mpAdcCharsSensitive->high_curve ? "yes" : "-", mpAdcCharsSensitive->coeff_a, mpAdcCharsSensitive->coeff_b);
 
     gpio_set_pull_mode(gpio, GPIO_FLOATING);
     gpio_set_intr_type(gpio, GPIO_INTR_DISABLE);
     gpio_set_direction(gpio, GPIO_MODE_INPUT);
 
     mChannel = GpioToChannel(gpio);
-    adc1_config_width(ADC_WIDTH_BIT_12);
+    adc1_config_width(bits);
     adc1_config_channel_atten(mChannel, attenuation);
 };
 
@@ -113,21 +120,55 @@ unsigned int ADC::Measure(unsigned int samples) {
     }
     adc_reading /= samples;
     //Convert adc_reading to voltage in mV
-    uint32_t voltage = esp_adc_cal_raw_to_voltage(adc_reading, mpAdcChars);
+    uint32_t voltage = esp_adc_cal_raw_to_voltage(adc_reading, mpAdcCharsNormal);
     ESP_LOGD(tag, "Raw: %d\tVoltage: %dmV", adc_reading, voltage);
     return voltage;
 }
 
+unsigned int ADC::AdaptiveMeasure(unsigned int samples) {
+
+    bool sensitiveMode = false;
+    if (adc1_get_raw(mChannel) < 800) {
+        sensitiveMode = true;
+    }
+
+    if (sensitiveMode) {
+        adc1_config_channel_atten(mChannel, ADC_ATTEN_DB_11);
+    }
+
+    uint32_t adc_reading = 0;
+    for (int i = 0; i < samples; i++) {
+        adc_reading += adc1_get_raw(mChannel);
+    }
+    //Multisampling
+    adc_reading /= samples;
+
+    uint32_t voltage;
+
+    //Convert adc_reading to voltage in mV
+    if (sensitiveMode) {
+        adc1_config_channel_atten(mChannel, ADC_ATTEN_DB_11);
+        voltage = esp_adc_cal_raw_to_voltage(adc_reading, mpAdcCharsSensitive);
+        ESP_LOGD(tag, "Sensitive mode - Raw: %d\tVoltage: %dmV", adc_reading, voltage);
+    } else {
+        voltage = esp_adc_cal_raw_to_voltage(adc_reading, mpAdcCharsNormal);
+        ESP_LOGD(tag, "Normal mode - Raw: %d\tVoltage: %dmV", adc_reading, voltage);
+    }
+
+    return voltage;
+}
+
+
 
 ADC::~ADC() {
-    free(mpAdcChars);
+    free(mpAdcCharsNormal);
 };
 
 //    ADC_ATTEN_DB_0   = No input attenumation, ADC can measure up to approx. 800 mV. 
 //    ADC_ATTEN_DB_2_5 = The input voltage of ADC will be attenuated, extending the range of measurement to up to approx. 1100 mV. 
 //    ADC_ATTEN_DB_6   = The input voltage of ADC will be attenuated, extending the range of measurement to up to  approx. 1350 mV. 
 //    ADC_ATTEN_DB_11  = The input voltage of ADC will be attenuated, extending the range of measurement to up to  approx. 2600 mV. 
-Max471Meter::Max471Meter(int gpioPinVoltage, int gpioPinCurrent) : mVoltage{(gpio_num_t)gpioPinVoltage, ADC_ATTEN_DB_11}, mCurrent{(gpio_num_t)gpioPinCurrent, ADC_ATTEN_DB_2_5} {
+Max471Meter::Max471Meter(int gpioPinVoltage, int gpioPinCurrent) : mVoltage{(gpio_num_t)gpioPinVoltage}, mCurrent{(gpio_num_t)gpioPinCurrent} {
 	xTaskCreate(&fMeterTask, "Max471Meter", 2048, this, ESP_TASK_PRIO_MIN, NULL); 
 }
 

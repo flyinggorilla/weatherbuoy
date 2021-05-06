@@ -19,12 +19,16 @@
 // will ALWAYS USE UNIT 1!!
 class ADC {
     public:
-        ADC(gpio_num_t gpio, adc_atten_t attenuation = ADC_ATTEN_DB_11);
+        ADC(gpio_num_t gpio);
         ~ADC();
         unsigned int Measure(unsigned int samples = 32); // returns mV
 
+        // start with highest voltage range to 3V (DB_11) and if less than 800mV measured, use most sensitive range (DB_0)
+        unsigned int AdaptiveMeasure(unsigned int samples = 16); // returns mV
+
     private:
-        esp_adc_cal_characteristics_t *mpAdcChars = nullptr;
+        esp_adc_cal_characteristics_t *mpAdcCharsNormal = nullptr;
+        esp_adc_cal_characteristics_t *mpAdcCharsSensitive = nullptr;
         adc1_channel_t mChannel;
         adc1_channel_t GpioToChannel(gpio_num_t gpio);
 };

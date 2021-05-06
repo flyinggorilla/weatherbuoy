@@ -182,13 +182,7 @@ bool SendData::PerformHttpPost(ReadMaximet &readMaximet, unsigned int powerVolta
         mPostData += mrConfig.msAPSsid;
         mPostData += "\",\"stapass\": \"";
         mPostData += mrConfig.msSTAPass.length() ? "*****" : "";
-        mPostData += "\",\"intervaldaytime\":";
-        mPostData += mrConfig.miSendDataIntervalDaytime;
-        mPostData += ",\"intervalnighttime\":";
-        mPostData += mrConfig.miSendDataIntervalNighttime;
-        mPostData += ",\"intervalhealth\":";
-        mPostData += mrConfig.miSendDataIntervalHealth;
-        mPostData += ",\"cellular\": {\"datasent\":";
+        mPostData += "\",\"cellular\": {\"datasent\":";
         mPostData += (unsigned long)(mrCellular.getDataSent()/1024); // convert to kB
         mPostData += ",\"datareceived\":";
         mPostData += (unsigned long)(mrCellular.getDataReceived()/1024); // convert to kB
@@ -287,12 +281,6 @@ bool SendData::PerformHttpPost(ReadMaximet &readMaximet, unsigned int powerVolta
             if (value.length()) { mrConfig.msTargetUrl = value; updateConfig = true; };
             value = ReadMessageValue("set-apssid:");
             if (value.length()) { mrConfig.msAPSsid = value; updateConfig = true; };
-            value = ReadMessageValue("set-intervaldaytime:");
-            if (value.length() && ((value.toInt() >= 1) && (value.toInt() < 60*60*24))) { mrConfig.miSendDataIntervalDaytime = value.toInt(); updateConfig = true; };
-            value = ReadMessageValue("set-intervalnighttime:");
-            if (value.length() && ((value.toInt() >= 1) && (value.toInt() < 60*60*24))) { mrConfig.miSendDataIntervalNighttime = value.toInt(); updateConfig = true; };
-            value = ReadMessageValue("set-intervalhealth:");
-            if (value.length() && ((value.toInt() >= 1) && (value.toInt() < 60*60*24*7))) { mrConfig.miSendDataIntervalHealth = value.toInt(); updateConfig = true; };
 
             mbRestart = false;
             if (command.equals("restart") || command.equals("config") || command.equals("udpate")) {

@@ -19,18 +19,6 @@ menu "Weatherbuoy"
     config WEATHERBUOY_TARGET_URL
         string "Default target URL to send data and retrieve configuration."
 
-    config WEATHERBUOY_SENDDATA_INTERVAL_DAYTIME
-        int "Default interval in seconds to send weatherdata at daytime"
-        default 10
-        
-    config WEATHERBUOY_SENDDATA_INTERVAL_NIGHTTIME
-        int "Default interval in seconds to send weatherdata at daytime"
-        default 60
-
-    config WEATHERBUOY_SENDDATA_INTERVAL_HEALTH
-        int "Default interval in seconds to send health and diagnostics information"
-        default 300
-
     config WEATHERBUOY_CELLULAR_APN
         string "Network provider APN"
             

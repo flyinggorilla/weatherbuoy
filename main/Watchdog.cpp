@@ -15,19 +15,20 @@ void fWatchdogTask(void *pvParameter) {
 Watchdog::Watchdog(int seconds) {
     miSeconds = seconds;
     ESP_LOGD(tag, "Starting Watchdog Task");
-	xTaskCreate(&fWatchdogTask, "Watchdog", 1024, this, ESP_TASK_TIMER_PRIO, NULL); 
+	xTaskCreate(&fWatchdogTask, "Watchdog", 1024, this, ESP_TASK_TIMER_PRIO, &mhTask); 
 
 }
 
 void Watchdog::clear() {
-    mbReset = false;
+    xTaskNotifyGive(mhTask);
 }
 
 void Watchdog::WatchdogTask() {
+    ulTaskNotifyTake(pdTRUE, 0); // suppress the first-start "watchdog cleared"
     while(true) {
-        mbReset = true;
-        vTaskDelay(miSeconds*1000/portTICK_PERIOD_MS);
-        if (mbReset) {
+        if (ulTaskNotifyTake(pdTRUE, miSeconds*1000/portTICK_PERIOD_MS) == pdTRUE) {
+            ESP_LOGW(tag, "Watchdog cleared.");
+        } else {
             ESP_LOGW(tag, "Watchdog triggered. restarting.");
             esp_restart();
         }

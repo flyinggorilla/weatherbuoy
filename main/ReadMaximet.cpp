@@ -96,11 +96,11 @@ void ReadMaximet::ReadMaximetTask() {
                 continue;
             case COLUMNS : 
                 maximetState = UNITS;
-                mrConfig.msMaximetColumns = line;
+                //mrConfig.msMaximetColumns = line;
                 continue;
             case UNITS : 
                 maximetState = ENDSTARTUP;
-                mrConfig.msMaximetUnits = line;
+                //mrConfig.msMaximetUnits = line;
                 continue;
             case ENDSTARTUP:
                 maximetState = SENDINGDATA;
@@ -173,7 +173,7 @@ void ReadMaximet::ReadMaximetTask() {
             
                 case CHECKSUM:
                     column += c;
-                    ESP_LOGI(tag, "Checksum control area: '%s' =? %02X", column.c_str(), checksum);
+                    ESP_LOGD(tag, "Checksum control area: '%s' =? %02X", column.c_str(), checksum);
                     if (column.length() == 2) {
                         int check = strtol(column.c_str(), 0, 16); // convert hex string like "FF" to integer
                         if (check != checksum) {
@@ -181,7 +181,7 @@ void ReadMaximet::ReadMaximetTask() {
                             ESP_LOGW(tag, "Invalid checksum %02X != %s, trashing data.", checksum, column.c_str());
                         } else {
                             parsingState = VALIDDATA;
-                            ESP_LOGI(tag, "Checksum validated");
+                            ESP_LOGD(tag, "Checksum validated");
                         }
                     }
                     break;

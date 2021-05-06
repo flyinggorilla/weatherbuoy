@@ -79,3 +79,8 @@ CONFIG_LILYGO_TTGO_TPCIE_SIM7600=y
 ## CPU revision 1 (instead of null)
 ## UART IRAM (enabled instead of disabled)
 ## disable ipv6 for ppp
+
+#
+# Common ESP-related
+#
+# CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192

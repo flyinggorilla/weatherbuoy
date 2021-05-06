@@ -52,7 +52,11 @@ static const char tag[] = "WeatherBuoy";
 #endif
 
 // Restart ESP32 if there is not data being successfully sent within a 15min period.
-#define CONFIG_WATCHDOG_SECONDS (60*15)
+#define CONFIG_WATCHDOG_SECONDS 60*90 // 90min
+#define CONFIG_SENDDATA_INTERVAL_DAYTIME 60 // seconds
+#define CONFIG_SENDDATA_INTERVAL_NIGHTTIME 60*5 // 5 minutes
+#define CONFIG_SENDDATA_INTERVAL_DIAGNOSTICS 60*15 // every 15min
+#define CONFIG_SENDDATA_INTERVAL_LOWBATTERY 60*60 // hourly
 
 
 
@@ -86,10 +90,6 @@ void Esp32WeatherBuoy::Start() {
     }
 
     int watchdogSeconds = CONFIG_WATCHDOG_SECONDS;
-    if (watchdogSeconds < config.miSendDataIntervalNighttime * 2) {
-        watchdogSeconds = config.miSendDataIntervalNighttime * 2;
-    }
-
     Watchdog watchdog(watchdogSeconds);
     ESP_LOGI(tag, "Watchdog started and adjusted to %d seconds.", watchdogSeconds);
 
@@ -101,15 +101,15 @@ void Esp32WeatherBuoy::Start() {
     ESP_LOGI(tag, "App Version: %s", esp_ota_get_app_description()->version);
 
     Max471Meter max471Meter(CONFIG_MAX471METER_GPIO_VOLTAGE, CONFIG_MAX471METER_GPIO_CURRENT);
-    ESP_LOGI(tag, "Max471Meter: voltage %d mV, current %d mA??", max471Meter.Voltage(), max471Meter.Current());
+    ESP_LOGI(tag, "Max471Meter: voltage %d mV, current %d mA", max471Meter.Voltage(), max471Meter.Current());
 
     ReadMaximet readMaximet(config);
     readMaximet.Start(CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN, CONFIG_WEATHERBUOY_READMAXIMET_TX_PIN);
 
     OnlineMode onlineMode = MODE_CELLULAR;
 
-    //ESP_LOGW(tag, "OFFLINE MODE")
-    //onlineMode = MODE_WIFISTA;
+    //ESP_LOGW(tag, "OFFLINE MODE");
+    //onlineMode = MODE_OFFLINE;
 
     switch(onlineMode) {
         case MODE_CELLULAR: {
@@ -147,6 +147,8 @@ void Esp32WeatherBuoy::Start() {
     
     int secondsToSleep = 0;
 
+    int logInfoSeconds = 0;
+
     while (true) {
         tempSensors.Read();
         bool isMaximetData = readMaximet.WaitForData(60);
@@ -157,15 +159,20 @@ void Esp32WeatherBuoy::Start() {
         // keep modem sleeping unless time to last send elapsed
         unsigned int uptimeSeconds = (unsigned int)(esp_timer_get_time()/1000000); // seconds since start
         secondsSinceLastSend = uptimeSeconds - lastSendTimestamp;
-        if (!isMaximetData && (secondsToSleep > secondsSinceLastSend)) {
-            ESP_LOGI(tag, "skipping sending --- sleep: %d, maximetdata: %s", secondsToSleep - secondsSinceLastSend, isMaximetData ? "true" : "false");
+        if (!isMaximetData || (secondsToSleep > secondsSinceLastSend)) {
+            if (logInfoSeconds == 0) {
+                ESP_LOGI(tag, "skipping sending --- sleep: %d, maximetdata: %s", secondsToSleep - secondsSinceLastSend, isMaximetData ? "true" : "false");
+                logInfoSeconds = 60;
+            }
+            logInfoSeconds--;
+            vTaskDelay(1*1000 / portTICK_PERIOD_MS);
             continue;
         }
         lastSendTimestamp = uptimeSeconds;
 
         // when sending, add diagnostics information after 300 seconds
         secondsSinceLastDiagnostics = uptimeSeconds - lastDiagnosticsTimestamp;
-        if (secondsSinceLastDiagnostics > config.miSendDataIntervalHealth || bDiagnosticsAtStartup) {
+        if (secondsSinceLastDiagnostics > CONFIG_SENDDATA_INTERVAL_DIAGNOSTICS || bDiagnosticsAtStartup) {
             bDiagnostics = true;
             bDiagnosticsAtStartup = false;
             lastDiagnosticsTimestamp = uptimeSeconds;
@@ -173,28 +180,46 @@ void Esp32WeatherBuoy::Start() {
             bDiagnostics = false;
         }
 
+        unsigned int voltage = max471Meter.Voltage();
+        unsigned int current = max471Meter.Current();
+        float boardtemp = tempSensors.BoardTemp();
+
         if (onlineMode == MODE_CELLULAR) {
             ESP_LOGW(tag, "switching to full power mode next...");
             cellular.SwitchToFullPowerMode();         
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             ESP_LOGW(tag, "switching to PPP mode next...");
             cellular.SwitchToPppMode(); 
-        }
-        
-        sendData.PerformHttpPost(readMaximet, max471Meter.Voltage(), max471Meter.Current(), tempSensors.BoardTemp(), tempSensors.WaterTemp(), bDiagnostics);
-        
-        if (onlineMode == MODE_CELLULAR) {
+            sendData.PerformHttpPost(readMaximet, voltage, current, boardtemp, tempSensors.WaterTemp(), bDiagnostics);
+
+//TODO RETRY ONCE ON ERROR             (or re)
+/*
+I (27166) SendData: Sending 866 bytes to https://atterwind.info/weatherbuoy
+E (40496) esp-tls: couldn't get hostname for :atterwind.info:
+E (40496) esp-tls: Failed to open new connection
+E (40496) TRANS_SSL: Failed to open a new connection
+E (40496) HTTP_CLIENT: Connection failed, sock < 0
+E (40506) SendData: Error ESP_ERR_HTTP_CONNECT in esp_http_client_open(): https://atterwind.info/weatherbuoy
+I (40516) WeatherBuoy: switching to low power mode...
+*/
+
             ESP_LOGI(tag, "switching to low power mode...");
             cellular.SwitchToLowPowerMode();            
+        } else if (onlineMode == MODE_WIFISTA) {
+            sendData.PerformHttpPost(readMaximet, voltage, current, boardtemp, tempSensors.WaterTemp(), bDiagnostics);
         }
 
         // determine nighttime by low solar radiation
-        ESP_LOGI(tag, "Solarradiation of %d", readMaximet.SolarRadiation());
-        if (readMaximet.SolarRadiation() > 2) {
-            ESP_LOGI(tag, "Daytime due to Solarradiation of %d", readMaximet.SolarRadiation());
-            secondsToSleep = config.miSendDataIntervalDaytime; //s;
-        } else {
-            secondsToSleep = config.miSendDataIntervalNighttime; //s;
+        ESP_LOGI(tag, "Solarradiation: %d  Voltage: %d", readMaximet.SolarRadiation(), voltage);
+        if (readMaximet.SolarRadiation() > 2 && voltage > 13100) {
+            secondsToSleep = CONFIG_SENDDATA_INTERVAL_DAYTIME; //s;
+            ESP_LOGI(tag, "Sending data at daytime interval every %d seconds", secondsToSleep);
+        } else if (voltage > 12750) {
+            secondsToSleep = CONFIG_SENDDATA_INTERVAL_NIGHTTIME; //s;
+            ESP_LOGI(tag, "Sending data at nighttime interval every %d minutes", secondsToSleep/60);
+        } else {   // got into low battery mode if voltage is below 12.5V 
+            secondsToSleep = CONFIG_SENDDATA_INTERVAL_LOWBATTERY;
+            ESP_LOGI(tag, "Sending data in low-battery mode every %d minutes", secondsToSleep/60);
         }
 
         //vTaskDelay(config.miSendDataIntervalHealth*1000 / portTICK_PERIOD_MS);
