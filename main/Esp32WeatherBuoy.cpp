@@ -51,8 +51,8 @@ static const char tag[] = "WeatherBuoy";
     // Waterproof sensor ROM code: "220120639e26f028"
 #endif
 
-// Restart ESP32 if there is not data being successfully sent within a 15min period.
-#define CONFIG_WATCHDOG_SECONDS 60*90 // 90min
+// Restart ESP32 if there is not data being successfully sent within this period.
+#define CONFIG_WATCHDOG_SECONDS 60*125 // 125min - if two hourly sends fail, thats the latest to restart
 #define CONFIG_SENDDATA_INTERVAL_DAYTIME 60 // seconds
 #define CONFIG_SENDDATA_INTERVAL_NIGHTTIME 60*5 // 5 minutes
 #define CONFIG_SENDDATA_INTERVAL_DIAGNOSTICS 60*15 // every 15min
@@ -214,6 +214,7 @@ void Esp32WeatherBuoy::Start() {
                 }
                 if (tries) {
                     ESP_LOGW(tag, "Retrying HTTP Post...");
+                    vTaskDelay(1000/portTICK_PERIOD_MS); // wait one second
                 }
             }
         }
@@ -224,7 +225,7 @@ void Esp32WeatherBuoy::Start() {
         } 
 
         // determine nighttime by low solar radiation
-        ESP_LOGI(tag, "Solarradiation: %d  Voltage: %d", readMaximet.SolarRadiation(), voltage);
+        ESP_LOGI(tag, "Solarradiation: %d W/m²  Voltage: %.02fV", readMaximet.SolarRadiation(), voltage/1000.0);
         if (readMaximet.SolarRadiation() > 2 && voltage > 13100) {
             secondsToSleep = CONFIG_SENDDATA_INTERVAL_DAYTIME; //s;
             ESP_LOGI(tag, "Sending data at daytime interval every %d seconds", secondsToSleep);
