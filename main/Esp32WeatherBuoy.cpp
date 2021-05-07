@@ -66,25 +66,17 @@ Esp32WeatherBuoy::~Esp32WeatherBuoy() {
 
 }
 
-void fWeatherBuoyTask(void *pvParameter) {
-	((Esp32WeatherBuoy*) pvParameter)->WeatherBuoyTask();
-	vTaskDelete(NULL);
-}
-
 extern "C" {
 void app_main();
 }
 
 void app_main() {
 	ESP_ERROR_CHECK(esp_netif_init()); 
-    Esp32WeatherBuoy *weatherBuoy = new Esp32WeatherBuoy();
-	xTaskCreate(&fWeatherBuoyTask, "Weatherbuoy", 8192, weatherBuoy, ESP_TASK_MAIN_PRIO, NULL); 
-}
-
-void Esp32WeatherBuoy::WeatherBuoyTask() {
-	Start();
+    Esp32WeatherBuoy esp32WeatherBuoy;
+	esp32WeatherBuoy.Start();
     esp_restart();
 }
+
 
 void TestHttp();
 void TestATCommands(Cellular &cellular);
@@ -157,12 +149,8 @@ void Esp32WeatherBuoy::Start() {
     int logInfoSeconds = 0;
 
     while (true) {
-        //ESP_LOGI(tag, "--------------- START reading temperature sensor -----------------");
         tempSensors.Read(); // note, this causes approx 700ms delay
-        //ESP_LOGI(tag, "--------------- END reading temperature sensor board %.2f water %.2f", tempSensors.GetBoardTemp(), tempSensors.GetWaterTemp());
-        //ESP_LOGI(tag, "--------------- WAIT FOR MAXIMET DATA -----------------");
         bool isMaximetData = readMaximet.WaitForData(60);
-        //ESP_LOGI(tag, "isMaximetData = %s", isMaximetData ? "YES" : "NO");
         unsigned int secondsSinceLastSend;
         unsigned int secondsSinceLastDiagnostics;
 
@@ -171,7 +159,7 @@ void Esp32WeatherBuoy::Start() {
         secondsSinceLastSend = uptimeSeconds - lastSendTimestamp;
         if (!isMaximetData || (secondsToSleep > secondsSinceLastSend)) {
             if (logInfoSeconds == 0) {
-                ESP_LOGI(tag, "Power management sleep: %d Measurements in queue %d", secondsToSleep - secondsSinceLastSend, readMaximet.GetQueueLength());
+                ESP_LOGI(tag, "Power management sleep: %d, Measurements in queue: %d", secondsToSleep - secondsSinceLastSend, readMaximet.GetQueueLength());
                 logInfoSeconds = 60;
             }
             logInfoSeconds--;

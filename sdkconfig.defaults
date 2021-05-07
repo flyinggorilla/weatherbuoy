@@ -82,5 +82,5 @@ CONFIG_LILYGO_TTGO_TPCIE_SIM7600=y
 
 #
 # Common ESP-related
-#
-# CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+# Main stack size: default is 3584, Configure the "main task" stack size. This is the stack of the task which calls app_main(). If app_main() returns then this task is deleted and its stack memory is freed.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192   
