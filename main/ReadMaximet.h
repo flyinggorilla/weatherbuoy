@@ -85,6 +85,9 @@ public:
     // peeks into queue, but doesnt return pointer to not accidentally delete data
     bool WaitForData(unsigned int timeoutSeconds);
 
+    // return the number of messages in the queue
+    int GetQueueLength();
+
     unsigned int SolarRadiation() { return muiSolarradiation; };
 
 

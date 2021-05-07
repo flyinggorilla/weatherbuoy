@@ -13,7 +13,6 @@ public:
 	virtual ~Esp32WeatherBuoy();
 
 	void Start();
-
 	enum OnlineMode {
 		MODE_OFFLINE,
 		MODE_WIFISTA,
@@ -25,6 +24,8 @@ public:
 	Config& GetConfig() { return config; }
 
 private:
+
+
 	void WeatherBuoyTask();
     friend void fWeatherBuoyTask(void *pvParameter);
 

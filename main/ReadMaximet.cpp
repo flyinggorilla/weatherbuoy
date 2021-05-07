@@ -29,7 +29,7 @@ void ReadMaximet::Start(int gpioRX, int gpioTX) {
         ESP_LOGE(tag, "Could not create Data queue. Data collection not initialized.");
     }
 
-	xTaskCreate(&fReadMaximetTask, "ReadMaximet", 1024*10, this, ESP_TASK_MAIN_PRIO, NULL);
+	xTaskCreate(&fReadMaximetTask, "ReadMaximet", 10240, this, ESP_TASK_MAIN_PRIO, NULL); // large stack is needed
 } 
 
 #define STX (0x02) // ASCII start of text
@@ -220,6 +220,10 @@ bool ReadMaximet::GetData(Data &data) {
     }
     ESP_LOGD(tag, "No data in Queue.");
     return false;
+}
+
+int ReadMaximet::GetQueueLength() {
+    return uxQueueMessagesWaiting(mxDataQueue);
 }
 
 bool ReadMaximet::WaitForData(unsigned int timeoutSeconds) {

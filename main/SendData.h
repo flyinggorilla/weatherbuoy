@@ -11,20 +11,14 @@
 
 class SendData {
 public:
-	SendData(Config &config, Cellular &cellular, Watchdog &watchdog);
+	SendData(Config &config, ReadMaximet &readMaximet, Cellular &cellular, Watchdog &watchdog);
 	virtual ~SendData();
-	//void EventHandler(int32_t id, void* event_data);
-    bool PerformHttpPost(ReadMaximet &readMaximet, unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics);
-
-
-    // post string data to a message queue for sending. Data is copied into queue
-    //bool PostData(String &data);
-    //bool PostHealth(unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature);
+    bool PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics);
+    bool PerformHttpPost();
     bool isRestart() { return mbRestart; };
 private:
-    //esp_event_loop_handle_t mhLoopHandle = nullptr;
-    //esp_event_handler_instance_t mhEventHandlerInstance = nullptr;
     Config &mrConfig;
+    ReadMaximet &mrReadMaximet;
     Cellular &mrCellular;
     Watchdog &mrWatchdog;
 
@@ -40,13 +34,6 @@ private: // esp http client
     bool mbSendDiagnostics = false;
     bool mbOtaAppValidated = false;
     bool mbRestart = false;
-
-/*private: // health data
-    unsigned int muiPowerVoltage = 0;
-    unsigned int muiPowerCurrent = 0;
-    float mfBoardTemperature = 0;
-    float mfWaterTemperature = 0;*/
-
 };
 
 

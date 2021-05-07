@@ -51,19 +51,7 @@ void SendData::Cleanup() {
     mhEspHttpClient = nullptr;
 }
 
-bool SendData::PerformHttpPost(ReadMaximet &readMaximet, unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics) {
-    // Initialize URL and HTTP client
-    if (!mhEspHttpClient) {
-        if (!mrConfig.msTargetUrl.startsWith("http")) {
-            ESP_LOGE(tag, "No proper target URL in form of'http(s)://server/' defined: url='%s'", mrConfig.msTargetUrl.c_str());
-            return false;
-        }
-        memset(&mEspHttpClientConfig, 0, sizeof(esp_http_client_config_t));
-        mEspHttpClientConfig.url = mrConfig.msTargetUrl.c_str();
-        mEspHttpClientConfig.method = HTTP_METHOD_POST; 
-        mhEspHttpClient = esp_http_client_init(&mEspHttpClientConfig);
-    }
-
+bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics) {
     bSendDiagnostics = bSendDiagnostics || mbSendDiagnostics;
 
     // POST message
@@ -72,7 +60,7 @@ bool SendData::PerformHttpPost(ReadMaximet &readMaximet, unsigned int powerVolta
     Data maximetData;
     mPostData = "{\"maximet\":[";
     bool bComma = false;
-    while (readMaximet.GetData(maximetData)) {
+    while (mrReadMaximet.GetData(maximetData)) {
         // SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,STATUS,WINDSTAT,CHECK
         mPostData += bComma ? ",{" : "{";
         mPostData += "\"uptime\":";
@@ -173,7 +161,25 @@ bool SendData::PerformHttpPost(ReadMaximet &readMaximet, unsigned int powerVolta
     }
     mPostData += "}";
 
-    ESP_LOGW(tag, "JSON: %s", mPostData.c_str());
+    ESP_LOGI(tag, "JSON: %s", mPostData.c_str());
+
+    return true;
+
+}
+
+bool SendData::PerformHttpPost() {
+    // Initialize URL and HTTP client
+    if (!mhEspHttpClient) {
+        if (!mrConfig.msTargetUrl.startsWith("http")) {
+            ESP_LOGE(tag, "No proper target URL in form of'http(s)://server/' defined: url='%s'", mrConfig.msTargetUrl.c_str());
+            return false;
+        }
+        memset(&mEspHttpClientConfig, 0, sizeof(esp_http_client_config_t));
+        mEspHttpClientConfig.url = mrConfig.msTargetUrl.c_str();
+        mEspHttpClientConfig.method = HTTP_METHOD_POST; 
+        mhEspHttpClient = esp_http_client_init(&mEspHttpClientConfig);
+    }
+
     
     // prepare and send HTTP headers and content length
     ESP_LOGI(tag, "Sending %d bytes to %s", mPostData.length(), mEspHttpClientConfig.url);
@@ -271,7 +277,7 @@ bool SendData::PerformHttpPost(ReadMaximet &readMaximet, unsigned int powerVolta
                 Cleanup();
                 memset(&mEspHttpClientConfig, 0, sizeof(esp_http_client_config_t));
 
-                readMaximet.Stop();
+                mrReadMaximet.Stop();
 
                 const String &pem = ReadMessagePemValue("set-cert-pem:");
                 mEspHttpClientConfig.method = HTTP_METHOD_GET; 
@@ -316,7 +322,7 @@ bool SendData::PerformHttpPost(ReadMaximet &readMaximet, unsigned int powerVolta
     return true;
 }
 
-SendData::SendData(Config &config, Cellular &cellular, Watchdog &watchdog) : mrConfig(config), mrCellular(cellular), mrWatchdog(watchdog) {
+SendData::SendData(Config &config, ReadMaximet &readMaximet, Cellular &cellular, Watchdog &watchdog) : mrConfig(config), mrReadMaximet(readMaximet), mrCellular(cellular), mrWatchdog(watchdog) {
     mhEspHttpClient = nullptr; 
 
 }

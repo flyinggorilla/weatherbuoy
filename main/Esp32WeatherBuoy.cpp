@@ -143,7 +143,7 @@ void Esp32WeatherBuoy::Start() {
     //TestATCommands();
     //TestHttp();
 
-    SendData sendData(config, cellular, watchdog);
+    SendData sendData(config, readMaximet, cellular, watchdog);
 
     ESP_LOGI(tag, "Starting Weatherbuoy main task.");
 
@@ -171,7 +171,7 @@ void Esp32WeatherBuoy::Start() {
         secondsSinceLastSend = uptimeSeconds - lastSendTimestamp;
         if (!isMaximetData || (secondsToSleep > secondsSinceLastSend)) {
             if (logInfoSeconds == 0) {
-                ESP_LOGI(tag, "skipping sending --- sleep: %d, maximetdata: %s", secondsToSleep - secondsSinceLastSend, isMaximetData ? "true" : "false");
+                ESP_LOGI(tag, "Power management sleep: %d Measurements in queue %d", secondsToSleep - secondsSinceLastSend, readMaximet.GetQueueLength());
                 logInfoSeconds = 60;
             }
             logInfoSeconds--;
@@ -214,10 +214,14 @@ void Esp32WeatherBuoy::Start() {
             }; 
         }
 
+        // read maximet data queue and create a HTTP POST message
+        sendData.PrepareHttpPost(voltage, current, boardtemp, watertemp, bDiagnostics);
+
+        // try sending, max 3 times
         if (onlineMode != MODE_OFFLINE) {
-            int tries = 2;
+            int tries = 3;
             while(tries--) {
-                if(sendData.PerformHttpPost(readMaximet, voltage, current, boardtemp, watertemp, bDiagnostics)) {
+                if(sendData.PerformHttpPost()) {
                     break;
                 }
                 if (tries) {
@@ -245,6 +249,9 @@ void Esp32WeatherBuoy::Start() {
         }
     }  
 }
+
+
+
 
 
 void TestHttp() {
