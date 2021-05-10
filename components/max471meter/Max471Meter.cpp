@@ -133,7 +133,7 @@ unsigned int ADC::AdaptiveMeasure(unsigned int samples) {
     }
 
     if (sensitiveMode) {
-        adc1_config_channel_atten(mChannel, ADC_ATTEN_DB_11);
+        adc1_config_channel_atten(mChannel, ADC_ATTEN_DB_0);
     }
 
     uint32_t adc_reading = 0;
@@ -147,7 +147,7 @@ unsigned int ADC::AdaptiveMeasure(unsigned int samples) {
 
     //Convert adc_reading to voltage in mV
     if (sensitiveMode) {
-        adc1_config_channel_atten(mChannel, ADC_ATTEN_DB_11);
+        adc1_config_channel_atten(mChannel, ADC_ATTEN_DB_11); // restore always high attenuation after sensitive mode
         voltage = esp_adc_cal_raw_to_voltage(adc_reading, mpAdcCharsSensitive);
         ESP_LOGD(tag, "Sensitive mode - Raw: %d\tVoltage: %dmV", adc_reading, voltage);
     } else {
