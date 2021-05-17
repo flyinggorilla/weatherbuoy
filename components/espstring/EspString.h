@@ -290,6 +290,14 @@ public:
         return buffer ? buffer : "";  //CHANGED!!!! DONT RETURN NULL
     }
 
+    const char * c_str(unsigned int index) const
+    {
+        if (index >= len) {
+            return "";
+        }
+        return buffer + index;  
+    }
+
     // search
     int indexOf(char ch) const;
     int indexOf(char ch, unsigned int fromIndex) const;

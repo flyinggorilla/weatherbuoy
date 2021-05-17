@@ -77,6 +77,10 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += maximetData.gdir;
         mPostData += ",\"avgdir\":";
         mPostData += maximetData.avgdir;
+        mPostData += ",\"cdir\":";
+        mPostData += maximetData.cdir;
+        mPostData += ",\"avgcdir\":";
+        mPostData += maximetData.avgcdir;
         mPostData += ",\"compassh\":";
         mPostData += maximetData.compassh;
         mPostData += ",\"pasl\":";

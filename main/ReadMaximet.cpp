@@ -29,7 +29,7 @@ void ReadMaximet::Start(int gpioRX, int gpioTX) {
         ESP_LOGE(tag, "Could not create Data queue. Data collection not initialized.");
     }
 
-	xTaskCreate(&fReadMaximetTask, "ReadMaximet", 10240, this, ESP_TASK_MAIN_PRIO, NULL); // large stack is needed
+	xTaskCreate(&fReadMaximetTask, "ReadMaximet", 1024*16, this, ESP_TASK_MAIN_PRIO, NULL); // large stack is needed
 } 
 
 #define STX (0x02) // ASCII start of text
@@ -113,6 +113,9 @@ void ReadMaximet::ReadMaximetTask() {
         int col = 0;
         int checksum = 0;
 
+        int cposDataStart = 0;
+        int cposDataEnd = 0;
+
         ParsingStates parsingState = START;
         while (cpos < len || parsingState == VALIDDATA) {
             char c = line.charAt(cpos++);
@@ -122,6 +125,8 @@ void ReadMaximet::ReadMaximetTask() {
                         parsingState = READCOLUMN;
                         data.init();
                         column.setlength(0);
+                        cposDataStart = cpos;
+                        cposDataEnd = cpos;
                     }
                     break;
                 case READCOLUMN: 
@@ -153,12 +158,12 @@ void ReadMaximet::ReadMaximetTask() {
                         }
                         column.setlength(0);
                     } else if (c < 0x20 || c > 0x7E) {
-                        ESP_LOGE(tag, "Invalid characters in maximet string: %s.", column.c_str());
+                        ESP_LOGE(tag, "Invalid character %02X in maximet string: '%s'.", c, column.c_str());
                         parsingState = GARBLED;
                     } else {
                         column += c;
                         if (column.length() > 128) {
-                            ESP_LOGE(tag, "Column data length exceeded maximum: %s.", column.c_str());
+                            ESP_LOGE(tag, "Column data length exceeded maximum: '%s'.", column.c_str());
                             parsingState = GARBLED;
                         }
                     }
@@ -166,6 +171,7 @@ void ReadMaximet::ReadMaximetTask() {
                     if (c == ETX) {
                         parsingState = CHECKSUM;
                         column.setlength(0);
+                        cposDataEnd = cpos-1;
                     } else {
                         checksum ^= c;
                     }
@@ -190,7 +196,8 @@ void ReadMaximet::ReadMaximetTask() {
                 case VALIDDATA:
                     parsingState = START;
                     data.uptime = esp_timer_get_time()/1000000; // seconds since start (good enough as int can store seconds over 68 years in 31 bits)
-                    ESP_LOGI(tag, "Pushing measurement data to queue: '%s', %d seconds since start", line.c_str(), data.uptime);
+                    line[cposDataEnd] = 0;
+                    ESP_LOGI(tag, "Pushing measurement data to queue: '%s', %d seconds since start (%d..%d)", line.c_str(cposDataStart), data.uptime, cposDataStart, cposDataEnd);
                     if (uxQueueSpacesAvailable(mxDataQueue) == 0) {
                         // queue is full, so remove an element
                         ESP_LOGW(tag, "Queue is full, dropping unsent oldest data.");

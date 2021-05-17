@@ -95,6 +95,7 @@ void Esp32WeatherBuoy::Start() {
     TemperatureSensors tempSensors(config);
     tempSensors.Init(CONFIG_TEMPERATURESENSOR_GPIO_ONEWIRE);
 
+
     ESP_LOGI(tag, "Hostname: %s", config.msHostname.c_str());
     ESP_LOGI(tag, "Target URL: %s", config.msTargetUrl.c_str());
     ESP_LOGI(tag, "App Version: %s", esp_ota_get_app_description()->version);
@@ -150,6 +151,7 @@ void Esp32WeatherBuoy::Start() {
 
     while (true) {
         tempSensors.Read(); // note, this causes approx 700ms delay
+        vTaskDelay(1*1000 / portTICK_PERIOD_MS);
         bool isMaximetData = readMaximet.WaitForData(60);
         unsigned int secondsSinceLastSend;
         unsigned int secondsSinceLastDiagnostics;
@@ -157,13 +159,12 @@ void Esp32WeatherBuoy::Start() {
         // keep modem sleeping unless time to last send elapsed
         unsigned int uptimeSeconds = (unsigned int)(esp_timer_get_time()/1000000); // seconds since start
         secondsSinceLastSend = uptimeSeconds - lastSendTimestamp;
-        if (!isMaximetData || (secondsToSleep > secondsSinceLastSend)) {
+        if (secondsToSleep > secondsSinceLastSend) {
             if (logInfoSeconds == 0) {
                 ESP_LOGI(tag, "Power management sleep: %d, Measurements in queue: %d", secondsToSleep - secondsSinceLastSend, readMaximet.GetQueueLength());
                 logInfoSeconds = 60;
             }
             logInfoSeconds--;
-            vTaskDelay(1*1000 / portTICK_PERIOD_MS);
             continue;
         }
         lastSendTimestamp = uptimeSeconds;
@@ -176,6 +177,11 @@ void Esp32WeatherBuoy::Start() {
             lastDiagnosticsTimestamp = uptimeSeconds;
         } else {
             bDiagnostics = false;
+        }
+
+        // check if maximeta or info data should be sent at all
+        if (!isMaximetData && !bDiagnostics) {
+            continue;
         }
 
         unsigned int voltage = max471Meter.Voltage();

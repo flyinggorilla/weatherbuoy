@@ -2,6 +2,9 @@
 #include "Config.h"
 #include <nvs_flash.h>
 #include "sdkconfig.h"
+#include "esp_log.h"
+
+const char tag[] ="Config";
 
 #define NVS_NAME "Config"
 
@@ -54,42 +57,43 @@ bool Config::Load(){
 bool Config::Save()
 {
 	nvs_handle h;
+	bool ret = true;
 
 	if (nvs_flash_init() != ESP_OK) 
 		return false;
 
 	if (nvs_open(NVS_NAME, NVS_READWRITE, &h) != ESP_OK)
 		return false;
-	nvs_erase_all(h); //otherwise I need double the space
+	//nvs_erase_all(h); //otherwise I need double the space
 
 	if (!WriteBool(h, "APMode", mbAPMode))
-		return nvs_close(h), false;
+		ret = false;
 	if (!WriteString(h, "APSsid", msAPSsid))
-		return nvs_close(h), false;
+		ret = false;
 	if (!WriteString(h, "APPass", msAPPass))
-		return nvs_close(h), false;
+		ret = false;
 	if (!WriteString(h, "STASsid", msSTASsid))
-		return nvs_close(h), false;
+		ret = false;
 	if (!WriteString(h, "STAPass", msSTAPass))
-		return nvs_close(h), false;
+		ret = false;
 	if (!WriteString(h, "Hostname", msHostname))
-		return nvs_close(h), false;
+		ret = false;
 	if (!WriteString(h, "TargetUrl", msTargetUrl))
-		return nvs_close(h), false;
+		ret = false;
 	if (!WriteString(h, "CellularApn", msCellularPass))
-		return nvs_close(h), false;
+		ret = false;
 	if (!WriteString(h, "CellularUser", msCellularUser))
-		return nvs_close(h), false;
+		ret = false;
 	if (!WriteString(h, "CellularPass", msCellularPass))
-		return nvs_close(h), false;
+		ret = false;
 	if (!WriteString(h, "CellularOperator", msCellularOperator))
-		return nvs_close(h), false;
+		ret = false;
 	if (!WriteString(h, "BoardSensorId", msBoardTempSensorId))
-		return nvs_close(h), false;
+		ret = false;
 
 	nvs_commit(h);
 	nvs_close(h);
-	return true;
+	return ret;
 }
 
 

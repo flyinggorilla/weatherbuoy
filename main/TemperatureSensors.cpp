@@ -42,6 +42,7 @@ void TemperatureSensors::Init(int oneWireGpioNum) {
     // Store the ROM code of the temperature sensore when exactly one sensor is present. This single sensor is treated as board sensor.
     // Every additional sensor found later is then optional.
     if (num_devices == 1) {
+        ESP_LOGD(tag, "Config sensor ID %s ?= ROM code %s.", mrConfig.msBoardTempSensorId.c_str(), romCodes[0]);
         if (mrConfig.msBoardTempSensorId != romCodes[0]) {
             mrConfig.msBoardTempSensorId = romCodes[0];
             ESP_LOGW(tag, "Writing detected board sensor ID %s to configuration.", mrConfig.msBoardTempSensorId.c_str());
