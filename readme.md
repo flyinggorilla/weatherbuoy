@@ -26,9 +26,23 @@
 | | | |
 | Weather station simulator | ESP8266 | |
 | | | |
+| M12 male front-mount | Solar panel power, 4-pins, 2 pins combined to double current of 4A per pin | [7000-13501-9710050](https://shop.murrelektronik.de/en/Connection-Technology/Flange-Connectors/Signal/M12-male-receptacle-A-cod-front-mount-7000-13501-9710050.html?listtype=search&searchparam=7000-13501-9710050) | EUR 10 |
+| M12 female with cable | Solar panel power, 4-pins, 2 pins combined to double current of 4A per pin, soldered to solar panel | [7000-12221-6340200](https://shop.murrelektronik.de/en/Connection-Technology/With-open-ended-wires/Signal/M12-female-0-with-cable-7000-12221-6340200.html?listtype=search&searchparam=7000-12221-6340200&src=search&srchPage=1&perPage=10&pos=1) | EUR 10 |
+| M8 male connector | soldered to Water temperature sensor cable | [7000-08401-0000000](https://shop.murrelektronik.de/en/Connection-Technology/Field-wireable/Signal/M8-MALE-0-FIELD-WIREABLE-SOLDER-PINS-7000-08401-0000000.html?listtype=search&searchparam=7000-08401-0000000&src=search&srchPage=1&perPage=10&pos=1) | EUR 11 |
+| M8 female front-mount 3-pin | Water temperature sensor | [7000-08571-9700050](https://shop.murrelektronik.de/en/Connection-Technology/Flange-Connectors/Signal/M8-FEMALE-FLANGE-PLUG-A-CODED-FRONT-MOUNT-7000-08571-9700050.html?listtype=search&searchparam=7000-08571-9700050&src=search&srchPage=1&perPage=10&pos=1) | EUR 9 |
+| M12 female front-mount 5-pin | RS232 data and 5V power connection to Maximet weatherstation | [7000-13561-9720100](https://shop.murrelektronik.de/en/Connection-Technology/Flange-Connectors/Signal/M12-female-receptacle-A-cod-front-mount-7000-13561-9720100.html?listtype=search&searchparam=7000-13561-9720100&src=search&srchPage=1&perPage=10&pos=1)| EUR 12 |
+| M12 male connector cable 5-pin | RS232 data and 5V power connection to Maximet weatherstation with Maximet specific IP67 soldered Connector | [7000-12041-6250300](https://shop.murrelektronik.de/en/Connection-Technology/With-open-ended-wires/Signal/M12-male-0-with-cable-7000-12041-6250300.html?listtype=search&searchparam=7000-12041-6250300&src=search&srchPage=1&perPage=10&pos=1) | EUR 11 |
+| Pressure compensation unit | Wiska EVPS - Pressure compensation unit, VentPLUG, plastic, metric | [WISKA EVPS 40 10106593](https://www.wiska.com/de/143/pde/10102369/evps-12.html) |
 | | | |
 | | | |
 | | | |
+| | | |
+| | | |
+| | | |
+
+
+
+
 | | | |
 
 
