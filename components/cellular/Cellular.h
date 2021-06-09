@@ -40,6 +40,7 @@ public:
     String msHardware;
     String msSubscriber;
     String msNetworkmode;
+    int    miSignalQuality = -1;
 
 private:
     bool PowerOn();

@@ -400,8 +400,15 @@ return; */
         } 
     #endif 
 
-    Command("AT+CSQ", "OK", &response,  "Signal Quality Report"); // +CSQ: 13,0
-    ESP_LOGI(tag, "Signal Quality: %s", response.substring(6).c_str());
+    if (Command("AT+CSQ", "OK", &response,  "Signal Quality Report")) { // +CSQ: 13,0
+        String sq;
+        sq = response.substring(6, response.indexOf(","));
+        miSignalQuality = sq.toInt();
+        ESP_LOGI(tag, "Signal Quality: %i, (%s)", miSignalQuality, sq.c_str());
+    } else {
+        miSignalQuality = -1;
+    }
+
     Command("AT+CNUM", "OK", &response,  "Subscriber Number"); // +CNUM: "","+43681207*****",145,0,4
     msSubscriber = "";
     if (response.startsWith("+CNUM: ")) {
@@ -674,8 +681,15 @@ bool Cellular::SwitchToFullPowerMode() {
                                                                 // +COPS: 0,0,"yesss!",2 // SIM7600
     ESP_LOGI(tag, "Operator: %s", response.c_str());
 
-    Command("AT+CSQ", "OK", &response,  "Signal Quality Report"); // +CSQ: 13,0
-    ESP_LOGI(tag, "Signal Quality: %s", response.substring(6).c_str());
+    if (Command("AT+CSQ", "OK", &response,  "Signal Quality Report")) { // +CSQ: 13,0
+        String sq;
+        sq = response.substring(6, response.indexOf(","));
+        miSignalQuality = sq.toInt();
+        ESP_LOGI(tag, "Signal Quality: %i (%s)", miSignalQuality, sq.c_str());
+    } else {
+        miSignalQuality = -1;
+    }
+
     ESP_LOGI(tag, "Switching to full power mode completed.");
     return true;
 }

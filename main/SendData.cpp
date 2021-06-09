@@ -160,7 +160,9 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += mrCellular.msHardware;
         mPostData += "\",\"networkmode\": \"";
         mPostData += mrCellular.msNetworkmode;
-        mPostData += "\"}}";
+        mPostData += "\",\"signalquality\": ";
+        mPostData += mrCellular.miSignalQuality;
+        mPostData += "}}";
         mbSendDiagnostics = false;
     }
     mPostData += "}";
