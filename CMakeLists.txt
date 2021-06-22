@@ -5,8 +5,10 @@ cmake_minimum_required(VERSION 3.5)
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 
 string(TIMESTAMP version v%y%m%d.%H%M UTC)
-set(PROJECT_VER ${version}) 
+set(PROJECT_VER "${version} ${CMAKE_BUILD_TYPE}") 
+message(${PROJECT_VER})
 project(esp32weatherbuoy)  
+
 
 
 ########## MANDATORY MENUCONFIG OPTIONS #############
