@@ -1,4 +1,4 @@
-# Weather Buoy 
+# Weather Buoy - ESP32 4G/LTE Solar
 <img src="weatherbuoy_onwater.jpg" alt="weather buoy on water">
 
 <br>
