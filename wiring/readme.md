@@ -1,0 +1,11 @@
+#wiring
+![wiring](electronicswiring.png)
+![wiring](wiringdiagram.png)
+![connectors](connectors.png)
+![buoy](buoydimensions.png)
+![current sensor](currentsensor.png)
+![fibox](fiboxdimensions.png)
+![maximet](gillmaximetdimensions.png)
+![max3232](max3232_ds18b20.png)
+![pcb](pcb.png)
+![protoboard](protoboard.png)
