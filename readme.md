@@ -47,6 +47,14 @@ files are in the folder [/cad](cad)
 [System: Fusion 360 live model](https://a360.co/3yyAmHY)
 [PCB: Fusion 360 live model](https://a360.co/3zrHFRN)
 
+## firmware
+* built with ESP-IDF Version 4.3 or later
+* adds software components for
+  * Cellular handling for SimCom Modem
+  * Max417 current/voltage measurement
+  * Comfortable/safer Strings
+  * reading/parsing Gill Maximet data from serial interface
+
 ## troubleshooting
 
 ### cannot flash via serial/USB anymore
