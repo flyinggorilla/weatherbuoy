@@ -1,15 +1,16 @@
 # Weather Buoy - ESP32 4G/LTE Solar
+* On-water solar powered autonomous wind and weather station
+* ESP32, SIM7600E, GILL MaxiMet GMX501
+
 <img src="weatherbuoy_onwater.jpg" alt="weather buoy on water">
 
 <br>
 
-<img src="rendering_mounted.png" alt="rendering" width="18.4%">
-<img src="rendering_electronics.png" alt="rendering electronics" width="39.1%">
-<img src="electronics.jpg" alt="electronics" width="23.4%">
-<img src="testsetup.jpg" alt="test setup" width="16.7%"> 
+<img src="rendering_mounted.png" alt="rendering">
+<img src="rendering_electronics.png" alt="rendering electronics">
+<img src="electronics.jpg" alt="electronics">
+<img src="testsetup.jpg" alt="test setup"> 
 
-* On-water solar powered autonomous wind and weather station
-* ESP32, SIM7600E, GILL MaxiMet GMX501
 
 ## Electronics part list
 
