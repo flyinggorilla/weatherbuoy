@@ -2,6 +2,7 @@
 ![wiring](electronicswiring.png)
 ![wiring](wiringdiagram.png)
 ![connectors](connectors.png)
+![maximetconnector](maximetconnector.png)
 ![buoy](buoydimensions.png)
 ![current sensor](currentsensor.png)
 ![fibox](fiboxdimensions.png)
