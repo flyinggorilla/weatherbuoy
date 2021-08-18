@@ -3,6 +3,7 @@
 * ESP32, SIM7600E, GILL MaxiMet GMX501
 
 <img src="weatherbuoy_onwater.jpg" alt="weather buoy on water">
+<img src="electronics_on_buoy.jpg" alt="electronics mounted on buoy with sun shield">
 
 <br>
 
