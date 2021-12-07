@@ -44,6 +44,12 @@ static const char tag[] = "WeatherBuoy";
     #define CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN 13 
     #define CONFIG_WEATHERBUOY_READMAXIMET_TX_PIN 14 
 
+    // I2C 
+    // last ports 
+    #define CONFIG_NMEA_I2C_SCL_PIN 22
+    #define CONFIG_NMEA_I2C_SDA_PIN 21 
+
+
     // OneWire protocol for temperature sensors DS18B20
     #define CONFIG_TEMPERATURESENSOR_GPIO_ONEWIRE 15 
     // Test setup DS18B20:
