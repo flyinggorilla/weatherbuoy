@@ -14,6 +14,26 @@
 #include "nvs_flash.h"
 #include "esp_ota_ops.h"
 
+///////////////////// BEGIN NMEA SPECIFIC  ////////////////////////////////
+
+
+#include "NMEA2000_esp32.h"
+#include "N2kMessages.h"
+extern "C" {
+// Application execution delay. Must be implemented by application.
+     void delay(uint32_t ms) {
+        vTaskDelay(ms / portTICK_PERIOD_MS);
+     };
+// Current uptime in milliseconds. Must be implemented by application.
+     uint32_t millis() {
+         return esp_timer_get_time()/1000;
+     };
+}
+
+///////////////////// END NMEA SPECIFIC ////////////////////////////////
+
+
+
 static const char tag[] = "WeatherBuoy";
 
 // ------------------------------------------
@@ -44,17 +64,21 @@ static const char tag[] = "WeatherBuoy";
     #define CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN 13 
     #define CONFIG_WEATHERBUOY_READMAXIMET_TX_PIN 14 
 
-    // I2C 
-    // last ports 
-    #define CONFIG_NMEA_I2C_SCL_PIN 22
-    #define CONFIG_NMEA_I2C_SDA_PIN 21 
-
-
     // OneWire protocol for temperature sensors DS18B20
     #define CONFIG_TEMPERATURESENSOR_GPIO_ONEWIRE 15 
     // Test setup DS18B20:
     // Breadboard TOS ROM code: "303c01e076e5f528" 
     // Waterproof sensor ROM code: "220120639e26f028"
+#endif
+
+#define NMEA 
+#ifdef NMEA
+    // I2C Pins 
+    #define CONFIG_I2C_SCL_PIN 22
+    #define CONFIG_I2C_SDA_PIN 21 
+    // I2C Pins used for TWAI (NMEA over CAN bus)
+    #define CONFIG_NMEA_TWAI_RX_PIN GPIO_NUM_22
+    #define CONFIG_NMEA_TWAI_TX_PIN GPIO_NUM_21 
 #endif
 
 // Restart ESP32 if there is not data being successfully sent within this period.
@@ -112,6 +136,31 @@ void Esp32WeatherBuoy::Start() {
     ReadMaximet readMaximet(config);
     readMaximet.Start(CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN, CONFIG_WEATHERBUOY_READMAXIMET_TX_PIN);
 
+    tNMEA2000_esp32 nmea(CONFIG_NMEA_TWAI_TX_PIN, CONFIG_NMEA_TWAI_RX_PIN);
+
+    nmea.SetProductInformation("00000002", // Manufacturer's Model serial code
+                                 100, // Manufacturer's product code
+                                 "weatherbuoy",  // Manufacturer's Model ID
+                                 "1.1.0.22 (2016-12-31)",  // Manufacturer's Software version code
+                                 "1.1.0.0 (2016-12-31)" // Manufacturer's Model version
+                                 );
+
+
+    nmea.SetDeviceInformation(1, // Unique number. Use e.g. Serial number.
+                                130, // Device function=Atmospheric. See codes on http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
+                                85, // Device class=External Environment. See codes on  http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
+                                2046 // Just choosen free from code list on http://www.nmea.org/Assets/20121020%20nmea%202000%20registration%20list.pdf                               
+                               );
+
+    nmea.SetMode(tNMEA2000::N2km_NodeOnly,23);
+
+    nmea.EnableForward(false);
+// List here messages your device will transmit.
+    const unsigned long TransmitMessages[] PROGMEM={130306L,0};    // 130306L PGN: Wind 
+    nmea.ExtendTransmitMessages(TransmitMessages);
+    nmea.Open();
+
+
     OnlineMode onlineMode = MODE_CELLULAR;
 
     //ESP_LOGW(tag, "OFFLINE MODE");
@@ -162,6 +211,16 @@ void Esp32WeatherBuoy::Start() {
         unsigned int secondsSinceLastSend;
         unsigned int secondsSinceLastDiagnostics;
 
+        //////////////////////////////////
+        //////// NMEA TEST CODE
+        tN2kMsg n2kMsg;
+        SetN2kWindSpeed(n2kMsg, 1, 99, 359, N2kWind_Apparent);
+        if(nmea.SendMsg(n2kMsg)) {
+            ESP_LOGI(tag, "NMEA SendMsg succeeded");
+        } else {
+            ESP_LOGW(tag, "NMEA SendMsg failed");
+        }
+
         // keep modem sleeping unless time to last send elapsed
         unsigned int uptimeSeconds = (unsigned int)(esp_timer_get_time()/1000000); // seconds since start
         secondsSinceLastSend = uptimeSeconds - lastSendTimestamp;
@@ -184,7 +243,7 @@ void Esp32WeatherBuoy::Start() {
         } else {
             bDiagnostics = false;
         }
-
+        
         // check if maximeta or info data should be sent at all
         if (!isMaximetData && !bDiagnostics) {
             continue;
