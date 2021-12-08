@@ -18,6 +18,7 @@
 
 
 #include "NMEA2000_esp32.h"
+#include "N2kStream_esp32.h"
 #include "N2kMessages.h"
 extern "C" {
 // Application execution delay. Must be implemented by application.
@@ -138,6 +139,11 @@ void Esp32WeatherBuoy::Start() {
 
     tNMEA2000_esp32 nmea(CONFIG_NMEA_TWAI_TX_PIN, CONFIG_NMEA_TWAI_RX_PIN);
 
+    //const short NMEA_DEVICE_ENVIRONMENTAL = 0;
+    /////////////// HOW TO USE MULTIPLE DEVICES
+    ////////////// https://github.com/ttlappalainen/NMEA2000/blob/master/Examples/MultiDevice/MultiDevice.ino
+    /////////////////////////////////////////////////////////////////////
+    nmea.SetDeviceCount(1); // Enable multi device support for 2 devices
     nmea.SetProductInformation("00000002", // Manufacturer's Model serial code
                                  100, // Manufacturer's product code
                                  "weatherbuoy",  // Manufacturer's Model ID
@@ -154,9 +160,11 @@ void Esp32WeatherBuoy::Start() {
 
     nmea.SetMode(tNMEA2000::N2km_NodeOnly,23);
 
-
-    nmea.EnableForward(false);
-// List here messages your device will transmit.
+    N2kStream_esp32 nmeaLogStream;
+    nmea.SetForwardStream(&nmeaLogStream);
+    //nmea.SetForwardOwnMessages(true);
+    nmea.EnableForward(true);
+    // List here messages your device will transmit.
     const unsigned long TransmitMessages[]={130306L,0};    // 130306L PGN: Wind 
     nmea.ExtendTransmitMessages(TransmitMessages);
     nmea.Open();
@@ -215,13 +223,15 @@ void Esp32WeatherBuoy::Start() {
         //////////////////////////////////
         //////// NMEA TEST CODE
         tN2kMsg n2kMsg;
-        SetN2kWindSpeed(n2kMsg, 1, 99, 359, N2kWind_Apparent);
+        SetN2kWindSpeed(n2kMsg, 1, 65, 66, N2kWind_Apparent);
         ESP_LOGI(tag, "NMEA sending...");
         if(nmea.SendMsg(n2kMsg)) {
             ESP_LOGI(tag, "NMEA SendMsg succeeded");
         } else {
             ESP_LOGW(tag, "NMEA SendMsg failed");
         } 
+
+
 
         nmea.ParseMessages();
 
