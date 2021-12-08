@@ -141,8 +141,8 @@ void Esp32WeatherBuoy::Start() {
     nmea.SetProductInformation("00000002", // Manufacturer's Model serial code
                                  100, // Manufacturer's product code
                                  "weatherbuoy",  // Manufacturer's Model ID
-                                 "1.1.0.22 (2016-12-31)",  // Manufacturer's Software version code
-                                 "1.1.0.0 (2016-12-31)" // Manufacturer's Model version
+                                 "1.1.0.22 (2021-12-08)",  // Manufacturer's Software version code
+                                 "1.1.0.0 (2021-12-08)" // Manufacturer's Model version
                                  );
 
 
@@ -154,9 +154,10 @@ void Esp32WeatherBuoy::Start() {
 
     nmea.SetMode(tNMEA2000::N2km_NodeOnly,23);
 
+
     nmea.EnableForward(false);
 // List here messages your device will transmit.
-    const unsigned long TransmitMessages[] PROGMEM={130306L,0};    // 130306L PGN: Wind 
+    const unsigned long TransmitMessages[]={130306L,0};    // 130306L PGN: Wind 
     nmea.ExtendTransmitMessages(TransmitMessages);
     nmea.Open();
 
@@ -215,11 +216,14 @@ void Esp32WeatherBuoy::Start() {
         //////// NMEA TEST CODE
         tN2kMsg n2kMsg;
         SetN2kWindSpeed(n2kMsg, 1, 99, 359, N2kWind_Apparent);
+        ESP_LOGI(tag, "NMEA sending...");
         if(nmea.SendMsg(n2kMsg)) {
             ESP_LOGI(tag, "NMEA SendMsg succeeded");
         } else {
             ESP_LOGW(tag, "NMEA SendMsg failed");
-        }
+        } 
+
+        nmea.ParseMessages();
 
         // keep modem sleeping unless time to last send elapsed
         unsigned int uptimeSeconds = (unsigned int)(esp_timer_get_time()/1000000); // seconds since start
