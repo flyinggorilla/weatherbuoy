@@ -162,7 +162,9 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += mrCellular.msNetworkmode;
         mPostData += "\",\"signalquality\": ";
         mPostData += mrCellular.miSignalQuality;
-        mPostData += "}}";
+        mPostData += "}\",\"display\": ";
+        mPostData += mrConfig.mbN2kDisplay ? "true" : "false";
+        mPostData += "}";
         mbSendDiagnostics = false;
     }
     mPostData += "}";
@@ -265,6 +267,8 @@ bool SendData::PerformHttpPost() {
             if (value.length()) { mrConfig.msTargetUrl = value; updateConfig = true; };
             value = ReadMessageValue("set-apssid:");
             if (value.length()) { mrConfig.msAPSsid = value; updateConfig = true; };
+            value = ReadMessageValue("set-display:");
+            if (value.length()) { mrConfig.mbN2kDisplay = value.equalsIgnoreCase("true"); updateConfig = true; };
 
             mbRestart = false;
             if (command.equals("restart") || command.equals("config") || command.equals("udpate")) {

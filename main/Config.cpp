@@ -10,6 +10,10 @@ const char tag[] ="Config";
 
 // NOTE: Keys are limited to 15 characters
 
+#ifndef CONFIG_WEATHERBUOY_NMEA2000_DISPLAY
+	#define CONFIG_WEATHERBUOY_NMEA2000_DISPLAY false
+#endif
+
 Config::Config() {
 	mbAPMode = true;
 	msAPSsid = CONFIG_WEATHERBUOY_HOSTNAME;
@@ -23,6 +27,7 @@ Config::Config() {
     msCellularPass = CONFIG_WEATHERBUOY_CELLULAR_PASS;
 	msCellularOperator = CONFIG_WEATHERBUOY_CELLULAR_OPERATOR;
 	miCellularNetwork = CONFIG_WEATHERBUOY_CELLULAR_NETWORK;
+	mbN2kDisplay = CONFIG_WEATHERBUOY_NMEA2000_DISPLAY;
 }
 
 Config::~Config() {
@@ -48,6 +53,7 @@ bool Config::Load(){
 	ReadString(h, "CellularOperator", msCellularOperator);
 	ReadInt(h, "CellularNetwork", miCellularNetwork);
 	ReadString(h, "BoardSensorId", msBoardTempSensorId);
+	ReadBool(h, "Display", mbN2kDisplay);
 
 	nvs_close(h);
 	return true;
@@ -90,6 +96,9 @@ bool Config::Save()
 		ret = false;
 	if (!WriteString(h, "BoardSensorId", msBoardTempSensorId))
 		ret = false;
+	if (!WriteBool(h, "Display", mbN2kDisplay))
+		ret = false;
+
 
 	nvs_commit(h);
 	nvs_close(h);

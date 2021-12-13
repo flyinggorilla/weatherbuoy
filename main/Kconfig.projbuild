@@ -54,5 +54,9 @@ menu "Weatherbuoy"
               51 – GSM+LTE Only
               54 – WCDMA+LTE Only
         default 2
-            
+
+    config WEATHERBUOY_NMEA2000_DISPLAY
+        bool "Sends data via NMEA 2000 (CAN Bus) to an external display, such as Garmin GNX130. Useful on boats to get a live Wind data display."
+        default false
+
 endmenu

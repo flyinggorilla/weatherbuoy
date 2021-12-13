@@ -75,6 +75,7 @@ void ReadMaximet::ReadMaximetTask() {
     Data data;
     String column;
     MaximetStates maximetState = SENDINGDATA;
+    int lastUptime = 0;
 
     ESP_LOGI(tag, "ReadMaximet task started and ready to receive data.");
     while (mbRun) {
@@ -197,19 +198,32 @@ void ReadMaximet::ReadMaximetTask() {
                     parsingState = START;
                     data.uptime = esp_timer_get_time()/1000000; // seconds since start (good enough as int can store seconds over 68 years in 31 bits)
                     line[cposDataEnd] = 0;
-                    ESP_LOGI(tag, "Pushing measurement data to queue: '%s', %d seconds since start (%d..%d)", line.c_str(cposDataStart), data.uptime, cposDataStart, cposDataEnd);
-                    if (uxQueueSpacesAvailable(mxDataQueue) == 0) {
-                        // queue is full, so remove an element
-                        ESP_LOGW(tag, "Queue is full, dropping unsent oldest data.");
-                        Data receivedData;
-                        xQueueReceive(mxDataQueue, &receivedData, 0);
+
+                    // Send data to display, if present
+                    if (mpDisplay) {
+                        mpDisplay->Send(data.temp);
+                        ESP_LOGI(tag, "Sent data to display: %.1f", data.temp);
                     }
 
-                    // PUT pData to queue
-                    if (xQueueSend(mxDataQueue, &data, 0) != pdTRUE) {
-                        // data could not put to queue, so make sure to delete the data
-                        ESP_LOGE(tag, "Queue is full. We should never be here.");
-                    } 
+                    // Put data not more frequent than every 30 seconds into queue
+                    if (data.uptime >= (lastUptime + 30)) {
+                        ESP_LOGI(tag, "Pushing measurement data to queue: '%s', %d seconds since start (%d..%d)", line.c_str(cposDataStart), data.uptime, cposDataStart, cposDataEnd);
+                        if (uxQueueSpacesAvailable(mxDataQueue) == 0) {
+                            // queue is full, so remove an element
+                            ESP_LOGW(tag, "Queue is full, dropping unsent oldest data.");
+                            Data receivedData;
+                            xQueueReceive(mxDataQueue, &receivedData, 0);
+                        }
+
+                        // PUT pData to queue
+                        if (xQueueSend(mxDataQueue, &data, 0) != pdTRUE) {
+                            // data could not put to queue, so make sure to delete the data
+                            ESP_LOGE(tag, "Queue is full. We should never be here.");
+                        }
+
+                        lastUptime =  data.uptime;
+                    }
+
                     break;
             }
         }

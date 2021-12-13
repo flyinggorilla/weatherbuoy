@@ -13,25 +13,7 @@
 #include "TemperatureSensors.h"
 #include "nvs_flash.h"
 #include "esp_ota_ops.h"
-
-///////////////////// BEGIN NMEA SPECIFIC  ////////////////////////////////
-
-
-#include "NMEA2000_esp32.h"
-#include "N2kStream_esp32.h"
-#include "N2kMessages.h"
-extern "C" {
-// Application execution delay. Must be implemented by application.
-     void delay(uint32_t ms) {
-        vTaskDelay(ms / portTICK_PERIOD_MS);
-     };
-// Current uptime in milliseconds. Must be implemented by application.
-     uint32_t millis() {
-         return esp_timer_get_time()/1000;
-     };
-}
-
-///////////////////// END NMEA SPECIFIC ////////////////////////////////
+#include "Display.h"
 
 
 
@@ -137,37 +119,12 @@ void Esp32WeatherBuoy::Start() {
     ReadMaximet readMaximet(config);
     readMaximet.Start(CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN, CONFIG_WEATHERBUOY_READMAXIMET_TX_PIN);
 
-    tNMEA2000_esp32 nmea(CONFIG_NMEA_TWAI_TX_PIN, CONFIG_NMEA_TWAI_RX_PIN);
-
-    //const short NMEA_DEVICE_ENVIRONMENTAL = 0;
-    /////////////// HOW TO USE MULTIPLE DEVICES
-    ////////////// https://github.com/ttlappalainen/NMEA2000/blob/master/Examples/MultiDevice/MultiDevice.ino
-    /////////////////////////////////////////////////////////////////////
-    nmea.SetDeviceCount(1); // Enable multi device support for 2 devices
-    nmea.SetProductInformation("00000002", // Manufacturer's Model serial code
-                                 100, // Manufacturer's product code
-                                 "weatherbuoy",  // Manufacturer's Model ID
-                                 "1.1.0.22 (2021-12-08)",  // Manufacturer's Software version code
-                                 "1.1.0.0 (2021-12-08)" // Manufacturer's Model version
-                                 );
-
-
-    nmea.SetDeviceInformation(1, // Unique number. Use e.g. Serial number.
-                                130, // Device function=Atmospheric. See codes on http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
-                                85, // Device class=External Environment. See codes on  http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
-                                2046 // Just choosen free from code list on http://www.nmea.org/Assets/20121020%20nmea%202000%20registration%20list.pdf                               
-                               );
-
-    nmea.SetMode(tNMEA2000::N2km_NodeOnly,23);
-
-    N2kStream_esp32 nmeaLogStream;
-    nmea.SetForwardStream(&nmeaLogStream);
-    //nmea.SetForwardOwnMessages(true);
-    nmea.EnableForward(true);
-    // List here messages your device will transmit.
-    const unsigned long TransmitMessages[]={130306L,0};    // 130306L PGN: Wind 
-    nmea.ExtendTransmitMessages(TransmitMessages);
-    nmea.Open();
+    Display *pDisplay = nullptr;
+    if (config.mbN2kDisplay) {
+        pDisplay = new Display(CONFIG_NMEA_TWAI_TX_PIN, CONFIG_NMEA_TWAI_RX_PIN);
+        pDisplay->Send(0.0);
+        readMaximet.SetDisplay(pDisplay);
+    }
 
 
     OnlineMode onlineMode = MODE_CELLULAR;
@@ -220,20 +177,6 @@ void Esp32WeatherBuoy::Start() {
         unsigned int secondsSinceLastSend;
         unsigned int secondsSinceLastDiagnostics;
 
-        //////////////////////////////////
-        //////// NMEA TEST CODE
-        tN2kMsg n2kMsg;
-        SetN2kWindSpeed(n2kMsg, 1, 65, 66, N2kWind_Apparent);
-        ESP_LOGI(tag, "NMEA sending...");
-        if(nmea.SendMsg(n2kMsg)) {
-            ESP_LOGI(tag, "NMEA SendMsg succeeded");
-        } else {
-            ESP_LOGW(tag, "NMEA SendMsg failed");
-        } 
-
-
-
-        nmea.ParseMessages();
 
         // keep modem sleeping unless time to last send elapsed
         unsigned int uptimeSeconds = (unsigned int)(esp_timer_get_time()/1000000); // seconds since start

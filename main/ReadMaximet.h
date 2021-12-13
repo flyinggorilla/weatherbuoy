@@ -4,6 +4,7 @@
 #include "esp_event.h"
 #include "EspString.h"
 #include "Config.h"
+#include "Display.h"
 
 class Data {
     public:
@@ -90,6 +91,8 @@ public:
 
     unsigned int SolarRadiation() { return muiSolarradiation; };
 
+    void SetDisplay(Display *pDisplay) { mpDisplay = pDisplay; };
+
 
 private:
     //main loop run by the task
@@ -105,6 +108,8 @@ private:
     bool mbRun = true;
 
     unsigned int muiSolarradiation = 999;
+
+    Display *mpDisplay = nullptr;
 };
 
 #endif 

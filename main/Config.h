@@ -39,6 +39,7 @@ public:
 	String msCellularOperator;
 	int miCellularNetwork;
 	String msBoardTempSensorId;
+	bool mbN2kDisplay;
 };
 
 #endif /* MAIN_CONFIG_H_ */
