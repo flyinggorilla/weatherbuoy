@@ -121,9 +121,12 @@ void Esp32WeatherBuoy::Start() {
 
     Display *pDisplay = nullptr;
     if (config.mbN2kDisplay) {
+        ESP_LOGI(tag, "Enabling NMEA2000 Display.");
         pDisplay = new Display(CONFIG_NMEA_TWAI_TX_PIN, CONFIG_NMEA_TWAI_RX_PIN);
         pDisplay->Send(0.0);
         readMaximet.SetDisplay(pDisplay);
+    } else {
+        ESP_LOGI(tag, "NMEA2000 Display is disabled.");
     }
 
 

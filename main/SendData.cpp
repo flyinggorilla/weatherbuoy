@@ -162,7 +162,7 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += mrCellular.msNetworkmode;
         mPostData += "\",\"signalquality\": ";
         mPostData += mrCellular.miSignalQuality;
-        mPostData += "}\",\"display\": ";
+        mPostData += "},\"display\": ";
         mPostData += mrConfig.mbN2kDisplay ? "true" : "false";
         mPostData += "}";
         mbSendDiagnostics = false;

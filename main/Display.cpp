@@ -67,8 +67,8 @@ Display::Display(gpio_num_t canTX, gpio_num_t canRX) : mNmea(canTX, canRX)
     #endif 
     // List here messages your device will transmit.
     //const unsigned long TransmitMessages[]={130306L, 0};    // 130306L PGN: Wind
-    //const unsigned long TransmitMessages[]={1290260L, 0};    // 130306L PGN: Wind
-    //mNmea.ExtendTransmitMessages(TransmitMessages);
+    const unsigned long TransmitMessages[]={129026L, 130306L, 127250L, 128259L, 129029L, 0};    // 130306L PGN: Wind
+    mNmea.ExtendTransmitMessages(TransmitMessages);
     mNmea.Open();
 }
 ///////////////////// END NMEA SPECIFIC ////////////////////////////////
