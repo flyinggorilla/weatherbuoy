@@ -76,9 +76,9 @@ Display::Display(gpio_num_t canTX, gpio_num_t canRX) : mNmea(canTX, canRX)
 void Display::Send(float temp)
 {
 
-    long double tws = KnotsToms(temp); // true wind speed
+    long double tws = KnotsToms(10.0); // true wind speed
     long double twa = DegToRad(0.0); // true wind angle (relative to heading)
-    long double aws = KnotsToms(10.0); // apparent wind speed
+    long double aws = KnotsToms(temp); // apparent wind speed
     long double awa = DegToRad(180.0+44.0); // apparent wind angle
     //////////////////////////////////
     //////// NMEA TEST CODE
@@ -159,7 +159,7 @@ void Display::Send(float temp)
 
      // PGN130306
     // GWS - Ground Wind Speed - requires GPS & COG/SOG data; 
-    SetN2kWindSpeed(n2kMsg1, 1, tws+5, twd+5, N2kWind_True_North); 
+    SetN2kWindSpeed(n2kMsg1, 1, tws, twd, N2kWind_True_North); 
     if (!mNmea.SendMsg(n2kMsg1))
     {
         ESP_LOGW(tag, "NMEA SendMsg failed");
