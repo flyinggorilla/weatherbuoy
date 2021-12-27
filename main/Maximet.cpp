@@ -20,10 +20,11 @@ void fMaximetTask(void *pvParameter)
     vTaskDelete(NULL);
 }
 
-void Maximet::Start(int gpioRX, int gpioTX)
+void Maximet::Start(int gpioRX, int gpioTX, bool alternateUart)
 {
     mgpioRX = gpioRX;
     mgpioTX = gpioTX;
+    muiUartNo = alternateUart ? UART_NUM_2 : UART_NUM_1;
     xTaskCreate(&fMaximetTask, "Maximet", 1024 * 16, this, ESP_TASK_MAIN_PRIO, NULL); // large stack is needed
 }
 
@@ -39,7 +40,7 @@ void Maximet::MaximetTask()
 
     // Cannot use GPIO 12, as it will prevent to boot when pulled high.
     // Change ports from default RX/TX to not conflict with Console
-    mpSerial = new Serial(UART_NUM_1, mgpioRX, mgpioTX, SERIAL_BAUD_RATE, SERIAL_BUFFER_SIZE);
+    mpSerial = new Serial(muiUartNo, mgpioRX, mgpioTX, SERIAL_BAUD_RATE, SERIAL_BUFFER_SIZE);
 
     //ESP_LOGI(tag, "Maximet task started. Waiting 30seconds for attaching to serial interface.");
     //vTaskDelay(30*1000/portTICK_PERIOD_MS);
@@ -139,65 +140,70 @@ void Maximet::MaximetTask()
                     col++;
                     ESP_LOGD(tag, "Column %d: '%s'", col, column.c_str());
 
-                    if ((col == 1) && column.equalsIgnoreCase("gmx200gps"))
+                    if ((col == 1) && column.equals("GMX200GPS"))
                     {
                         model = gmx200gps;
                     }
 
                     if (model == gmx200gps)
                     {
-                        // GMX200GPS,+47.260818:+13.925746:+3.10,,0.0,000.34,000.86,000.42,082,090,094,270,281,188,1023.1,0969.0,039,07.13,+023.2,0065,-01,+01,0000,0000,28
+                        // GMX200GPS,+47.703818:+13.704246:+3.10,3.0,004.00,005.00,006.00,007,008,009,010,011,012,-01,+01,0000,0000,22
+                        // "USERINF,GPSLOCATION,CSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,XTILT,YTILT,STATUS,WINDSTAT,CHECK");
+                        // "-,-,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-");
+
                         switch (col)
                         {
                         case 1:
                             // no need to store with data
                             break;
                         case 2: {
-                                String x;
                                 int latPos = column.indexOf(':', 0);
                                 int lonPos = column.indexOf(':', latPos+1);
                                 data.lat = column.substring(0, latPos).toFloat();
                                 data.lon = column.substring(latPos+1, lonPos).toFloat();
-                                ESP_LOGW(tag, "lat: %0.6f lon: %0.6f ", data.lat, data.lon);
+                                ESP_LOGD(tag, "col: '%s' lat: %0.6f lon: %0.6f ", column.c_str(), data.lat, data.lon);
                             }
                             break;
                         case 3:
                             data.cspeed = column.toFloat();
                             break;
                         case 4:
-                            data.gspeed = column.toFloat();
+                            data.speed = column.toFloat();
                             break;
                         case 5:
-                            data.avgspeed = column.toFloat();
+                            data.gspeed = column.toFloat();
                             break;
                         case 6:
-                            data.dir = column.toInt();
+                            data.avgspeed = column.toFloat();
                             break;
                         case 7:
-                            data.gdir = column.toInt();
+                            data.dir = column.toInt();
                             break;
                         case 8:
-                            data.avgdir = column.toInt();
+                            data.gdir = column.toInt();
                             break;
                         case 9:
-                            data.cdir = column.toInt();
+                            data.avgdir = column.toInt();
                             break;
                         case 10:
-                            data.avgcdir = column.toInt();
+                            data.cdir = column.toInt();
                             break;
                         case 11:
-                            data.compassh = column.toInt();
+                            data.avgcdir = column.toInt();
                             break;
                         case 12:
-                            data.xtilt = column.toFloat();
+                            data.compassh = column.toInt();
                             break;
                         case 13:
-                            data.ytilt = column.toFloat();
+                            data.xtilt = column.toFloat();
                             break;
                         case 14:
-                            column.toCharArray(data.status, data.statuslen);
+                            data.ytilt = column.toFloat();
                             break;
                         case 15:
+                            column.toCharArray(data.status, data.statuslen);
+                            break;
+                        case 16:
                             column.toCharArray(data.windstat, data.statuslen);
                             break;
                         }
@@ -408,17 +414,10 @@ unsigned char CalculateChecksum(String &msg)
 
 void Maximet::SimulatorDataPoint(float temperature, double longitude, double latitude)
 {
-    String gpsdata;
-    if (latitude > 0)
-    {
-        gpsdata.printf("%+02.6f:%+02.6f:+3.10", latitude, longitude);
-    }
-
     String data;
-
     if (mMaximetModel == gmx200gps)
     {
-        data.printf("GMX200GPS,%s,0.0,000.34,000.86,000.42,082,090,094,270,281,188,1023.1,0969.0,039,07.13,%+06.1f,0065,-01,+01,0000,0000,", gpsdata.c_str(), temperature);
+        data.printf("GMX200GPS,%+02.6f:%+02.6f:+2.00,%0.1f,004.00,005.00,006.00,007,008,009,010,011,012,-01,+01,0000,0000,", latitude, longitude, temperature);
     }
     else
     {

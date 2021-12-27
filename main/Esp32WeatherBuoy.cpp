@@ -6,7 +6,6 @@
 #include "Config.h"
 #include "SendData.h"
 #include "Maximet.h"
-#include "SimulateMaximet.h"
 #include "Watchdog.h"
 #include "Wifi.h"
 #include "Cellular.h"
@@ -102,6 +101,23 @@ void Esp32WeatherBuoy::Start()
         ESP_LOGE(tag, "Error, could not load configuration.");
     }
 
+    switch (config.miMode)
+    {
+    case WEATHERBUOY_MODE_NMEA2000_DISPLAY:
+        ESP_LOGI(tag, "Operating mode: Racing Committee Boat with Garmin GNX130 NMEA200 Display");
+        break;
+    case WEATHERBUOY_MODE_MAXIMET_GMX200GPS:
+        ESP_LOGI(tag, "Operating mode: Gill Maximet Wind Sensor GMX200GPS Simulator");
+        break;
+    case WEATHERBUOY_MODE_MAXIMET_GMX501:
+        ESP_LOGI(tag, "Operating mode: Gill Maximet Wind Sensor GMX501 Simulator");
+        break;
+    default:
+        ESP_LOGI(tag, "Operating mode: Buoy");
+        break;
+    }
+
+
     int watchdogSeconds = CONFIG_WATCHDOG_SECONDS;
     Watchdog watchdog(watchdogSeconds);
     ESP_LOGI(tag, "Watchdog started and adjusted to %d seconds.", watchdogSeconds);
@@ -160,6 +176,7 @@ void Esp32WeatherBuoy::Start()
 
     Maximet maximet(dataQueue);
     maximet.Start(maximetRxPin, maximetTxPin);
+    //maximet.Start(maximetRxPin, maximetTxPin, mOnlineMode == MODE_CELLULAR);
 
     SendData sendData(config, dataQueue, cellular, watchdog);
 
@@ -328,19 +345,34 @@ void Esp32WeatherBuoy::RunSimulator(TemperatureSensors &tempSensors, DataQueue &
     unsigned int httpPostDataIntervalSeconds = 30;
     unsigned int lastSendTimestamp = 0;
 
-    double latitude = 47.946818;
-    double longitude = 13.582746;
+    double latitude = 0;
+    double longitude = 0;
+
+    const double minLatitude = 47.81358410627437;
+    const double maxLatitude = 47.95123189196899;
+    const double minLongitude = 13.50722014276939;
+    const double maxLongitude = 13.5951846390785;
+
     while (true)
     {
         tempSensors.Read(); // note, this causes approx 700ms delay
         vTaskDelay((maximetDataIntervalSeconds * 1000 - 700) / portTICK_PERIOD_MS);
         //ESP_LOGI(tag, "Sending temperature %.2f", tempSensors.GetBoardTemp());
-        longitude += 0.0005;
+        if (latitude < minLatitude && latitude > maxLatitude) {
+            latitude = maxLatitude;
+        }
+        if (longitude < minLongitude && longitude > maxLongitude) {
+            longitude = minLongitude;
+        }
+
+        longitude += 0.005;
         latitude -= 0.001;
         unsigned int voltage = max471Meter.Voltage();
         unsigned int current = max471Meter.Current();
         float boardtemp = tempSensors.GetBoardTemp();
         float watertemp = tempSensors.GetWaterTemp();
+
+
         maximet.SimulatorDataPoint(tempSensors.GetBoardTemp(), longitude, latitude);
 
         unsigned int uptimeSeconds = (unsigned int)(esp_timer_get_time() / 1000000); // seconds since start

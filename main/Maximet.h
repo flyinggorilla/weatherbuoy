@@ -18,7 +18,7 @@ public:
 	virtual ~Maximet();
 
     // start the task
-    void Start(int gpioRX, int gpioTX);
+    void Start(int gpioRX, int gpioTX, bool alternateUart = false);
 
     // stop the task (e.g. before OTA update)
     void Stop() { mbRun = false; }; 
@@ -44,6 +44,7 @@ private:
     Serial *mpSerial;
     int mgpioRX;
     int mgpioTX;
+    unsigned int muiUartNo;
 
     DataQueue &mrDataQueue;
     
