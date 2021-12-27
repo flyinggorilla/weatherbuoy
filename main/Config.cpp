@@ -8,11 +8,21 @@ const char tag[] ="Config";
 
 #define NVS_NAME "Config"
 
-// NOTE: Keys are limited to 15 characters
-
-#ifndef CONFIG_WEATHERBUOY_NMEA2000_DISPLAY
-	#define CONFIG_WEATHERBUOY_NMEA2000_DISPLAY false
+#ifdef CONFIG_WEATHERBUOY_MODE_BUOY
+	#define CONFIG_WEATHERBUOY_MODE WEATHERBUOY_MODE_DEFAULT
 #endif
+#ifdef CONFIG_WEATHERBUOY_MODE_NMEA2000_DISPLAY
+	#define CONFIG_WEATHERBUOY_MODE WEATHERBUOY_MODE_NMEA2000_DISPLAY
+#endif
+#ifdef CONFIG_WEATHERBUOY_MODE_MAXIMET_GMX501
+	#define CONFIG_WEATHERBUOY_MODE WEATHERBUOY_MODE_MAXIMET_GMX501
+#endif
+#ifdef CONFIG_WEATHERBUOY_MODE_MAXIMET_GMX200GPS
+	#define CONFIG_WEATHERBUOY_MODE WEATHERBUOY_MODE_MAXIMET_GMX200GPS
+#endif
+
+
+// NOTE: Keys are limited to 15 characters
 
 Config::Config() {
 	mbAPMode = true;
@@ -27,7 +37,7 @@ Config::Config() {
     msCellularPass = CONFIG_WEATHERBUOY_CELLULAR_PASS;
 	msCellularOperator = CONFIG_WEATHERBUOY_CELLULAR_OPERATOR;
 	miCellularNetwork = CONFIG_WEATHERBUOY_CELLULAR_NETWORK;
-	mbN2kDisplay = CONFIG_WEATHERBUOY_NMEA2000_DISPLAY;
+	miMode = CONFIG_WEATHERBUOY_MODE;
 }
 
 Config::~Config() {
@@ -40,6 +50,7 @@ bool Config::Load(){
 		return false;
 	if (nvs_open(NVS_NAME, NVS_READONLY, &h) != ESP_OK)
 		return false;
+	ReadInt(h, "Mode", miMode);
 	ReadBool(h, "APMode", mbAPMode);
 	ReadString(h, "APSsid", msAPSsid);
 	ReadString(h, "APPass", msAPPass);
@@ -53,7 +64,6 @@ bool Config::Load(){
 	ReadString(h, "CellularOperator", msCellularOperator);
 	ReadInt(h, "CellularNetwork", miCellularNetwork);
 	ReadString(h, "BoardSensorId", msBoardTempSensorId);
-	ReadBool(h, "Display", mbN2kDisplay);
 
 	nvs_close(h);
 	return true;
@@ -72,6 +82,8 @@ bool Config::Save()
 		return false;
 	//nvs_erase_all(h); //otherwise I need double the space
 
+	if (!WriteInt(h, "Mode", miMode))
+		ret = false;
 	if (!WriteBool(h, "APMode", mbAPMode))
 		ret = false;
 	if (!WriteString(h, "APSsid", msAPSsid))
@@ -95,8 +107,6 @@ bool Config::Save()
 	if (!WriteString(h, "CellularOperator", msCellularOperator))
 		ret = false;
 	if (!WriteString(h, "BoardSensorId", msBoardTempSensorId))
-		ret = false;
-	if (!WriteBool(h, "Display", mbN2kDisplay))
 		ret = false;
 
 

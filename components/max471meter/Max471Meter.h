@@ -38,8 +38,8 @@ class Max471Meter {
         Max471Meter(int gpioPinVoltage, int gpioPinCurrent);
         virtual ~Max471Meter();
 
-        unsigned int Voltage();
-        unsigned int Current();
+        unsigned int Voltage(); // [mV]
+        unsigned int Current(); // [mA]
         unsigned int CurrentMin() { return muiCurrentMin; };
         unsigned int CurrentMax() { return muiCurrentMax; };
 

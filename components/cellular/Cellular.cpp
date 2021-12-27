@@ -88,7 +88,9 @@ bool Cellular::InitModem() {
     muiBufferLen = 0;
     mpBuffer = (uint8_t *) malloc(muiBufferSize+16);
 
-    PowerOn();
+    if (!PowerOn())
+        return false;
+
     InitNetwork();
     return true;
 }

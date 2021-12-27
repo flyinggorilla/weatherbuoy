@@ -18,6 +18,8 @@ public:
     //bool ReadLine();
     //String& data() { return mData; }; 
 
+    bool Write(String& buffer);
+
 private:
     bool ReadIntoBuffer();
     unsigned char *mpBuffer;

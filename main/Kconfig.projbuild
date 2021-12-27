@@ -1,5 +1,22 @@
 menu "Weatherbuoy"
 
+    choice WEATHERBUOY_MODE
+        prompt "Operation Mode"
+        default WEATHERBUOY_MODE_BUOY
+        help
+            The default mode is to operate weatherbuoy electronics as BUOY. 
+            However, the same electronics can be used on a moving boat, e.g. regatta start boat with a Garmin GNX130 display.
+            Additional modes allow to reuse same electronics to simulate maximet wind sensors for testing purposes.
+        config WEATHERBUOY_MODE_BUOY
+            bool "Operate as an autonomous solar powered anchored weatherbuoy on the water."
+        config WEATHERBUOY_MODE_NMEA2000_DISPLAY
+            bool "Operate as an regatta racing committee anemometer on a startboat with NMEA2000 compatible display like Garmin GNX130."
+        config WEATHERBUOY_MODE_MAXIMET_GMX501
+            bool "Simulate Gill Maximet weather station GMX501, without GPS"
+        config WEATHERBUOY_MODE_MAXIMET_GMX200GPS
+            bool "Simulate Gill Maximet weather station GMX200, with GPS option"
+    endchoice
+
     config WEATHERBUOY_WIFI_STA_SSID
         string "Default WiFi Station SSID"
 
@@ -55,8 +72,5 @@ menu "Weatherbuoy"
               54 – WCDMA+LTE Only
         default 2
 
-    config WEATHERBUOY_NMEA2000_DISPLAY
-        bool "Sends data via NMEA 2000 (CAN Bus) to an external display, such as Garmin GNX130. Useful on boats to get a live Wind data display."
-        default false
 
 endmenu

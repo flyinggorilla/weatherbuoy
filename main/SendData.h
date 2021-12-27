@@ -7,18 +7,18 @@
 #include "Config.h"
 #include "Cellular.h"
 #include "Watchdog.h"
-#include "ReadMaximet.h"
+#include "DataQueue.h"
 
 class SendData {
 public:
-	SendData(Config &config, ReadMaximet &readMaximet, Cellular &cellular, Watchdog &watchdog);
+	SendData(Config &config, DataQueue &dataQueue, Cellular &cellular, Watchdog &watchdog);
 	virtual ~SendData();
     bool PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics);
     bool PerformHttpPost();
     bool isRestart() { return mbRestart; };
 private:
     Config &mrConfig;
-    ReadMaximet &mrReadMaximet;
+    DataQueue &mrDataQueue;
     Cellular &mrCellular;
     Watchdog &mrWatchdog;
 

@@ -1,10 +1,8 @@
-#ifndef MAIN_READMAXIMET_H_
-#define MAIN_READMAXIMET_H_
+#ifndef MAIN_DATAQUEUE_H_
+#define MAIN_DATAQUEUE_H_
 
 #include "esp_event.h"
 #include "EspString.h"
-#include "Config.h"
-#include "Display.h"
 
 class Data {
     public:
@@ -35,6 +33,9 @@ class Data {
             ytilt = 0;
             status[0] = 0;
             windstat[0] = 0; 
+            lat = 0;
+            lon = 0;
+            cspeed = 0;
         }
 
         int uptime;
@@ -42,6 +43,7 @@ class Data {
         float speed; 
         float gspeed; 
         float avgspeed; 
+        float cspeed; // only avail if GPS
 
         int dir;
         int gdir; 
@@ -63,21 +65,18 @@ class Data {
         float xtilt;
         float ytilt;
 
+        double lat; // only avail if GPS
+        double lon; // only avail if GPS
+
         static const int statuslen = 5;
         char status[statuslen];
         char windstat[statuslen]; 
 };
 
-class ReadMaximet {
+class DataQueue {
 public:
-	ReadMaximet(Config &config);
-	virtual ~ReadMaximet();
-
-    // start the task
-    void Start(int gpioRX, int gpioTX);
-
-    // stop the task (e.g. before OTA update)
-    void Stop() { mbRun = false; }; 
+	DataQueue();
+	virtual ~DataQueue();
 
     // read data from queue; 
     // returns false if no data available
@@ -89,27 +88,17 @@ public:
     // return the number of messages in the queue
     int GetQueueLength();
 
-    unsigned int SolarRadiation() { return muiSolarradiation; };
-
-    void SetDisplay(Display *pDisplay) { mpDisplay = pDisplay; };
-
+    // returns true when the queue is full
+    bool IsFull();
+    
+    // adds a data element to the queue
+    bool PutData(Data &data);
 
 private:
-    //main loop run by the task
-    void ReadMaximetTask();
-    friend void fReadMaximetTask(void *pvParameter);
-
-    Config &mrConfig;
-    //SendData &mrSendData;
-    int mgpioRX;
-    int mgpioTX;
-    
+   
     QueueHandle_t mxDataQueue;
-    bool mbRun = true;
+    //bool mbRun = true;
 
-    unsigned int muiSolarradiation = 999;
-
-    Display *mpDisplay = nullptr;
 };
 
 #endif 

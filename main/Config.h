@@ -4,6 +4,11 @@
 #include <nvs.h>
 #include "EspString.h"
 
+#define WEATHERBUOY_MODE_DEFAULT 0
+#define WEATHERBUOY_MODE_NMEA2000_DISPLAY 1
+#define WEATHERBUOY_MODE_MAXIMET_GMX501 100
+#define WEATHERBUOY_MODE_MAXIMET_GMX200GPS 101
+
 class Config {
 public:
 	Config();
@@ -26,6 +31,7 @@ private:
 
 
 public:
+	int miMode;
 	bool mbAPMode;
 	String msAPSsid;
 	String msAPPass;
@@ -39,7 +45,6 @@ public:
 	String msCellularOperator;
 	int miCellularNetwork;
 	String msBoardTempSensorId;
-	bool mbN2kDisplay;
 };
 
 #endif /* MAIN_CONFIG_H_ */

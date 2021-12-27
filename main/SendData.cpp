@@ -10,7 +10,7 @@
 #include "esp_ota_ops.h"
 #include "esp_https_ota.h"
 #include "esputil.h"
-#include "ReadMaximet.h"
+#include "Maximet.h"
 
 static const char tag[] = "SendData";
 static const int SENDDATA_QUEUE_SIZE = (3); 
@@ -60,7 +60,7 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
     Data maximetData;
     mPostData = "{\"maximet\":[";
     bool bComma = false;
-    while (mrReadMaximet.GetData(maximetData)) {
+    while (mrDataQueue.GetData(maximetData)) {
         // SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,STATUS,WINDSTAT,CHECK
         mPostData += bComma ? ",{" : "{";
         mPostData += "\"uptime\":";
@@ -103,7 +103,16 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += maximetData.status;
         mPostData += "\",\"windstat\":\"";
         mPostData += maximetData.windstat;
-        mPostData += "\"}";
+        mPostData += "\"";
+        if (maximetData.lon) { // check if GPS data is available
+            mPostData += ",\"lon\":";
+            mPostData += maximetData.lon;
+            mPostData += ",\"lat\":";
+            mPostData += maximetData.lat;
+            mPostData += ",\"cspeed\":";
+            mPostData += maximetData.cspeed;
+        }
+        mPostData += "}";
         bComma = true;
     }
     mPostData += "]";
@@ -143,7 +152,7 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += "\",\"appass\": \"";
         mPostData += mrConfig.msAPPass.length() ? "*****" : "";
         mPostData += "\",\"stassid\": \"";
-        mPostData += mrConfig.msAPSsid;
+        mPostData += mrConfig.msSTASsid;
         mPostData += "\",\"stapass\": \"";
         mPostData += mrConfig.msSTAPass.length() ? "*****" : "";
         mPostData += "\",\"cellular\": {\"datasent\":";
@@ -162,8 +171,21 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += mrCellular.msNetworkmode;
         mPostData += "\",\"signalquality\": ";
         mPostData += mrCellular.miSignalQuality;
-        mPostData += "},\"display\": ";
-        mPostData += mrConfig.mbN2kDisplay ? "true" : "false";
+        mPostData += "},\"mode\": ";
+        switch (mrConfig.miMode) {
+            case WEATHERBUOY_MODE_NMEA2000_DISPLAY:
+                mPostData += "\"display\"";
+                break;
+            case WEATHERBUOY_MODE_MAXIMET_GMX501:
+                mPostData += "\"gmx501\"";
+                break;
+            case WEATHERBUOY_MODE_MAXIMET_GMX200GPS:
+                mPostData += "\"gmx200gps\"";
+                break;
+            default:
+                mPostData += "\"default\"";
+                break;
+        }
         mPostData += "}";
         mbSendDiagnostics = false;
     }
@@ -267,9 +289,22 @@ bool SendData::PerformHttpPost() {
             if (value.length()) { mrConfig.msTargetUrl = value; updateConfig = true; };
             value = ReadMessageValue("set-apssid:");
             if (value.length()) { mrConfig.msAPSsid = value; updateConfig = true; };
-            value = ReadMessageValue("set-display:");
-            if (value.length()) { mrConfig.mbN2kDisplay = value.equalsIgnoreCase("true"); updateConfig = true; };
-
+            value = ReadMessageValue("set-mode:");
+            if (value.length()) { 
+                if (value.equalsIgnoreCase("default")) {
+                    mrConfig.miMode = WEATHERBUOY_MODE_DEFAULT; 
+                    updateConfig = true; 
+                } else if (value.equalsIgnoreCase("display")) {
+                    mrConfig.miMode = WEATHERBUOY_MODE_NMEA2000_DISPLAY; 
+                    updateConfig = true; 
+                } else if (value.equalsIgnoreCase("gmx501")) {
+                    mrConfig.miMode = WEATHERBUOY_MODE_MAXIMET_GMX501; 
+                    updateConfig = true; 
+                } else if (value.equalsIgnoreCase("gmx200gps")) {
+                    mrConfig.miMode = WEATHERBUOY_MODE_MAXIMET_GMX200GPS; 
+                    updateConfig = true; 
+                } 
+            }
             mbRestart = false;
             if (command.equals("restart") || command.equals("config") || command.equals("udpate")) {
                 if (updateConfig) {
@@ -287,7 +322,8 @@ bool SendData::PerformHttpPost() {
                 Cleanup();
                 memset(&mEspHttpClientConfig, 0, sizeof(esp_http_client_config_t));
 
-                mrReadMaximet.Stop();
+                //*** TODO ##################################### NEEDED ?????***************************************************
+                //mrMaximet.Stop();
 
                 const String &pem = ReadMessagePemValue("set-cert-pem:");
                 mEspHttpClientConfig.method = HTTP_METHOD_GET; 
@@ -332,7 +368,7 @@ bool SendData::PerformHttpPost() {
     return true;
 }
 
-SendData::SendData(Config &config, ReadMaximet &readMaximet, Cellular &cellular, Watchdog &watchdog) : mrConfig(config), mrReadMaximet(readMaximet), mrCellular(cellular), mrWatchdog(watchdog) {
+SendData::SendData(Config &config, DataQueue &dataQueue, Cellular &cellular, Watchdog &watchdog) : mrConfig(config), mrDataQueue(dataQueue), mrCellular(cellular), mrWatchdog(watchdog) {
     mhEspHttpClient = nullptr; 
 
 }
