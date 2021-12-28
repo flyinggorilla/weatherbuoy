@@ -185,10 +185,6 @@ void Esp32WeatherBuoy::Start()
     case WEATHERBUOY_MODE_NMEA2000_DISPLAY:
     {
         ESP_LOGI(tag, "Racing Committee Boat with Garmin GNX130 NMEA200 Display");
-        Display *pDisplay = nullptr;
-        pDisplay = new Display(CONFIG_NMEA_TWAI_TX_PIN, CONFIG_NMEA_TWAI_RX_PIN);
-        pDisplay->Send(0.0);
-        maximet.SetDisplay(pDisplay);
         RunDisplay(tempSensors, dataQueue, max471Meter, sendData);
         break;
     }
@@ -410,9 +406,12 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
 
     int logInfoSeconds = 0;
 
+
+    Display display(CONFIG_NMEA_TWAI_TX_PIN, CONFIG_NMEA_TWAI_RX_PIN, dataQueue);
+    display.Start();
+
     while (true)
     {
-        tempSensors.Read(); // note, this causes approx 700ms delay
         vTaskDelay(1 * 1000 / portTICK_PERIOD_MS);
         bool isMaximetData = dataQueue.WaitForData(60);
         unsigned int secondsSinceLastSend;
@@ -452,6 +451,7 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
             continue;
         }
 
+        tempSensors.Read(); // note, this causes approx 700ms delay
         unsigned int voltage = max471Meter.Voltage();
         unsigned int current = max471Meter.Current();
         float boardtemp = tempSensors.GetBoardTemp();
@@ -459,7 +459,7 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
 
         if (mOnlineMode == MODE_CELLULAR)
         {
-            ESP_LOGI(tag, "switching to full power mode next...");
+            /*ESP_LOGI(tag, "switching to full power mode next...");
             if (!cellular.SwitchToFullPowerMode())
             {
                 ESP_LOGW(tag, "Retrying switching to full power mode ...");
@@ -467,7 +467,7 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
                 {
                     ESP_LOGE(tag, "Switching to full power mode failed");
                 }
-            }
+            }*/
 
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             ESP_LOGI(tag, "switching to PPP mode next...");
@@ -502,11 +502,12 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
             }
         }
 
+        /*
         if (mOnlineMode == MODE_CELLULAR)
         {
             ESP_LOGI(tag, "switching to low power mode...");
             cellular.SwitchToLowPowerMode();
-        }
+        } */
 
         secondsToSleep = CONFIG_SENDDATA_INTERVAL_DAYTIME;
     }

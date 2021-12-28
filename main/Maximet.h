@@ -3,7 +3,6 @@
 
 #include "esp_event.h"
 #include "EspString.h"
-#include "Display.h"
 #include "DataQueue.h"
 #include "Serial.h"
 
@@ -28,8 +27,6 @@ public:
 
     unsigned int SolarRadiation() { return muiSolarradiation; };
 
-    void SetDisplay(Display *pDisplay) { mpDisplay = pDisplay; };
-
     void SimulatorDataPoint(float temperature, double longitude, double latitude);
 
 private:
@@ -51,8 +48,6 @@ private:
     bool mbRun = true;
 
     unsigned int muiSolarradiation = 999;
-
-    Display *mpDisplay = nullptr;
 };
 
 #endif 

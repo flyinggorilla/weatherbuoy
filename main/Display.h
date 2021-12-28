@@ -6,6 +6,7 @@
 #include "NMEA2000_esp32.h"
 #include "N2kStream_esp32.h"
 #include "MovingAverage.h"
+#include "DataQueue.h"
 
 
 // Weatherbuoy electronics can be used on a boat too, for instance for a Sail Race Committee boat.
@@ -14,16 +15,21 @@
 
 class Display {
     public:
+        Display(gpio_num_t canTX, gpio_num_t canRX, DataQueue &dataQueue);
 
-        Display(gpio_num_t canTX, gpio_num_t canRX);
-
-        void Send(float temp);
-    
+        // starts the thread to refresh display data in 1s interval. 
+        void Start();
+   
     private:
+        void Write();
+        DataQueue &mrDataQueue;
         tNMEA2000_esp32 mNmea;
         N2kStream_esp32 mNmeaLogStream;
         MovingAverage<300> mMovingWindspeedAvg; // 5 minutes if 1sec samples
         MovingAverage<300> mMovingWindangleAvg; // 5 minutes if 1sec samples
+        
+        void DisplayTask();
+        friend void fDisplayTask(void *pvParameter);
 
 };
 

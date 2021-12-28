@@ -329,12 +329,7 @@ void Maximet::MaximetTask()
                 data.uptime = esp_timer_get_time() / 1000000; // seconds since start (good enough as int can store seconds over 68 years in 31 bits)
                 line[cposDataEnd] = 0;
 
-                // Send data to display, if present
-                if (mpDisplay)
-                {
-                    mpDisplay->Send(data.temp);
-                    ESP_LOGI(tag, "Sent data to display: %.1f", data.temp);
-                }
+                mrDataQueue.PutLatestData(data);
 
                 // Put data not more frequent than every 30 seconds into queue
                 if (data.uptime >= (lastUptime + 30))
@@ -421,7 +416,7 @@ void Maximet::SimulatorDataPoint(float temperature, double longitude, double lat
     }
     else
     {
-        data.printf("000.34,000.86,000.42,082,090,094,270,281,188,1023.1,0969.0,039,07.13,%+06.1f,0065,-01,+01,0000,0000,", temperature);
+        data.printf("000.34,000.86,000.42,082,090,094,270,281,188,1023.1,0969.0,039,07.13,%+0.1f,0065,-01,+01,0000,0000,", temperature);
     }
 
     String line;

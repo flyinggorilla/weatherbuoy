@@ -82,6 +82,10 @@ public:
     // returns false if no data available
     bool GetData(Data &data);
 
+    // read data from latest data queue ; 
+    // returns false if no data available
+    bool GetLatestData(Data &data, unsigned int timeoutSeconds);
+
     // peeks into queue, but doesnt return pointer to not accidentally delete data
     bool WaitForData(unsigned int timeoutSeconds);
 
@@ -94,9 +98,15 @@ public:
     // adds a data element to the queue
     bool PutData(Data &data);
 
+    // adds data to a 1-sized queue, contains always the latest data
+    bool PutLatestData(Data &data);
+
+
 private:
    
     QueueHandle_t mxDataQueue;
+    QueueHandle_t mxDataLatest;
+
     //bool mbRun = true;
 
 };
