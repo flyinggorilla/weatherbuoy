@@ -106,9 +106,9 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += "\"";
         if (maximetData.lon) { // check if GPS data is available
             mPostData += ",\"lon\":";
-            mPostData += maximetData.lon;
+            mPostData += String(maximetData.lon, 6);
             mPostData += ",\"lat\":";
-            mPostData += maximetData.lat;
+            mPostData += String(maximetData.lat, 6);
             mPostData += ",\"cspeed\":";
             mPostData += maximetData.cspeed;
         }

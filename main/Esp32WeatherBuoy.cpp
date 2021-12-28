@@ -348,25 +348,38 @@ void Esp32WeatherBuoy::RunSimulator(TemperatureSensors &tempSensors, DataQueue &
     double latitude = 0;
     double longitude = 0;
 
+    // 0.000001° ~= 11cm distance. --> 5 to 6 digits after comma is required
+    // 0.00001° ~= 1.1m
+    // 0.0001° ~= 11m
+    // 0.001° ~= 110m
+    // 0.01° ~= 1.1km
+    // 0.1° ~= 11km
+
+    //const double minLatitude = 47.81358410627437;
+    //const double maxLatitude = 47.95123189196899;
+    //const double minLongitude = 13.50722014276939;
+    //const double maxLongitude = 13.5951846390785;
     const double minLatitude = 47.81358410627437;
-    const double maxLatitude = 47.95123189196899;
-    const double minLongitude = 13.50722014276939;
-    const double maxLongitude = 13.5951846390785;
+    const double maxLatitude = 47.92123189196899;
+    const double minLongitude = 13.54722014276939;
+    const double maxLongitude = 13.5551846390785;
 
     while (true)
     {
         tempSensors.Read(); // note, this causes approx 700ms delay
         vTaskDelay((maximetDataIntervalSeconds * 1000 - 700) / portTICK_PERIOD_MS);
         //ESP_LOGI(tag, "Sending temperature %.2f", tempSensors.GetBoardTemp());
-        if (latitude < minLatitude && latitude > maxLatitude) {
+        if (latitude < minLatitude || latitude > maxLatitude) {
             latitude = maxLatitude;
         }
-        if (longitude < minLongitude && longitude > maxLongitude) {
+        if (longitude < minLongitude || longitude > maxLongitude) {
             longitude = minLongitude;
         }
 
-        longitude += 0.005;
-        latitude -= 0.001;
+        longitude += 0.000011; // move east
+        latitude -= 0.000101; // move south (towards equator)
+        //longitude = 0.123456;
+        //latitude = 7.654321;
         unsigned int voltage = max471Meter.Voltage();
         unsigned int current = max471Meter.Current();
         float boardtemp = tempSensors.GetBoardTemp();
@@ -386,6 +399,117 @@ void Esp32WeatherBuoy::RunSimulator(TemperatureSensors &tempSensors, DataQueue &
 }
 
 void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData){
+    ESP_LOGI(tag, "Starting: Startboat NMEA 2000 Display main task.");
+
+    bool bDiagnostics;
+    bool bDiagnosticsAtStartup = true;
+    unsigned int lastSendTimestamp = 0;
+    unsigned int lastDiagnosticsTimestamp = 0;
+
+    int secondsToSleep = 0;
+
+    int logInfoSeconds = 0;
+
+    while (true)
+    {
+        tempSensors.Read(); // note, this causes approx 700ms delay
+        vTaskDelay(1 * 1000 / portTICK_PERIOD_MS);
+        bool isMaximetData = dataQueue.WaitForData(60);
+        unsigned int secondsSinceLastSend;
+        unsigned int secondsSinceLastDiagnostics;
+
+        // keep modem sleeping unless time to last send elapsed
+        unsigned int uptimeSeconds = (unsigned int)(esp_timer_get_time() / 1000000); // seconds since start
+        secondsSinceLastSend = uptimeSeconds - lastSendTimestamp;
+        if (secondsToSleep > secondsSinceLastSend)
+        {
+            if (logInfoSeconds == 0)
+            {
+                ESP_LOGI(tag, "Power management sleep: %d, Measurements in queue: %d", secondsToSleep - secondsSinceLastSend, dataQueue.GetQueueLength());
+                logInfoSeconds = 60;
+            }
+            logInfoSeconds--;
+            continue;
+        }
+        lastSendTimestamp = uptimeSeconds;
+
+        // when sending, add diagnostics information after 300 seconds
+        secondsSinceLastDiagnostics = uptimeSeconds - lastDiagnosticsTimestamp;
+        if (secondsSinceLastDiagnostics > CONFIG_SENDDATA_INTERVAL_DIAGNOSTICS || bDiagnosticsAtStartup)
+        {
+            bDiagnostics = true;
+            bDiagnosticsAtStartup = false;
+            lastDiagnosticsTimestamp = uptimeSeconds;
+        }
+        else
+        {
+            bDiagnostics = false;
+        }
+
+        // check if maximeta or info data should be sent at all
+        if (!isMaximetData && !bDiagnostics)
+        {
+            continue;
+        }
+
+        unsigned int voltage = max471Meter.Voltage();
+        unsigned int current = max471Meter.Current();
+        float boardtemp = tempSensors.GetBoardTemp();
+        float watertemp = tempSensors.GetWaterTemp();
+
+        if (mOnlineMode == MODE_CELLULAR)
+        {
+            ESP_LOGI(tag, "switching to full power mode next...");
+            if (!cellular.SwitchToFullPowerMode())
+            {
+                ESP_LOGW(tag, "Retrying switching to full power mode ...");
+                if (!cellular.SwitchToFullPowerMode())
+                {
+                    ESP_LOGE(tag, "Switching to full power mode failed");
+                }
+            }
+
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
+            ESP_LOGI(tag, "switching to PPP mode next...");
+            if (!cellular.SwitchToPppMode())
+            {
+                ESP_LOGW(tag, "Retrying switching to PPP mode next...");
+                if (!cellular.SwitchToPppMode())
+                {
+                    ESP_LOGE(tag, "Failed to switch to PPP mode.");
+                }
+            };
+        }
+
+        // read maximet data queue and create a HTTP POST message
+        sendData.PrepareHttpPost(voltage, current, boardtemp, watertemp, bDiagnostics);
+
+        // try sending, max 3 times
+        if (mOnlineMode != MODE_OFFLINE)
+        {
+            int tries = 3;
+            while (tries--)
+            {
+                if (sendData.PerformHttpPost())
+                {
+                    break;
+                }
+                if (tries)
+                {
+                    ESP_LOGW(tag, "Retrying HTTP Post...");
+                    vTaskDelay(1000 / portTICK_PERIOD_MS); // wait one second
+                }
+            }
+        }
+
+        if (mOnlineMode == MODE_CELLULAR)
+        {
+            ESP_LOGI(tag, "switching to low power mode...");
+            cellular.SwitchToLowPowerMode();
+        }
+
+        secondsToSleep = CONFIG_SENDDATA_INTERVAL_DAYTIME;
+    }
 
 };
 

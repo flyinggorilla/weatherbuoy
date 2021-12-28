@@ -45,7 +45,7 @@ bool DataQueue::IsFull()
 
 bool DataQueue::PutData(Data &data)
 {
-    return (xQueueSend(mxDataQueue, &data, 0) != pdTRUE);
+    return (xQueueSend(mxDataQueue, &data, 0) == pdTRUE);
 }
 
 DataQueue::DataQueue()
