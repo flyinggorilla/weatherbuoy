@@ -84,9 +84,15 @@ void Display::DisplayTask()
     while (true)
     {
         Data data;
+        //double windspeed5minAvg = 0.0;
+        //double winddirection5minAvg = 0.0;
+
         if (mrDataQueue.GetLatestData(data, 90)) {
             // successful data retreiveal
             ESP_LOGI(tag, "data: %0.1f", data.cspeed);
+
+            //windspeed5minAvg = mWindspeed5minAvg(data.cspeed*1000)/1000.0;
+            //winddirection5minAvg = mWinddirection5minAvg(data.cdir*1000)/1000.0;
         } else {
             //data.init();
         }
@@ -94,7 +100,7 @@ void Display::DisplayTask()
         long double tws = KnotsToms(10.0);        // true wind speed
         long double twa = DegToRad(0.0);          // true wind angle (relative to heading)
         long double aws = KnotsToms(data.cspeed);      // apparent wind speed
-        long double awa = DegToRad(180.0 + 44.0); // apparent wind angle
+        long double awa = DegToRad(4.4); // apparent wind angle
         //////////////////////////////////
         //////// NMEA TEST CODE
         tN2kMsg n2kMsg1;
@@ -126,8 +132,8 @@ void Display::DisplayTask()
 
         // PGN130306
         // AWA - Apparent Wind Data - requires GPS & COG/SOG data
-        //windspeedAvg = mMovingWindspeedAvg(windspeed);
-        //windangleAvg = mMovingWindangleAvg(windangle);
+        //windspeedAvg = mWindspeed5minAvg(windspeed);
+        //windangleAvg = mMoving5minWindDirectionAvg(windangle);
         SetN2kWindSpeed(n2kMsg1, 1, aws, awa, N2kWind_Apparent);
         if (!mNmea.SendMsg(n2kMsg1))
         {
@@ -144,7 +150,8 @@ void Display::DisplayTask()
         long double cog = acos((aws * cos(awa) - sog) / tws); // course over ground, heading vs. true north
         long double twd = fmod(M_TWOPI + cog + twa, M_TWOPI);
 
-        ESP_LOGI(tag, "SOG: %.2Lf, AWS: %.2Lf, AWA: %.2Lf, TWS: %.2Lf, TWD: %.2Lf, COG: %.2Lf", sog, aws, awa, tws, twd, cog);
+        ESP_LOGI(tag, "SOG: %.2f, AWS: %.2f, AWA: %.2f, TWS: %.2f, TWD: %.2f, COG: %.2f", msToKnots(sog), msToKnots(aws), RadToDeg(awa), msToKnots(tws), RadToDeg(twd), RadToDeg(cog));
+        //ESP_LOGI(tag, "SOG: %.2Lf, AWS: %.2Lf, AWA: %.2Lf, TWS: %.2Lf, TWD: %.2Lf, COG: %.2Lf", sog, aws, awa, tws, twd, cog);
 
         // PGN127250
         SetN2kTrueHeading(n2kMsg1, 1, DegToRad(cog));

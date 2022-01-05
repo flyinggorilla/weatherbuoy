@@ -147,9 +147,9 @@ void Maximet::MaximetTask()
 
                     if (model == gmx200gps)
                     {
-                        // GMX200GPS,+47.703818:+13.704246:+3.10,3.0,004.00,005.00,006.00,007,008,009,010,011,012,-01,+01,0000,0000,22
-                        // "USERINF,GPSLOCATION,CSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,XTILT,YTILT,STATUS,WINDSTAT,CHECK");
-                        // "-,-,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-");
+                        // ~~~~~ GMX200GPS,+47.703818:+13.704246:+3.10,3.0,004.00,005.00,006.00,007,008,009,010,011,012,-01,+01,0000,0000,22
+                        // "USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,CSPEED,CGSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,CGDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,XTILT,YTILT,STATUS,WINDSTAT,GPSSTATUS,CHECK");
+                        // "-,-,MS,DEG,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-,-");
 
                         switch (col)
                         {
@@ -165,46 +165,64 @@ void Maximet::MaximetTask()
                             }
                             break;
                         case 3:
-                            data.cspeed = column.toFloat();
+                            data.gpsspeed = column.toFloat();
                             break;
                         case 4:
-                            data.speed = column.toFloat();
+                            data.gpsheading = column.toInt();
                             break;
                         case 5:
-                            data.gspeed = column.toFloat();
+                            data.cspeed = column.toFloat();
                             break;
                         case 6:
-                            data.avgspeed = column.toFloat();
+                            data.cgspeed = column.toFloat();
                             break;
                         case 7:
-                            data.dir = column.toInt();
+                            data.avgcspeed = column.toFloat();
                             break;
                         case 8:
-                            data.gdir = column.toInt();
+                            data.speed = column.toFloat();
                             break;
                         case 9:
-                            data.avgdir = column.toInt();
+                            data.gspeed = column.toFloat();
                             break;
                         case 10:
-                            data.cdir = column.toInt();
+                            data.avgspeed = column.toFloat();
                             break;
                         case 11:
-                            data.avgcdir = column.toInt();
+                            data.dir = column.toInt();
                             break;
                         case 12:
-                            data.compassh = column.toInt();
+                            data.gdir = column.toInt();
                             break;
                         case 13:
-                            data.xtilt = column.toFloat();
+                            data.avgdir = column.toInt();
                             break;
                         case 14:
-                            data.ytilt = column.toFloat();
+                            data.cdir = column.toInt();
                             break;
                         case 15:
-                            column.toCharArray(data.status, data.statuslen);
+                            data.cgdir = column.toInt();
                             break;
                         case 16:
+                            data.avgcdir = column.toInt();
+                            break;
+                        case 17:
+                            data.compassh = column.toInt();
+                            break;
+                        case 18:
+                            data.xtilt = column.toFloat();
+                            break;
+                        case 19:
+                            data.ytilt = column.toFloat();
+                            break;
+                        case 20:
+                            column.toCharArray(data.status, data.statuslen);
+                            break;
+                        case 21:
                             column.toCharArray(data.windstat, data.statuslen);
+                            break;
+                        case 22:
+                            column.toCharArray(data.gpsstatus, data.statuslen);
                             break;
                         }
                     }
@@ -381,8 +399,8 @@ void Maximet::SimulatorStart(MaximetModel maximetModel)
     {
         SendLine("MAXIMET GMX200GPS-ESP32 Simulator V2.0");
         SendLine("STARTUP: OK");
-        SendLine("USERINF,GPSLOCATION,CSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,XTILT,YTILT,STATUS,WINDSTAT,CHECK");
-        SendLine("-,-,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-");
+        SendLine("USERINF,GPSLOCATION,GPSSPEED,CSPEED,CGSPEED,AVGCSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,XTILT,YTILT,STATUS,WINDSTAT,CHECK");
+        SendLine("-,-,MS,MS,MS,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-"); 
         SendLine("");
         SendLine("<END OF STARTUP MESSAGE>");
     }
@@ -412,7 +430,7 @@ void Maximet::SimulatorDataPoint(float temperature, double longitude, double lat
     String data;
     if (mMaximetModel == gmx200gps)
     {
-        data.printf("GMX200GPS,%+02.6f:%+02.6f:+2.00,%0.1f,004.00,005.00,006.00,007,008,009,010,011,012,-01,+01,0000,0000,", latitude, longitude, temperature);
+        data.printf("GMX200GPS,%+02.6f:%+02.6f:+2.00,003.0,004,%0.1f,006.00,007.00,008.00,009.00,010.00,011,012,013,014,015,016,-017,+018,0019,0020,0021", latitude, longitude, temperature);
     }
     else
     {

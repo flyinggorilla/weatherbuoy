@@ -25,8 +25,8 @@ class Display {
         DataQueue &mrDataQueue;
         tNMEA2000_esp32 mNmea;
         N2kStream_esp32 mNmeaLogStream;
-        MovingAverage<300> mMovingWindspeedAvg; // 5 minutes if 1sec samples
-        MovingAverage<300> mMovingWindangleAvg; // 5 minutes if 1sec samples
+        //SimpleMovingAverage<300> mWindspeed5minAvg; // 5 minutes if 1sec samples
+        //SimpleMovingAverage<300> mWinddirection5minAvg; // 5 minutes if 1sec samples
         
         void DisplayTask();
         friend void fDisplayTask(void *pvParameter);

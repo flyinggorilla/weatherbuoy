@@ -406,9 +406,9 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
 
     int logInfoSeconds = 0;
 
-
-    Display display(CONFIG_NMEA_TWAI_TX_PIN, CONFIG_NMEA_TWAI_RX_PIN, dataQueue);
-    display.Start();
+    // allocate display on heap as moving averages require some memory
+    Display *display = new Display(CONFIG_NMEA_TWAI_TX_PIN, CONFIG_NMEA_TWAI_RX_PIN, dataQueue);
+    display->Start();
 
     while (true)
     {

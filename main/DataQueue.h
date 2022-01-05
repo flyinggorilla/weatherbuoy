@@ -33,26 +33,36 @@ class Data {
             ytilt = 0;
             status[0] = 0;
             windstat[0] = 0; 
+            gpsstatus[0] = 0;
             lat = 0;
             lon = 0;
             cspeed = 0;
+            cgspeed = 0;
+            avgcspeed = 0;
+            gpsspeed = 0;
+            gpsheading = 0;
+
         }
 
         int uptime;
 
         float speed; 
+        float gpsspeed; // only avail if GPS
         float gspeed; 
         float avgspeed; 
         float cspeed; // only avail if GPS
+        float cgspeed; // only avail if GPS
+        float avgcspeed; // only avail if GPS
 
         int dir;
         int gdir; 
         int avgdir; 
 
         int compassh;
+        int gpsheading; // only avila if GPS
 
         int cdir; 
-        int cgdir; // CALCULATED!!!  (maximet["GDIR"]+maximet["COMPASSH"]) % 360;
+        int cgdir; // avail if GPS .... otherwise it is CALCULATED!!!  (maximet["GDIR"]+maximet["COMPASSH"]) % 360;
         int avgcdir; 
 
         float temp;
@@ -71,6 +81,7 @@ class Data {
         static const int statuslen = 5;
         char status[statuslen];
         char windstat[statuslen]; 
+        char gpsstatus[statuslen]; 
 };
 
 class DataQueue {
