@@ -37,6 +37,17 @@ void fDisplayTask(void *pvParameter)
     vTaskDelete(NULL);
 }
 
+/*void calcApparentWind() {
+        // To display Apparent wind indpendently from True-Wind, we calculate Speed over Ground (which we dont need for other use)
+
+        long double sog = 1.0l / 2.0l * (2.0l * aws * cos(awa) + sqrt(2.0l) * sqrt(-aws * aws + 2.0l * tws * tws + aws * aws * cos(2.0l * awa)));
+        long double cog = acos((aws * cos(awa) - sog) / tws); // course over ground, heading vs. true north
+        long double twd = fmod(M_TWOPI + cog + twa, M_TWOPI);
+
+        //ESP_LOGI(tag, "SOG: %.2f, AWS: %.2f, AWA: %.2f, TWS: %.2f, TWD: %.2f, COG: %.2f", msToKnots(sog), msToKnots(aws), RadToDeg(awa), msToKnots(tws), RadToDeg(twd), RadToDeg(cog));
+        //ESP_LOGI(tag, "SOG: %.2Lf, AWS: %.2Lf, AWA: %.2Lf, TWS: %.2Lf, TWD: %.2Lf, COG: %.2Lf", sog, aws, awa, tws, twd, cog);
+}*/
+
 void Display::Start()
 {
     /// PGNS
@@ -79,97 +90,92 @@ void Display::Start()
     xTaskCreate(&fDisplayTask, "Display", 1024 * 16, this, ESP_TASK_MAIN_PRIO, NULL); // large stack is needed
 }
 
+int cnt = 0;
+
 void Display::DisplayTask()
 {
     while (true)
     {
         Data data;
-        //double windspeed5minAvg = 0.0;
-        //double winddirection5minAvg = 0.0;
-
-        if (mrDataQueue.GetLatestData(data, 90)) {
-            // successful data retreiveal
-            ESP_LOGI(tag, "data: %0.1f", data.cspeed);
-
-            //windspeed5minAvg = mWindspeed5minAvg(data.cspeed*1000)/1000.0;
-            //winddirection5minAvg = mWinddirection5minAvg(data.cdir*1000)/1000.0;
-        } else {
-            //data.init();
+        if (!mrDataQueue.GetLatestData(data, 90)) {
+            mNmea.ParseMessages();
+            delay(500);
+            continue;
         }
 
-        long double tws = KnotsToms(10.0);        // true wind speed
-        long double twa = DegToRad(0.0);          // true wind angle (relative to heading)
-        long double aws = KnotsToms(data.cspeed);      // apparent wind speed
-        long double awa = DegToRad(4.4); // apparent wind angle
-        //////////////////////////////////
-        //////// NMEA TEST CODE
+
+        static const double defaultLatitude = 47.940703;
+        static const double defaultLongitude = 13.595386;
+        static const double defaultAltitude = 469;
+        static const double hdop = 1; // horizontal dilution in meters
+        double altitude = defaultAltitude;
+        double longitude = data.lon;
+        double latitude = data.lat;
+        double tws = data.cspeed;
+        int twd = data.cdir;
+        double avgTws = data.avgcspeed;
+        int avgTwd = data.avgcdir;
+        int awa = data.dir; // > 180 ? data.dir - 360 : data.dir;
+        double aws = data.speed;
+        double heading = data.compassh;
+        double sog = data.gpsspeed;
+        double cog = data.gpsheading;
+
+        if (isnan(data.lat) || isnan(data.lon) || data.lat == 0 || data.lon == 0) {
+            latitude = defaultLatitude;
+            longitude = defaultLongitude;
+            tws = data.speed;
+            avgTws = data.avgspeed;
+            avgTwd = (data.avgdir + data.compassh) % 360; // as avgcdir is not populated when GNSS is not available, lets do the math with compass
+        }
+
+sog = KnotsToms(1);
+
+
+        // USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,CSPEED,CGSPEED,AVGCSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,CGDIR,AVGCDIR,COMPASSH,XTILT,YTILT,STATUS,WINDSTAT,GPSSTATUS,TIME,CHECK
+        ESP_LOGI(tag, "RAW: lat: %0.6f, lon: %0.6f, gpsheading: %d, compass: %d, cspeed: %0.1f, cdir: %d, avgcspeed: %0.1f, avgcdir: %d, speed: %0.1f, dir: %d, avgspeed: %0.1f, avgdir: %d", 
+            data.lat, data.lon, data.gpsheading, data.compassh, msToKnots(data.cspeed), data.cdir, msToKnots(data.avgcspeed), data.avgcdir, msToKnots(data.speed), data.dir, msToKnots(data.avgspeed), data.avgdir);
+
+        ESP_LOGI(tag, "lat: %0.6f, lon: %0.6f, cog: %d, heading: %d, tws: %0.1f, twd: %d, avgTws: %0.1f, avgTwd: %d, aws: %0.1f, awa: %d", 
+            latitude, longitude, data.gpsheading, data.compassh, msToKnots(tws), twd, msToKnots(avgTws), avgTwd, msToKnots(aws), awa);
+
         tN2kMsg n2kMsg1;
-        /*windspeed++;
-        if (windspeed > 20) {
-            windspeed = 0;
-        }
-        windangle = windspeed*15.0;*/
 
         // TODO REVERSE CALCULATION OF COG SOG APPARENT WIND!!!  ****************************************************************
         // https://en.wikipedia.org/wiki/Apparent_wind
+       
+
+        uint16_t systemDate = data.time / (60*60*24);
+        double systemTime = data.time - systemDate*60*60*24;
+        SetN2kSystemTime(n2kMsg1, 1, systemDate, systemTime);
+        //ESP_LOGI(tag, "time:%ld, days:%d, seconds: %f", data.time, systemDate, systemTime);
+          
 
         // PGN129029
-        static const double latitude = 47.940703;
-        static const double longitude = 13.595386;
-        static const double altitude = 469;
-        static const double hdop = 1; // horizontal dilution in meters
-        SetN2kGNSS(n2kMsg1, 1, 18610, 118000, latitude, longitude, altitude, N2kGNSSt_GPS, N2kGNSSm_GNSSfix, 10, hdop);
+        SetN2kGNSS(n2kMsg1, 1, systemDate, systemTime, latitude, longitude, altitude, N2kGNSSt_GPS, N2kGNSSm_GNSSfix, 10, hdop);
         if (!mNmea.SendMsg(n2kMsg1))
         {
             ESP_LOGW(tag, "NMEA SendMsg failed");
         }
 
         // PGN127250
-        /*SetN2kMagneticHeading(n2kMsg1, 1, N2khr_magnetic, DegToRad(0), 0);
-    if(!mNmea.SendMsg(n2kMsg1)) {
-        ESP_LOGW(tag, "NMEA SendMsg failed");
-    } */
+        //SetN2kMagneticHeading(n2kMsg1, 1, DegToRad(heading), 0);  
+        SetN2kTrueHeading(n2kMsg1, 1, DegToRad(heading));  
+        if(!mNmea.SendMsg(n2kMsg1)) {
+            ESP_LOGW(tag, "NMEA SendMsg failed");
+        } 
 
         // PGN130306
         // AWA - Apparent Wind Data - requires GPS & COG/SOG data
-        //windspeedAvg = mWindspeed5minAvg(windspeed);
-        //windangleAvg = mMoving5minWindDirectionAvg(windangle);
-        SetN2kWindSpeed(n2kMsg1, 1, aws, awa, N2kWind_Apparent);
-        if (!mNmea.SendMsg(n2kMsg1))
-        {
-            ESP_LOGW(tag, "NMEA SendMsg failed");
-        }
-        mNmea.ParseMessages();
-
-        // Boat Velocity = 1/2 (2 A cos(β) + sqrt(2) sqrt(-A^2 + 2 W^2 + A^2 cos(2 β)))
-        //SetN2kCOGSOGRapid(n2kMsg1, 1, N2khr_magnetic, DegToRad(12), KnotsToms(34));
-
-        // To display Apparent wind indpendently from True-Wind, we calculate Speed over Ground (which we dont need for other use)
-
-        long double sog = 1.0l / 2.0l * (2.0l * aws * cos(awa) + sqrt(2.0l) * sqrt(-aws * aws + 2.0l * tws * tws + aws * aws * cos(2.0l * awa)));
-        long double cog = acos((aws * cos(awa) - sog) / tws); // course over ground, heading vs. true north
-        long double twd = fmod(M_TWOPI + cog + twa, M_TWOPI);
-
-        ESP_LOGI(tag, "SOG: %.2f, AWS: %.2f, AWA: %.2f, TWS: %.2f, TWD: %.2f, COG: %.2f", msToKnots(sog), msToKnots(aws), RadToDeg(awa), msToKnots(tws), RadToDeg(twd), RadToDeg(cog));
-        //ESP_LOGI(tag, "SOG: %.2Lf, AWS: %.2Lf, AWA: %.2Lf, TWS: %.2Lf, TWD: %.2Lf, COG: %.2Lf", sog, aws, awa, tws, twd, cog);
-
-        // PGN127250
-        SetN2kTrueHeading(n2kMsg1, 1, DegToRad(cog));
+        SetN2kWindSpeed(n2kMsg1, 1, aws, DegToRad(awa), N2kWind_Apparent);
         if (!mNmea.SendMsg(n2kMsg1))
         {
             ESP_LOGW(tag, "NMEA SendMsg failed");
         }
 
-        // PGN128259
-        SetN2kBoatSpeed(n2kMsg1, 1, KnotsToms(sog), N2kDoubleNA, N2kSWRT_Paddle_wheel); // does not influence TWD, but must be present
-        if (!mNmea.SendMsg(n2kMsg1))
-        {
-            ESP_LOGW(tag, "NMEA SendMsg failed");
-        }
-
-        //sog = KnotsToms(7);
-        // PGN129026
-        SetN2kCOGSOGRapid(n2kMsg1, 1, N2khr_true, cog, sog);
+      
+        // PGN129026 -- required, otherwise no TWS/TWD display
+        SetN2kCOGSOGRapid(n2kMsg1, 1, N2khr_true, DegToRad(cog), sog);
         if (!mNmea.SendMsg(n2kMsg1))
         {
             ESP_LOGW(tag, "NMEA SendMsg failed");
@@ -177,15 +183,22 @@ void Display::DisplayTask()
 
         // PGN130306
         // GWS - Ground Wind Speed - requires GPS & COG/SOG data;
-        SetN2kWindSpeed(n2kMsg1, 1, tws, twd, N2kWind_True_North);
+        SetN2kWindSpeed(n2kMsg1, 1, avgTws, DegToRad(avgTwd), N2kWind_True_North);
         if (!mNmea.SendMsg(n2kMsg1))
         {
             ESP_LOGW(tag, "NMEA SendMsg failed");
         }
-    }
+
+        // PGN126992 --- requires 129026 SOG/COG and 129029 GNSS
+        // System Time is set via GNSS updates
+
+        mNmea.ParseMessages();
+    } 
 }
 
 Display::Display(gpio_num_t canTX, gpio_num_t canRX, DataQueue &dataQueue) : mrDataQueue(dataQueue), mNmea(canTX, canRX)
 {
 }
+
+
 

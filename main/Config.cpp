@@ -38,6 +38,7 @@ Config::Config() {
 	msCellularOperator = CONFIG_WEATHERBUOY_CELLULAR_OPERATOR;
 	miCellularNetwork = CONFIG_WEATHERBUOY_CELLULAR_NETWORK;
 	miMode = CONFIG_WEATHERBUOY_MODE;
+	msNtpServer = CONFIG_WEATHERBUOY_NTPSERVER;
 }
 
 Config::~Config() {
@@ -64,6 +65,7 @@ bool Config::Load(){
 	ReadString(h, "CellularOperator", msCellularOperator);
 	ReadInt(h, "CellularNetwork", miCellularNetwork);
 	ReadString(h, "BoardSensorId", msBoardTempSensorId);
+	ReadString(h, "NtpServer", msNtpServer);
 
 	nvs_close(h);
 	return true;
@@ -107,6 +109,8 @@ bool Config::Save()
 	if (!WriteString(h, "CellularOperator", msCellularOperator))
 		ret = false;
 	if (!WriteString(h, "BoardSensorId", msBoardTempSensorId))
+		ret = false;
+	if (!WriteString(h, "NtpServer", msNtpServer))
 		ret = false;
 
 

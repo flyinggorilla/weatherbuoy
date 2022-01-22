@@ -48,6 +48,7 @@ private:
     bool mbRun = true;
 
     unsigned int muiSolarradiation = 999;
+
 };
 
 #endif 

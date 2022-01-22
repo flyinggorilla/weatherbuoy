@@ -20,6 +20,7 @@ public:
 	void StartAPMode(String &rsSsid, String &rsPass, String &rsHostname);
 	void StartSTAMode(String &rsSsid, String &rsPass, String &rsHostname);
 	void StartSTAModeEnterprise(String &rsSsid, String &rsUser, String &rsPass, String &rsCA, String &rsHostname);
+	void StartTimeSync(String &rsNtpServer);
 
 	bool IsConnected() { return mbConnected; };
 	void addDNSServer(String &ip);

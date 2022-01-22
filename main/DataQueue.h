@@ -41,6 +41,7 @@ class Data {
             avgcspeed = 0;
             gpsspeed = 0;
             gpsheading = 0;
+            time = 0;
 
         }
 
@@ -79,9 +80,11 @@ class Data {
         double lon; // only avail if GPS
 
         static const int statuslen = 5;
+        static const int timelen = 22; 
         char status[statuslen];
         char windstat[statuslen]; 
         char gpsstatus[statuslen]; 
+        time_t time; // only avail if GPS -- 2022-01-21T22:43:11.4
 };
 
 class DataQueue {

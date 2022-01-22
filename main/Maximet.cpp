@@ -147,9 +147,9 @@ void Maximet::MaximetTask()
 
                     if (model == gmx200gps)
                     {
-                        // ~~~~~ GMX200GPS,+47.703818:+13.704246:+3.10,3.0,004.00,005.00,006.00,007,008,009,010,011,012,-01,+01,0000,0000,22
-                        // "USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,CSPEED,CGSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,CGDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,XTILT,YTILT,STATUS,WINDSTAT,GPSSTATUS,CHECK");
-                        // "-,-,MS,DEG,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-,-");
+                        // GMX200GPS,+48.339284:+014.309088:+0021.20,000.22,035,000.20,000.00,000.00,000.13,000.00,000.00,038,000,000,249,000,000,287,-02,-01,0004,0100,0104,2022-01-22T14:11:06.8,68
+                        // USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,CSPEED,CGSPEED,AVGCSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,CGDIR,AVGCDIR,COMPASSH,XTILT,YTILT,STATUS,WINDSTAT,GPSSTATUS,TIME,CHECK
+                        // -,-,MS,DEG,MS,MS,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-,-,-
 
                         switch (col)
                         {
@@ -223,6 +223,18 @@ void Maximet::MaximetTask()
                             break;
                         case 22:
                             column.toCharArray(data.gpsstatus, data.statuslen);
+                            break;
+                        case 23:
+                            if (column.length() >= 19) {
+                                struct tm tm;
+                                column.setlength(19);
+                                strptime(column.c_str(), "%FT%T", &tm); //"2022-01-21T22:43:11.4" no trailing Z!!!
+                                data.time = mktime(&tm);
+                                
+                                uint16_t systemDate = data.time / (60*60*24);
+                                double systemTime = data.time - systemDate * 60 * 60 * 24;
+                                ESP_LOGD(tag, "time:%ld, days:%d, seconds: %f", data.time, systemDate, systemTime);
+                            }
                             break;
                         }
                     }
@@ -397,10 +409,14 @@ void Maximet::SimulatorStart(MaximetModel maximetModel)
     mMaximetModel = maximetModel;
     if (mMaximetModel == gmx200gps)
     {
+        // GMX200GPS,+48.339284:+014.309088:+0021.20,000.22,035,000.20,000.00,000.00,000.13,000.00,000.00,038,000,000,249,000,000,287,-02,-01,0004,0100,0104,2022-01-22T14:11:06.8,68
+        // USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,CSPEED,CGSPEED,AVGCSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,CGDIR,AVGCDIR,COMPASSH,XTILT,YTILT,STATUS,WINDSTAT,GPSSTATUS,TIME,CHECK
+        // -,-,MS,DEG,MS,MS,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-,-,-
+
         SendLine("MAXIMET GMX200GPS-ESP32 Simulator V2.0");
         SendLine("STARTUP: OK");
-        SendLine("USERINF,GPSLOCATION,GPSSPEED,CSPEED,CGSPEED,AVGCSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,XTILT,YTILT,STATUS,WINDSTAT,CHECK");
-        SendLine("-,-,MS,MS,MS,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-"); 
+        SendLine("USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,CSPEED,CGSPEED,AVGCSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,CGDIR,AVGCDIR,COMPASSH,XTILT,YTILT,STATUS,WINDSTAT,GPSSTATUS,TIME,CHECK");
+        SendLine("-,-,MS,DEG,MS,MS,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-,-,-"); 
         SendLine("");
         SendLine("<END OF STARTUP MESSAGE>");
     }
@@ -428,9 +444,17 @@ unsigned char CalculateChecksum(String &msg)
 void Maximet::SimulatorDataPoint(float temperature, double longitude, double latitude)
 {
     String data;
+    time_t now;
+    time(&now);
+    tm *pUtcTime = gmtime(&now);
+    char isoTime[25];
+    isoTime[0] = 0;
+    strftime(isoTime, sizeof(isoTime)-1, "%FT%T.0", pUtcTime);
+
     if (mMaximetModel == gmx200gps)
     {
-        data.printf("GMX200GPS,%+02.6f:%+02.6f:+2.00,003.0,004,%0.1f,006.00,007.00,008.00,009.00,010.00,011,012,013,014,015,016,-017,+018,0019,0020,0021", latitude, longitude, temperature);
+        // GMX200GPS,+48.339284:+014.309088:+0021.20, 000.22,035,000.20,000.00,000.00,000.13,000.00,000.00,038,000,000,249,000,000,287,-02,-01,0004,0100,0104,2022-01-22T14:11:06.8,68
+        data.printf("GMX200GPS,%+02.6f:%+02.6f:+2.00, 003.0,004,%0.1f,006.00,007.00,008.00,009.00,010.00,011,012,013,014,015,016,017,-018,+019, 0020,0021,0022,%s", latitude, longitude, temperature,isoTime);
     }
     else
     {

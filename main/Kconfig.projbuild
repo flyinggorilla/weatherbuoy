@@ -33,6 +33,12 @@ menu "Weatherbuoy"
         string "Default WiFi AP Password."
         default ""
 
+    config WEATHERBUOY_NTPSERVER
+        string "Default NTP Server."
+        default "pool.ntp.org"
+        help
+            NTP server hostname. e.g. at.pool.ntp.org.
+    
     config WEATHERBUOY_TARGET_URL
         string "Default target URL to send data and retrieve configuration."
 

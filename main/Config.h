@@ -43,6 +43,7 @@ public:
 	String msCellularUser;
 	String msCellularPass;
 	String msCellularOperator;
+	String msNtpServer;
 	int miCellularNetwork;
 	String msBoardTempSensorId;
 };

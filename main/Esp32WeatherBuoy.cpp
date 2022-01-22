@@ -159,6 +159,9 @@ void Esp32WeatherBuoy::Start()
             //config.Save();
             ESP_LOGI(tag, "sssi %s pass %s host %s", config.msSTASsid.c_str(), config.msSTAPass.c_str(), config.msHostname.c_str());
             wifi.StartSTAMode(config.msSTASsid, config.msSTAPass, config.msHostname);
+            wifi.StartTimeSync(config.msNtpServer);
+        	ESP_LOGI(tag, "NTP Time Syncronization enabled: %s", config.msNtpServer.c_str());
+
             mOnlineMode = MODE_WIFISTA;
         }
         else if (config.msAPSsid.length())

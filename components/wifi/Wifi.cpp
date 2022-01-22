@@ -12,6 +12,7 @@
 #include <lwip/netdb.h>
 #include <lwip/sockets.h>
 #include <esp_netif.h>
+#include <esp_sntp.h>
 
 
 static char tag[] = "Wifi";
@@ -317,4 +318,12 @@ void Wifi::OnEvent(esp_event_base_t base, int32_t id, void* event_data)
 			break;
 		}
     }
+}
+
+
+void Wifi::StartTimeSync(String &rsNtpServer) {
+	sntp_setoperatingmode(SNTP_OPMODE_POLL);
+	sntp_set_sync_mode(SNTP_SYNC_MODE_SMOOTH);
+	sntp_setservername(0, rsNtpServer.c_str());
+	sntp_init();	
 }
