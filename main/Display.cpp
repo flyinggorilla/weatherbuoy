@@ -129,15 +129,16 @@ void Display::DisplayTask()
             avgTwd = (data.avgdir + data.compassh) % 360; // as avgcdir is not populated when GNSS is not available, lets do the math with compass
         }
 
-sog = KnotsToms(1);
+        // #### TEST ONLY 
+        // sog = KnotsToms(1);
 
 
         // USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,CSPEED,CGSPEED,AVGCSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,CGDIR,AVGCDIR,COMPASSH,XTILT,YTILT,STATUS,WINDSTAT,GPSSTATUS,TIME,CHECK
-        ESP_LOGI(tag, "RAW: lat: %0.6f, lon: %0.6f, gpsheading: %d, compass: %d, cspeed: %0.1f, cdir: %d, avgcspeed: %0.1f, avgcdir: %d, speed: %0.1f, dir: %d, avgspeed: %0.1f, avgdir: %d", 
+        /*ESP_LOGI(tag, "RAW: lat: %0.6f, lon: %0.6f, gpsheading: %d, compass: %d, cspeed: %0.1f, cdir: %d, avgcspeed: %0.1f, avgcdir: %d, speed: %0.1f, dir: %d, avgspeed: %0.1f, avgdir: %d", 
             data.lat, data.lon, data.gpsheading, data.compassh, msToKnots(data.cspeed), data.cdir, msToKnots(data.avgcspeed), data.avgcdir, msToKnots(data.speed), data.dir, msToKnots(data.avgspeed), data.avgdir);
 
         ESP_LOGI(tag, "lat: %0.6f, lon: %0.6f, cog: %d, heading: %d, tws: %0.1f, twd: %d, avgTws: %0.1f, avgTwd: %d, aws: %0.1f, awa: %d", 
-            latitude, longitude, data.gpsheading, data.compassh, msToKnots(tws), twd, msToKnots(avgTws), avgTwd, msToKnots(aws), awa);
+            latitude, longitude, data.gpsheading, data.compassh, msToKnots(tws), twd, msToKnots(avgTws), avgTwd, msToKnots(aws), awa); */
 
         tN2kMsg n2kMsg1;
 
@@ -147,7 +148,9 @@ sog = KnotsToms(1);
 
         uint16_t systemDate = data.time / (60*60*24);
         double systemTime = data.time - systemDate*60*60*24;
-        SetN2kSystemTime(n2kMsg1, 1, systemDate, systemTime);
+        //SetN2kSystemTime(n2kMsg1, 1, systemDate, systemTime);
+        
+        altitude = data.time % 60; // ABUSE ALTITUDE FOR SECONDS DISPLAY!!!!! DELETE IF NOT NEEDED
         //ESP_LOGI(tag, "time:%ld, days:%d, seconds: %f", data.time, systemDate, systemTime);
           
 

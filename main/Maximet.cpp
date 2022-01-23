@@ -222,7 +222,12 @@ void Maximet::MaximetTask()
                             column.toCharArray(data.windstat, data.statuslen);
                             break;
                         case 22:
-                            column.toCharArray(data.gpsstatus, data.statuslen);
+                            if (column.length() == 4) {
+                                data.gpsfix = column.charAt(1) == '1';
+                                data.gpssat = (unsigned char) strtol(column.substring(2,4).c_str(), nullptr, 16);
+
+
+                            }
                             break;
                         case 23:
                             if (column.length() >= 19) {

@@ -104,13 +104,25 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += "\",\"windstat\":\"";
         mPostData += maximetData.windstat;
         mPostData += "\"";
-        if (maximetData.lon) { // check if GPS data is available
+        if (maximetData.time) { // check if GPS data is available
             mPostData += ",\"lon\":";
             mPostData += String(maximetData.lon, 6);
             mPostData += ",\"lat\":";
             mPostData += String(maximetData.lat, 6);
-            mPostData += ",\"cspeed\":";
+            mPostData += ",\"cspeed\":"; 
             mPostData += maximetData.cspeed;
+            mPostData += ",\"cgspeed\":"; 
+            mPostData += maximetData.cgspeed;
+            mPostData += ",\"avgcspeed\":"; 
+            mPostData += maximetData.avgcspeed;
+            mPostData += ",\"gpsspeed\":"; 
+            mPostData += maximetData.gpsspeed;
+            mPostData += ",\"gpsheading\":"; 
+            mPostData += maximetData.gpsheading;
+            mPostData += ",\"gpsfix\":"; 
+            mPostData += maximetData.gpsfix;
+            mPostData += ",\"gpssat\":";
+            mPostData += maximetData.gpssat;
         }
         mPostData += "}";
         bComma = true;
