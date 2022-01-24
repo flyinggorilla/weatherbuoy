@@ -61,11 +61,10 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
     mPostData = "{\"maximet\":[";
     bool bComma = false;
     while (mrDataQueue.GetData(maximetData)) {
-        // SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,STATUS,WINDSTAT,CHECK
         mPostData += bComma ? ",{" : "{";
         mPostData += "\"uptime\":";
         mPostData += maximetData.uptime;
-        mPostData += ",\"speed\":";
+        /*mPostData += ",\"speed\":";
         mPostData += maximetData.speed;
         mPostData += ",\"gspeed\":";
         mPostData += maximetData.gspeed;
@@ -76,9 +75,17 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += ",\"gdir\":";
         mPostData += maximetData.gdir;
         mPostData += ",\"avgdir\":";
-        mPostData += maximetData.avgdir;
+        mPostData += maximetData.avgdir;*/
+        mPostData += ",\"cspeed\":"; 
+        mPostData += maximetData.cspeed;
+        mPostData += ",\"cgspeed\":"; 
+        mPostData += maximetData.cgspeed;
+        mPostData += ",\"avgcspeed\":"; 
+        mPostData += maximetData.avgcspeed;
         mPostData += ",\"cdir\":";
         mPostData += maximetData.cdir;
+        mPostData += ",\"cgdir\":";
+        mPostData += maximetData.cgdir;
         mPostData += ",\"avgcdir\":";
         mPostData += maximetData.avgcdir;
         mPostData += ",\"compassh\":";
@@ -105,24 +112,22 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += maximetData.windstat;
         mPostData += "\"";
         if (maximetData.time) { // check if GPS data is available
+            mPostData += ", \"gps\": {";
+            mPostData += "\"time\":";  
+            mPostData += maximetData.time;
             mPostData += ",\"lon\":";
             mPostData += String(maximetData.lon, 6);
             mPostData += ",\"lat\":";
             mPostData += String(maximetData.lat, 6);
-            mPostData += ",\"cspeed\":"; 
-            mPostData += maximetData.cspeed;
-            mPostData += ",\"cgspeed\":"; 
-            mPostData += maximetData.cgspeed;
-            mPostData += ",\"avgcspeed\":"; 
-            mPostData += maximetData.avgcspeed;
-            mPostData += ",\"gpsspeed\":"; 
+            mPostData += ",\"sog\":";  
             mPostData += maximetData.gpsspeed;
-            mPostData += ",\"gpsheading\":"; 
+            mPostData += ",\"cog\":"; 
             mPostData += maximetData.gpsheading;
-            mPostData += ",\"gpsfix\":"; 
+            mPostData += ",\"fix\":"; 
             mPostData += maximetData.gpsfix;
-            mPostData += ",\"gpssat\":";
+            mPostData += ",\"sat\":";
             mPostData += maximetData.gpssat;
+            mPostData += "}";
         }
         mPostData += "}";
         bComma = true;

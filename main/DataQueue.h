@@ -3,6 +3,13 @@
 
 #include "esp_event.h"
 #include "EspString.h"
+#include <math.h>
+
+short nans();
+unsigned char nanuc();
+float nanf();
+bool isnans(short n);
+bool isnauc(unsigned char uc);
 
 class Data
 {
@@ -15,33 +22,41 @@ public:
     void init()
     {
         uptime = esp_timer_get_time() / 1000;
-        speed = 0;
-        gspeed = 0;
-        avgspeed = 0;
-        dir = 0;
-        gdir = 0;
-        avgdir = 0;
-        compassh = 0;
+        //speed = nanf();
+        //gspeed = nanf();
+        //avgspeed = nanf();
+        //dir = 0;
+        //gdir = 0;
+        //avgdir = 0;
+
+        // wind
+        cspeed = 0;
+        cgspeed = 0;
+        avgcspeed = 0;
         cdir = 0;
         cgdir = 0; // CALCULATED!!!  (maximet["GDIR"]+maximet["COMPASSH"]) % 360;
         avgcdir = 0;
+        compassh = 0;
+
+        // weather
         temp = 0;
         pasl = 0;
         pstn = 0;
         rh = 0;
         ah = 0;
         solarrad = 0;
+
+        // status
         xtilt = 0;
         ytilt = 0;
         status[0] = 0;
         windstat[0] = 0;
+
+        // GPS
         gpsfix = 0;
         gpssat = 0;
         lat = 0;
         lon = 0;
-        cspeed = 0;
-        cgspeed = 0;
-        avgcspeed = 0;
         gpsspeed = 0;
         gpsheading = 0;
         time = 0;
@@ -50,34 +65,32 @@ public:
     int uptime;
 
     float speed;
-    float gspeed;
-    float avgspeed;
+    //float gspeed;
+    //float avgspeed;
+    short dir;
+    //short gdir;
+    //short avgdir;
 
-    int16_t dir;
-    int16_t gdir;
-    int16_t avgdir;
+    // wind
+    float cspeed;    // only avail if GPS, or derived
+    float cgspeed;   // only avail if GPS, or derived
+    float avgcspeed; // only avail if GPS, or derived
+    short compassh;
+    short cdir; // corrected through compass
+    short cgdir; // avail if GPS .... otherwise it is CALCULATED!!!  (maximet["GDIR"]+maximet["COMPASSH"]) % 360;
+    short avgcdir; // 
 
-    int16_t compassh;
-
-    float cspeed;    // only avail if GPS
-    float cgspeed;   // only avail if GPS
-    float avgcspeed; // only avail if GPS
-
-    int16_t cdir; // corrected through compass
-    int16_t cgdir; // avail if GPS .... otherwise it is CALCULATED!!!  (maximet["GDIR"]+maximet["COMPASSH"]) % 360;
-    int16_t avgcdir; // 
-
+    // weather
     float temp;
     float pasl;
     float pstn;
     float rh;
     float ah;
-    int16_t solarrad;
+    short solarrad;
 
+    // status
     float xtilt;
     float ytilt;
-
-
     static const int statuslen = 5;
     char status[statuslen];
     char windstat[statuslen];
@@ -85,10 +98,10 @@ public:
     // GPS data
     double lat; // only avail if GPS
     double lon; // only avail if GPS
-    int16_t gpsheading; // only avila if GPS
+    short gpsheading; // only avila if GPS
     float gpsspeed; // only avail if GPS
-    uint8_t gpsfix;
-    uint8_t gpssat;
+    unsigned char gpsfix;
+    unsigned char gpssat;
     time_t time; // only avail if GPS -- 2022-01-21T22:43:11.4
 };
 

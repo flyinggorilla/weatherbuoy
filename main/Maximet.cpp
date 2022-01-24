@@ -31,6 +31,22 @@ void Maximet::Start(int gpioRX, int gpioTX, bool alternateUart)
 #define STX (0x02) // ASCII start of text
 #define ETX (0x03) // ASCII end of text
 
+float StringToFloatOrNaN(String &column) {
+    if (!column.length()) {
+        return nanf();
+    }
+    return column.toFloat();
+}
+
+short StringToShortOrNaN(String &column) {
+    if (!column.length()) {
+        return nans();
+    }
+    return column.toInt();
+}
+
+
+
 void Maximet::MaximetTask()
 {
 
@@ -118,6 +134,11 @@ void Maximet::MaximetTask()
         int cposDataEnd = 0;
         MaximetModel model = gmx501;
 
+        float gspeed;
+        float avgspeed;
+        short gdir;
+        short avgdir;
+
         ParsingStates parsingState = START;
         while (cpos < len || parsingState == VALIDDATA)
         {
@@ -132,6 +153,11 @@ void Maximet::MaximetTask()
                     column.setlength(0);
                     cposDataStart = cpos;
                     cposDataEnd = cpos;
+
+                    gspeed = nanf();
+                    avgspeed = nanf();
+                    gdir = nans();
+                    avgdir = nans();
                 }
                 break;
             case READCOLUMN:
@@ -157,54 +183,59 @@ void Maximet::MaximetTask()
                             // no need to store with data
                             break;
                         case 2: {
-                                int latPos = column.indexOf(':', 0);
-                                int lonPos = column.indexOf(':', latPos+1);
-                                data.lat = column.substring(0, latPos).toFloat();
-                                data.lon = column.substring(latPos+1, lonPos).toFloat();
+                                if(column.length() > 20) {
+                                    int latPos = column.indexOf(':', 0);
+                                    int lonPos = column.indexOf(':', latPos+1);
+                                    data.lat = column.substring(0, latPos).toFloat();
+                                    data.lon = column.substring(latPos+1, lonPos).toFloat();
+                                } else {
+                                    data.lat = nanf();
+                                    data.lon = nanf();
+                                }
                                 ESP_LOGD(tag, "col: '%s' lat: %0.6f lon: %0.6f ", column.c_str(), data.lat, data.lon);
                             }
                             break;
                         case 3:
-                            data.gpsspeed = column.toFloat();
+                            data.gpsspeed = column.toFloat(); // leave at 0 if not available
                             break;
                         case 4:
-                            data.gpsheading = column.toInt();
+                            data.gpsheading = column.toInt(); // leave at 0 if not available
                             break;
                         case 5:
-                            data.cspeed = column.toFloat();
+                            data.cspeed = StringToFloatOrNaN(column); // derive from speed if not available
                             break;
                         case 6:
-                            data.cgspeed = column.toFloat();
+                            data.cgspeed = StringToFloatOrNaN(column); // derive from gspeed if not available
                             break;
                         case 7:
-                            data.avgcspeed = column.toFloat();
+                            data.avgcspeed = StringToFloatOrNaN(column); // derive from avgspeed if not available
                             break;
                         case 8:
                             data.speed = column.toFloat();
                             break;
                         case 9:
-                            data.gspeed = column.toFloat();
+                            gspeed = column.toFloat();
                             break;
                         case 10:
-                            data.avgspeed = column.toFloat();
+                            avgspeed = column.toFloat();
                             break;
                         case 11:
                             data.dir = column.toInt();
                             break;
                         case 12:
-                            data.gdir = column.toInt();
+                            gdir = column.toInt();
                             break;
                         case 13:
-                            data.avgdir = column.toInt();
+                            avgdir = column.toInt();
                             break;
                         case 14:
-                            data.cdir = column.toInt();
+                            data.cdir = StringToShortOrNaN(column);
                             break;
                         case 15:
-                            data.cgdir = column.toInt();
+                            data.cgdir = StringToShortOrNaN(column);
                             break;
                         case 16:
-                            data.avgcdir = column.toInt();
+                            data.avgcdir = StringToShortOrNaN(column);
                             break;
                         case 17:
                             data.compassh = column.toInt();
@@ -225,8 +256,6 @@ void Maximet::MaximetTask()
                             if (column.length() == 4) {
                                 data.gpsfix = column.charAt(1) == '1';
                                 data.gpssat = (unsigned char) strtol(column.substring(2,4).c_str(), nullptr, 16);
-
-
                             }
                             break;
                         case 23:
@@ -251,28 +280,29 @@ void Maximet::MaximetTask()
                         switch (col)
                         {
                         case 1:
-                            data.speed = column.toFloat();
+                            data.cspeed = data.speed = column.toFloat();
                             break;
                         case 2:
-                            data.gspeed = column.toFloat();
+                            data.cgspeed = gspeed = column.toFloat();
                             break;
                         case 3:
-                            data.avgspeed = column.toFloat();
+                            data.avgcspeed = avgspeed = column.toFloat(); 
                             break;
                         case 4:
                             data.dir = column.toInt();
                             break;
                         case 5:
-                            data.gdir = column.toInt();
+                            gdir = column.toInt();
+                            data.cgdir = nans();
                             break;
                         case 6:
-                            data.avgdir = column.toInt();
+                            avgdir = column.toInt();
                             break;
                         case 7:
-                            data.cdir = column.toInt();
+                            data.cdir = StringToShortOrNaN(column);
                             break;
                         case 8:
-                            data.avgcdir = column.toInt();
+                            data.avgcdir = StringToShortOrNaN(column);
                             break;
                         case 9:
                             data.compassh = column.toInt();
@@ -363,6 +393,30 @@ void Maximet::MaximetTask()
                 parsingState = START;
                 data.uptime = esp_timer_get_time() / 1000000; // seconds since start (good enough as int can store seconds over 68 years in 31 bits)
                 line[cposDataEnd] = 0;
+
+                if (isnanf(data.cspeed)) {
+                    data.cspeed = data.speed;
+                }
+
+                if (isnanf(data.cgspeed)) {
+                    data.cgspeed = gspeed;
+                }
+
+                if (isnanf(data.avgcspeed)) {
+                    data.avgcspeed = avgspeed;
+                }
+
+                if (isnans(data.cdir)) {
+                    data.cdir = (data.dir + data.compassh) % 360;
+                }
+
+                if (isnans(data.cgdir)) {
+                    data.cgdir = (gdir + data.compassh) % 360;
+                }
+
+                if (isnans(data.avgcdir)) {
+                    data.avgcdir = (avgdir + data.compassh) % 360; // as avgcdir is not populated when GNSS is not available, lets do the math with compass
+                } 
 
                 mrDataQueue.PutLatestData(data);
 

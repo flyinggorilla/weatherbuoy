@@ -76,7 +76,7 @@ coredump.dat
 
 *.out.log
 maximetsimulator/secureboot.py
-
+testjson.json
 
 # logs
 logs

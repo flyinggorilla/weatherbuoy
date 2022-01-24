@@ -111,8 +111,8 @@ void Display::DisplayTask()
         double altitude = defaultAltitude;
         double longitude = data.lon;
         double latitude = data.lat;
-        double tws = data.cspeed;
-        int twd = data.cdir;
+        //double tws = data.cspeed;
+        //int twd = data.cdir;
         double avgTws = data.avgcspeed;
         int avgTwd = data.avgcdir;
         int awa = data.dir; // > 180 ? data.dir - 360 : data.dir;
@@ -121,14 +121,15 @@ void Display::DisplayTask()
         double sog = data.gpsspeed;
         double cog = data.gpsheading;
 
-        if (isnan(data.lat) || isnan(data.lon) || data.lat == 0 || data.lon == 0) {
+        /*if (isnanf(data.lat) || isnanf(data.lon) || data.lat == 0 || data.lon == 0) {
             latitude = defaultLatitude;
             longitude = defaultLongitude;
-            tws = data.speed;
-            avgTws = data.avgspeed;
-            avgTwd = (data.avgdir + data.compassh) % 360; // as avgcdir is not populated when GNSS is not available, lets do the math with compass
-        }
+        }*/
 
+        if (isnanf(data.lat) || isnanf(data.lon) || data.lat == 0 || data.lon == 0) {
+            latitude = N2kDoubleNA;
+            longitude = N2kDoubleNA;
+        }
         // #### TEST ONLY 
         // sog = KnotsToms(1);
 

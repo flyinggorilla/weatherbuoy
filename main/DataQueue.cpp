@@ -79,3 +79,24 @@ DataQueue::DataQueue()
 DataQueue::~DataQueue()
 {
 }
+
+
+short nans() {
+    return SHRT_MIN;
+}
+
+unsigned char nanuc() {
+    return UCHAR_MAX;
+}
+
+float nanf() {
+    return nanf("");
+}
+
+bool isnans(short n) {
+    return n == nans();
+}
+
+bool isnauc(unsigned char uc) {
+    return uc == nanuc();
+}
