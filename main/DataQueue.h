@@ -22,10 +22,10 @@ public:
     void init()
     {
         uptime = esp_timer_get_time() / 1000;
-        //speed = nanf();
+        speed = nanf();
         //gspeed = nanf();
         //avgspeed = nanf();
-        //dir = 0;
+        dir = 0;
         //gdir = 0;
         //avgdir = 0;
 
@@ -64,10 +64,10 @@ public:
 
     int uptime;
 
-    float speed;
+    float speed; // required for Display
     //float gspeed;
     //float avgspeed;
-    short dir;
+    short dir; // required for Display
     //short gdir;
     //short avgdir;
 

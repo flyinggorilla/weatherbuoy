@@ -188,10 +188,10 @@ void Maximet::MaximetTask()
         int cposDataEnd = 0;
         MaximetModel model = gmx501;
 
-        float gspeed;
-        float avgspeed;
-        short gdir;
-        short avgdir;
+        float maximetGSpeed;
+        float maximetAvgSpeed;
+        short maximetGDir;
+        short maximetAvgDir;
 
         ParsingStates parsingState = START;
         while (cpos < len || parsingState == VALIDDATA)
@@ -208,10 +208,10 @@ void Maximet::MaximetTask()
                     cposDataStart = cpos;
                     cposDataEnd = cpos;
 
-                    gspeed = nanf();
-                    avgspeed = nanf();
-                    gdir = nans();
-                    avgdir = nans();
+                    maximetGSpeed = nanf();
+                    maximetAvgSpeed = nanf();
+                    maximetGDir = nans();
+                    maximetAvgDir = nans();
                 }
                 break;
             case READCOLUMN:
@@ -265,19 +265,19 @@ void Maximet::MaximetTask()
                             data.speed = column.toFloat();
                             break;
                         case 9:
-                            gspeed = column.toFloat();
+                            maximetGSpeed = column.toFloat();
                             break;
                         case 10:
-                            avgspeed = column.toFloat();
+                            maximetAvgSpeed = column.toFloat();
                             break;
                         case 11:
                             data.dir = column.toInt();
                             break;
                         case 12:
-                            gdir = column.toInt();
+                            maximetGDir = column.toInt();
                             break;
                         case 13:
-                            avgdir = column.toInt();
+                            maximetAvgDir = column.toInt();
                             break;
                         case 14:
                             data.cdir = StringToShortOrNaN(column);
@@ -325,20 +325,20 @@ void Maximet::MaximetTask()
                             data.cspeed = data.speed = column.toFloat();
                             break;
                         case 3:
-                            data.cgspeed = gspeed = column.toFloat();
+                            data.cgspeed = maximetGSpeed = column.toFloat();
                             break;
                         case 4:
-                            data.avgcspeed = avgspeed = column.toFloat();
+                            data.avgcspeed = maximetAvgSpeed = column.toFloat();
                             break;
                         case 5:
                             data.dir = column.toInt();
                             break;
                         case 6:
-                            gdir = column.toInt();
+                            maximetGDir = column.toInt();
                             data.cgdir = nans();
                             break;
                         case 7:
-                            avgdir = column.toInt();
+                            maximetAvgDir = column.toInt();
                             break;
                         case 8:
                             data.cdir = StringToShortOrNaN(column);
@@ -401,20 +401,20 @@ void Maximet::MaximetTask()
                             data.cspeed = data.speed = column.toFloat();
                             break;
                         case 2:
-                            data.cgspeed = gspeed = column.toFloat();
+                            data.cgspeed = maximetGSpeed = column.toFloat();
                             break;
                         case 3:
-                            data.avgcspeed = avgspeed = column.toFloat();
+                            data.avgcspeed = maximetAvgSpeed = column.toFloat();
                             break;
                         case 4:
                             data.dir = column.toInt();
                             break;
                         case 5:
-                            gdir = column.toInt();
+                            maximetGDir = column.toInt();
                             data.cgdir = nans();
                             break;
                         case 6:
-                            avgdir = column.toInt();
+                            maximetAvgDir = column.toInt();
                             break;
                         case 7:
                             data.cdir = StringToShortOrNaN(column);
@@ -512,19 +512,19 @@ void Maximet::MaximetTask()
                 data.uptime = esp_timer_get_time() / 1000000; // seconds since start (good enough as int can store seconds over 68 years in 31 bits)
                 line[cposDataEnd] = 0;
 
-/*                if (isnanf(data.cspeed))
+                if (isnanf(data.cspeed))
                 {
                     data.cspeed = data.speed;
                 }
 
                 if (isnanf(data.cgspeed))
                 {
-                    data.cgspeed = gspeed;
+                    data.cgspeed = maximetGSpeed;
                 }
 
                 if (isnanf(data.avgcspeed))
                 {
-                    data.avgcspeed = avgspeed;
+                    data.avgcspeed = maximetAvgSpeed;
                 }
 
                 if (isnans(data.cdir))
@@ -534,13 +534,13 @@ void Maximet::MaximetTask()
 
                 if (isnans(data.cgdir))
                 {
-                    data.cgdir = (gdir + data.compassh) % 360;
+                    data.cgdir = (maximetGDir + data.compassh) % 360;
                 }
 
                 if (isnans(data.avgcdir))
                 {
-                    data.avgcdir = (avgdir + data.compassh) % 360; // as avgcdir is not populated when GNSS is not available, lets do the math with compass
-                } */
+                    data.avgcdir = (maximetAvgDir + data.compassh) % 360; // as avgcdir is not populated when GNSS is not available, lets do the math with compass
+                } 
 
                 mrDataQueue.PutLatestData(data);
 
@@ -548,7 +548,7 @@ void Maximet::MaximetTask()
                 //shortAvgCGSpeedVector.add(data.cspeed, data.cdir);
 
                 ESP_LOGI(tag, "data.speed: %0.2f data.dir: %d, data.compassh: %d, data.cspeed: %0.2f data.cdir: %d, data.cgspeed: %0.2f data.cgdir: %d, avgspeed: %0.2f avggdir: %d, data.avgcspeed: %0.2f data.avgcdir: %d", 
-                            data.speed, data.dir, data.compassh, data.cspeed, data.cdir, data.cgspeed, data.cgdir, avgspeed, avgdir, data.avgcspeed, data.avgcdir);
+                            data.speed, data.dir, data.compassh, data.cspeed, data.cdir, data.cgspeed, data.cgdir, maximetAvgSpeed, maximetAvgDir, data.avgcspeed, data.avgcdir);
 
                 // Put data not more frequent than every 30 seconds into queue
                 if (data.uptime >= (lastUptime + 30))
