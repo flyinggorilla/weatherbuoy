@@ -92,6 +92,9 @@ void app_main()
 void TestHttp();
 void TestATCommands(Cellular &cellular);
 
+#include "VelocityVector.h"
+void TestVelocityVector();
+
 void Esp32WeatherBuoy::Start()
 {
 
@@ -116,6 +119,9 @@ void Esp32WeatherBuoy::Start()
         ESP_LOGI(tag, "Operating mode: Buoy");
         break;
     }
+
+
+TestVelocityVector();
 
 
     int watchdogSeconds = CONFIG_WATCHDOG_SECONDS;
@@ -660,4 +666,42 @@ void TestATCommands(Cellular &cellular)
     //Command("AT+CGDATA=?", "OK", nullptr, "Read operator names"); //
     //    Command("AT+IPR=?", "OK", &response,  "Operator Selection"); // AT+IPR=?
     // +IPR: (0,300,600,1200,2400,4800,9600,19200,38400,57600,115200,230400,460800,921600,3000000,3200000,3686400)
+}
+
+
+void TestVelocityVector() {
+    VelocityVector v;
+    ESP_LOGI("TESTVV", "New: [%0.6f, %d]", v.getSpeed(), v.getDir());
+    v.add(10, 45);
+    ESP_LOGI("TESTVV", "Add [10, 45°]: [%0.6f, %d]", v.getSpeed(), v.getDir());
+    v.add(10, 360-45);
+    ESP_LOGI("TESTVV", "Add [10, -45°]: [%0.6f, %d]", v.getSpeed(), v.getDir());
+    v.add(10, 90+45);
+    v.add(10, 180+45);
+    ESP_LOGI("TESTVV", "Add [10, 135°], Add [10, 225°]: [%0.6f, %d]", v.getSpeed(), v.getDir());
+    v.add(5, 180);
+    ESP_LOGI("TESTVV", "Add [5, 180°]: [%0.6f, %d]", v.getSpeed(), v.getDir());
+    v.clear();
+    ESP_LOGI("TESTVV", "Clear: [%0.6f, %d]", v.getSpeed(), v.getDir());
+    v.add(10, 0);
+    v.add(10, 90);
+    v.add(10, 180);
+    ESP_LOGI("TESTVV", "Add [10, 0°], Add [10, 90°], Add [10, 180°]: [%0.6f, %d]", v.getSpeed(), v.getDir());
+    v.clear();
+    ESP_LOGI("TESTVV", "Clear: [%0.6f, %d]", v.getSpeed(), v.getDir());
+    v.add(10, 90);
+    ESP_LOGI("TESTVV", "Add [10, 90°]: [%0.6f, %d]", v.getSpeed(), v.getDir());
+    v.clear();
+    ESP_LOGI("TESTVV", "Clear: [%0.6f, %d]", v.getSpeed(), v.getDir());
+    v.add(10, 180);
+    ESP_LOGI("TESTVV", "Add [10, 180°]: [%0.6f, %d]", v.getSpeed(), v.getDir());
+    v.clear();
+    ESP_LOGI("TESTVV", "Clear: [%0.6f, %d]", v.getSpeed(), v.getDir());
+    v.add(10, 270);
+    ESP_LOGI("TESTVV", "Add [10, 270°]: [%0.6f, %d]", v.getSpeed(), v.getDir());
+    v.clear();
+    ESP_LOGI("TESTVV", "Clear: [%0.6f, %d]", v.getSpeed(), v.getDir());
+    v.add(10, 360);
+    ESP_LOGI("TESTVV", "Add [10, 360°]: [%0.6f, %d]", v.getSpeed(), v.getDir());
+
 }

@@ -8,7 +8,8 @@
 
 enum MaximetModel {
     gmx501,
-    gmx200gps
+    gmx200gps,
+    gmx501gps
 };
 
 class Maximet {
