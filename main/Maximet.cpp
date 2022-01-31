@@ -34,6 +34,9 @@ void Maximet::Start(int gpioRX, int gpioTX, bool alternateUart)
     mgpioTX = gpioTX;
     muiUartNo = alternateUart ? UART_NUM_2 : UART_NUM_1;
     xTaskCreate(&fMaximetTask, "Maximet", 1024 * 16, this, ESP_TASK_MAIN_PRIO, NULL); // large stack is needed
+
+    vTaskDelay(1000/portTICK_PERIOD_MS);
+    ReadConfig();
 }
 
 #define STX (0x02) // ASCII start of text
@@ -154,6 +157,28 @@ void Maximet::MaximetTask()
             continue;
         }
         ESP_LOGD(tag, "THE LINE: %s", line.c_str());
+
+        if (mbCommandline) {
+            //ESP_LOGI(tag, "Commandline reponse: %s", line.c_str());
+            if (line.startsWith("AVGLONG = ")) {
+                muiAvgLong = 0;
+                int pos = line.indexOf("=");
+                String val = line.substring(pos+1);
+                muiAvgLong = val.toInt();
+                ESP_LOGI(tag, "AVGLONG: %d", muiAvgLong);
+            } else if (line.startsWith("REPORT = ")) {
+                int pos = line.indexOf("=");
+                msReport = line.substring(pos+1);
+                ESP_LOGI(tag, "REPORT: %s", msReport.c_str());
+            } else if(line.startsWith("OUTFREQ = 1HZ")) { //"1/MIN" or "1HZ"
+                muiOutputIntervalSec = 1;
+                ESP_LOGI(tag, "OUTFREQ: every %d second(s)", muiOutputIntervalSec);
+            } else if(line.startsWith("OUTFREQ = 1/MIN")) { //"1/MIN" or "1HZ"
+                muiOutputIntervalSec = 60;
+                ESP_LOGI(tag, "OUTFREQ: every %d second(s)", muiOutputIntervalSec);
+            }
+            continue;
+        }
 
         if (line.startsWith("STARTUP: OK"))
         {
@@ -547,6 +572,7 @@ void Maximet::MaximetTask()
                 shortAvgCSpeedVector.add(data.cspeed, data.cdir);
                 //shortAvgCGSpeedVector.add(data.cspeed, data.cdir);
 
+///////////// TODO avgspeedvector not needed when maximet sends only once per minute!!!
                 ESP_LOGI(tag, "data.speed: %0.2f data.dir: %d, data.compassh: %d, data.cspeed: %0.2f data.cdir: %d, data.cgspeed: %0.2f data.cgdir: %d, avgspeed: %0.2f avggdir: %d, data.avgcspeed: %0.2f data.avgcdir: %d", 
                             data.speed, data.dir, data.compassh, data.cspeed, data.cdir, data.cgspeed, data.cgdir, maximetAvgSpeed, maximetAvgDir, data.avgcspeed, data.avgcdir);
 
@@ -696,4 +722,43 @@ Maximet::Maximet(DataQueue &dataQueue) : mrDataQueue(dataQueue)
 
 Maximet::~Maximet()
 {
+}
+
+void Maximet::Command(String &command) {
+    String cmd = "*\r\necho off\r\n"; 
+    mpSerial->Write(cmd);
+    vTaskDelay(1500/portTICK_PERIOD_MS); // wait 1.5 seconds to ensure no data coming
+
+    mbCommandline = true;
+    mpSerial->Write(command);
+    vTaskDelay(1500/portTICK_PERIOD_MS); // wait 1.5 seconds to check response data before exiting
+
+    cmd ="\r\nexit\r\n";
+    mpSerial->Write(cmd);
+    vTaskDelay(500/portTICK_PERIOD_MS); // wait 0.5 seconds to allow for full line of data after exiting
+    mbCommandline = false;
+}
+
+void Maximet::SetAvgLong(unsigned short avglong) {
+    String command;
+    command.printf("AVGLONG %d\r\nAVGLONG\r\n", avglong);
+    Command(command);
+}
+
+void Maximet::ReadConfig() {
+    String command;
+    command.printf("REPORT\r\nAVGLONG\r\nOUTFREQ\r\n");
+    Command(command);
+}
+
+void Maximet::SetOutfreq(bool high) {
+    String command;
+    if (high) {
+        command.printf("OUTFREQ 1HZ\r\nOUTFREQ\r\n");
+    } 
+    else 
+    {
+        command.printf("OUTFREQ 1/MIN\r\nOUTFREQ\r\n");
+    } 
+    Command(command);
 }

@@ -109,7 +109,7 @@ bool Serial::ReadLine(String& line) {
 
 bool Serial::Write(String &buffer) {
     if (uart_write_bytes(muiUartNo, buffer.c_str(), buffer.length()) >= 0) {
-        ESP_LOGI(tag, "Sent to UART: \"%s\"", buffer.c_str());
+        ESP_LOGD(tag, "Sent to UART: \"%s\"", buffer.c_str());
         //ESP_LOG_BUFFER_HEXDUMP(tag, buffer.c_str(), buffer.length(), ESP_LOG_INFO);
         return true;
     }

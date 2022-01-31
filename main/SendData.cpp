@@ -51,6 +51,13 @@ void SendData::Cleanup() {
     mhEspHttpClient = nullptr;
 }
 
+void SendData::SetMaximetDiagnostics(String &report, unsigned int avglong, unsigned int outfreq) {
+    msMaximetReport = report;
+    muiMaximetAvgLong = avglong;
+    muiMaximetOutfreqSeconds = outfreq;
+};
+
+
 bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics) {
     bSendDiagnostics = bSendDiagnostics || mbSendDiagnostics;
 
@@ -203,7 +210,13 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
                 mPostData += "\"default\"";
                 break;
         }
-        mPostData += "}";
+        mPostData += ",\"avglong\": ";
+        mPostData += muiMaximetAvgLong;
+        mPostData += ",\"outfreq\": ";
+        mPostData += muiMaximetOutfreqSeconds;
+        mPostData += ",\"report\": \"";
+        mPostData += msMaximetReport;
+        mPostData += "\"}";
         mbSendDiagnostics = false;
     }
     mPostData += "}";

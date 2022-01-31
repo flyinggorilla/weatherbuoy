@@ -30,6 +30,21 @@ public:
 
     void SimulatorDataPoint(float temperature, double longitude, double latitude);
 
+    // reconfigure Maximet long 
+    void SetAvgLong(unsigned short avglong);
+
+    // reconfigure Maximet output frequency
+    // high = true: 1 output per second
+    // high = false: 1 output per minute
+    void SetOutfreq(bool high);  
+
+    // read maximet key configuration fields
+    void ReadConfig();
+
+    unsigned int GetOutfreq() { return muiOutputIntervalSec; };
+    unsigned int GetAvgLong() { return muiAvgLong; };
+    String& GetReport() { return msReport; };
+
 private:
     //main loop run by the task
     void MaximetTask();
@@ -37,6 +52,10 @@ private:
 
     void SendLine(const char* text);
     void SendLine(String &line);
+
+    // enters Maximet commmandline mode with *\r\n and allows to send config; 
+    // calls "exit" automatically at the end to continue data sending
+    void Command(String &command);
 
     MaximetModel mMaximetModel;
     Serial *mpSerial;
@@ -47,6 +66,10 @@ private:
     DataQueue &mrDataQueue;
     
     bool mbRun = true;
+    bool mbCommandline = false;
+    String msReport;
+    unsigned int muiAvgLong = 0;
+    unsigned int muiOutputIntervalSec = 0;
 
     unsigned int muiSolarradiation = 999;
 

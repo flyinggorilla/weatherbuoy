@@ -187,6 +187,13 @@ TestVelocityVector();
     maximet.Start(maximetRxPin, maximetTxPin);
     //maximet.Start(maximetRxPin, maximetTxPin, mOnlineMode == MODE_CELLULAR);
 
+
+    // ESP_LOGI(tag, "SetAvgLong");
+    // maximet.SetAvgLong(5);
+    // ESP_LOGI(tag, "SetOutfreq(high)");
+    // maximet.SetOutfreq(true);
+    // ESP_LOGI(tag, "done");
+
     SendData sendData(config, dataQueue, cellular, watchdog);
 
     switch (config.miMode)
@@ -194,7 +201,7 @@ TestVelocityVector();
     case WEATHERBUOY_MODE_NMEA2000_DISPLAY:
     {
         ESP_LOGI(tag, "Racing Committee Boat with Garmin GNX130 NMEA200 Display");
-        RunDisplay(tempSensors, dataQueue, max471Meter, sendData);
+        RunDisplay(tempSensors, dataQueue, max471Meter, sendData, maximet);
         break;
     }
     case WEATHERBUOY_MODE_MAXIMET_GMX200GPS:
@@ -293,6 +300,10 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
                     ESP_LOGE(tag, "Failed to switch to PPP mode.");
                 }
             };
+        }
+
+        if (bDiagnostics) {
+            sendData.SetMaximetDiagnostics(maximet.GetReport(), maximet.GetAvgLong(), maximet.GetOutfreq() );
         }
 
         // read maximet data queue and create a HTTP POST message
@@ -403,7 +414,7 @@ void Esp32WeatherBuoy::RunSimulator(TemperatureSensors &tempSensors, DataQueue &
     }
 }
 
-void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData){
+void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet){
     ESP_LOGI(tag, "Starting: Startboat NMEA 2000 Display main task.");
 
     bool bDiagnostics;
@@ -488,6 +499,10 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
                     ESP_LOGE(tag, "Failed to switch to PPP mode.");
                 }
             };
+        }
+
+        if (bDiagnostics) {
+            sendData.SetMaximetDiagnostics(maximet.GetReport(), maximet.GetAvgLong(), maximet.GetOutfreq() );
         }
 
         // read maximet data queue and create a HTTP POST message
