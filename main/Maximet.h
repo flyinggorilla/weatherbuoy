@@ -43,6 +43,7 @@ public:
 
     unsigned int GetOutfreq() { return muiOutputIntervalSec; };
     unsigned int GetAvgLong() { return muiAvgLong; };
+    String& GetUserinf() { return msUserinfo; };
     String& GetReport() { return msReport; };
 
 private:
@@ -68,6 +69,7 @@ private:
     bool mbRun = true;
     bool mbCommandline = false;
     String msReport;
+    String msUserinfo;
     unsigned int muiAvgLong = 0;
     unsigned int muiOutputIntervalSec = 0;
 

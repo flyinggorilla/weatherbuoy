@@ -51,11 +51,11 @@ void SendData::Cleanup() {
     mhEspHttpClient = nullptr;
 }
 
-void SendData::SetMaximetDiagnostics(String &report, unsigned int avglong, unsigned int outfreq) {
+void SendData::SetMaximetDiagnostics(String &report, unsigned int avglong, unsigned int outfreq, String &userinf) {
     msMaximetReport = report;
-    msMaximetReport.trim();
     muiMaximetAvgLong = avglong;
     muiMaximetOutfreqSeconds = outfreq;
+    msMaximetUserinfo = userinf;
 };
 
 
@@ -162,8 +162,6 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
     mPostData += boardTemperature;
     mPostData += ",\"watertemp\":";
     mPostData += waterTemperature;
-    mPostData += ",\"cputemp\":";
-    mPostData += esp32_temperature();
     mPostData += "}";
 
     if (bSendDiagnostics) {
@@ -218,7 +216,9 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += muiMaximetAvgLong;
         mPostData += ",\"outfreq\": ";
         mPostData += muiMaximetOutfreqSeconds;
-        mPostData += ",\"report\": \"";
+        mPostData += ",\"userinf\": \"";
+        mPostData += msMaximetUserinfo;
+        mPostData += "\",\"report\": \"";
         mPostData += msMaximetReport;
         mPostData += "\"}}";
         mbSendDiagnostics = false;

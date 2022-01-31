@@ -13,7 +13,7 @@ class SendData {
 public:
 	SendData(Config &config, DataQueue &dataQueue, Cellular &cellular, Watchdog &watchdog);
 	virtual ~SendData();
-    void SetMaximetDiagnostics(String &report, unsigned int avglong, unsigned int outfreq);
+    void SetMaximetDiagnostics(String &report, unsigned int avglong, unsigned int outfreq, String &userinf);
     bool PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics);
     bool PerformHttpPost();
     bool isRestart() { return mbRestart; };
@@ -39,6 +39,7 @@ private: // esp http client
 private:
     unsigned int muiMaximetOutfreqSeconds = 0;
     unsigned int muiMaximetAvgLong = 0;
+    String msMaximetUserinfo;
     String msMaximetReport;
 };
 

@@ -8,6 +8,7 @@
 #include "Maximet.h"
 #include "Max471Meter.h"
 #include "SendData.h"
+#include "Display.h"
 #include "TemperatureSensors.h"
 
 #define FIRMWARE_VERSION __DATE__ " " __TIME__
@@ -39,6 +40,7 @@ private:
 	Cellular cellular;
 	OnlineMode mOnlineMode;
 	bool mbCellular;
+	Display *mpDisplay = nullptr;
 };
 
 

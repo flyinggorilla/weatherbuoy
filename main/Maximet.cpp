@@ -169,6 +169,7 @@ void Maximet::MaximetTask()
             } else if (line.startsWith("REPORT = ")) {
                 int pos = line.indexOf("=");
                 msReport = line.substring(pos+1);
+                msReport.trim();
                 ESP_LOGI(tag, "REPORT: %s", msReport.c_str());
             } else if(line.startsWith("OUTFREQ = 1HZ")) { //"1/MIN" or "1HZ"
                 muiOutputIntervalSec = 1;
@@ -176,6 +177,11 @@ void Maximet::MaximetTask()
             } else if(line.startsWith("OUTFREQ = 1/MIN")) { //"1/MIN" or "1HZ"
                 muiOutputIntervalSec = 60;
                 ESP_LOGI(tag, "OUTFREQ: every %d second(s)", muiOutputIntervalSec);
+            } else if(line.startsWith("USERINF = ")) { 
+                int pos = line.indexOf("=");
+                msUserinfo = line.substring(pos+1);
+                msUserinfo.trim();
+                ESP_LOGI(tag, "USERINFO: %s", msUserinfo.c_str());
             }
             continue;
         }
@@ -747,7 +753,7 @@ void Maximet::SetAvgLong(unsigned short avglong) {
 
 void Maximet::ReadConfig() {
     String command;
-    command.printf("REPORT\r\nAVGLONG\r\nOUTFREQ\r\n");
+    command.printf("USERINF\r\nREPORT\r\nAVGLONG\r\nOUTFREQ\r\n");
     Command(command);
 }
 

@@ -141,6 +141,13 @@ void Esp32WeatherBuoy::Start()
 
     DataQueue dataQueue;
 
+    // allocate NMEA2000 display output on heap as moving averages require some memory
+    if (config.miMode == WEATHERBUOY_MODE_NMEA2000_DISPLAY) {
+        mpDisplay = new Display(CONFIG_NMEA_TWAI_TX_PIN, CONFIG_NMEA_TWAI_RX_PIN, dataQueue);
+        mpDisplay->Start();
+    }
+
+    // start Maximet wind/weather data reading
     int maximetRxPin = CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN;
     int maximetTxPin = CONFIG_WEATHERBUOY_READMAXIMET_TX_PIN;
     Maximet maximet(dataQueue);
@@ -303,7 +310,7 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
         }
 
         if (bDiagnostics) {
-            sendData.SetMaximetDiagnostics(maximet.GetReport(), maximet.GetAvgLong(), maximet.GetOutfreq() );
+            sendData.SetMaximetDiagnostics(maximet.GetReport(), maximet.GetAvgLong(), maximet.GetOutfreq(), maximet.GetUserinf() );
         }
 
         // read maximet data queue and create a HTTP POST message
@@ -426,10 +433,6 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
 
     int logInfoSeconds = 0;
 
-    // allocate display on heap as moving averages require some memory
-    Display *display = new Display(CONFIG_NMEA_TWAI_TX_PIN, CONFIG_NMEA_TWAI_RX_PIN, dataQueue);
-    display->Start();
-
     while (true)
     {
         vTaskDelay(1 * 1000 / portTICK_PERIOD_MS);
@@ -502,7 +505,7 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
         }
 
         if (bDiagnostics) {
-            sendData.SetMaximetDiagnostics(maximet.GetReport(), maximet.GetAvgLong(), maximet.GetOutfreq() );
+            sendData.SetMaximetDiagnostics(maximet.GetReport(), maximet.GetAvgLong(), maximet.GetOutfreq(), maximet.GetUserinf() );
         }
 
         // read maximet data queue and create a HTTP POST message
