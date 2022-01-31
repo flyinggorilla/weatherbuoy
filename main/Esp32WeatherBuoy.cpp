@@ -120,8 +120,9 @@ void Esp32WeatherBuoy::Start()
         break;
     }
 
-
-TestVelocityVector();
+    #ifdef TESTVELOCITYVECTOR
+    TestVelocityVector();
+    #endif
 
 
     int watchdogSeconds = CONFIG_WATCHDOG_SECONDS;
@@ -142,6 +143,16 @@ TestVelocityVector();
 
     int maximetRxPin = CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN;
     int maximetTxPin = CONFIG_WEATHERBUOY_READMAXIMET_TX_PIN;
+    Maximet maximet(dataQueue);
+    maximet.Start(maximetRxPin, maximetTxPin);
+    //maximet.Start(maximetRxPin, maximetTxPin, mOnlineMode == MODE_CELLULAR);
+
+
+    // ESP_LOGI(tag, "SetAvgLong");
+    // maximet.SetAvgLong(5);
+    // ESP_LOGI(tag, "SetOutfreq(high)");
+    // maximet.SetOutfreq(true);
+    // ESP_LOGI(tag, "done");
 
     // detect available Simcom 7600E Modem, such as on Lillygo PCI board
     if (cellular.InitModem())
@@ -182,17 +193,6 @@ TestVelocityVector();
             mOnlineMode = MODE_OFFLINE;
         }
     }
-
-    Maximet maximet(dataQueue);
-    maximet.Start(maximetRxPin, maximetTxPin);
-    //maximet.Start(maximetRxPin, maximetTxPin, mOnlineMode == MODE_CELLULAR);
-
-
-    // ESP_LOGI(tag, "SetAvgLong");
-    // maximet.SetAvgLong(5);
-    // ESP_LOGI(tag, "SetOutfreq(high)");
-    // maximet.SetOutfreq(true);
-    // ESP_LOGI(tag, "done");
 
     SendData sendData(config, dataQueue, cellular, watchdog);
 
@@ -683,7 +683,7 @@ void TestATCommands(Cellular &cellular)
     // +IPR: (0,300,600,1200,2400,4800,9600,19200,38400,57600,115200,230400,460800,921600,3000000,3200000,3686400)
 }
 
-
+#ifdef TESTVELOCITYVECTOR
 void TestVelocityVector() {
     VelocityVector v;
     ESP_LOGI("TESTVV", "New: [%0.6f, %d]", v.getSpeed(), v.getDir());
@@ -720,3 +720,4 @@ void TestVelocityVector() {
     ESP_LOGI("TESTVV", "Add [10, 360°]: [%0.6f, %d]", v.getSpeed(), v.getDir());
 
 }
+#endif

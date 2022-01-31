@@ -53,6 +53,7 @@ void SendData::Cleanup() {
 
 void SendData::SetMaximetDiagnostics(String &report, unsigned int avglong, unsigned int outfreq) {
     msMaximetReport = report;
+    msMaximetReport.trim();
     muiMaximetAvgLong = avglong;
     muiMaximetOutfreqSeconds = outfreq;
 };
@@ -122,14 +123,16 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
             mPostData += ", \"gps\": {";
             mPostData += "\"time\":";  
             mPostData += maximetData.time;
-            mPostData += ",\"lon\":";
-            mPostData += String(maximetData.lon, 6);
-            mPostData += ",\"lat\":";
-            mPostData += String(maximetData.lat, 6);
-            mPostData += ",\"sog\":";  
-            mPostData += maximetData.gpsspeed;
-            mPostData += ",\"cog\":"; 
-            mPostData += maximetData.gpsheading;
+            if (!isnan(maximetData.lon) && !isnan(maximetData.lat)) {
+                mPostData += ",\"lon\":";
+                mPostData += String(maximetData.lon, 6);
+                mPostData += ",\"lat\":";
+                mPostData += String(maximetData.lat, 6);
+                mPostData += ",\"sog\":";  
+                mPostData += maximetData.gpsspeed;
+                mPostData += ",\"cog\":"; 
+                mPostData += maximetData.gpsheading;
+            }
             mPostData += ",\"fix\":"; 
             mPostData += maximetData.gpsfix;
             mPostData += ",\"sat\":";
@@ -210,13 +213,14 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
                 mPostData += "\"default\"";
                 break;
         }
-        mPostData += ",\"avglong\": ";
+        mPostData += ", \"maximet\": {";
+        mPostData += "\"avglong\": ";
         mPostData += muiMaximetAvgLong;
         mPostData += ",\"outfreq\": ";
         mPostData += muiMaximetOutfreqSeconds;
         mPostData += ",\"report\": \"";
         mPostData += msMaximetReport;
-        mPostData += "\"}";
+        mPostData += "\"}}";
         mbSendDiagnostics = false;
     }
     mPostData += "}";
