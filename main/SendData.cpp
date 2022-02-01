@@ -134,10 +134,10 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
             mPostData += maximetData.time;
             if (!isnan(maximetData.lon) && !isnan(maximetData.lat))
             {
-                mPostData += ",\"lon\":";
-                mPostData += String(maximetData.lon, 6);
                 mPostData += ",\"lat\":";
                 mPostData += String(maximetData.lat, 6);
+                mPostData += ",\"lon\":";
+                mPostData += String(maximetData.lon, 6);
                 mPostData += ",\"sog\":";
                 mPostData += maximetData.gpsspeed;
                 mPostData += ",\"cog\":";
@@ -207,26 +207,29 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += mrCellular.msNetworkmode;
         mPostData += "\",\"signalquality\": ";
         mPostData += mrCellular.miSignalQuality;
-        mPostData += "},\"display\": ";
-        mPostData += mrConfig.mbNmeaDisplay;
+        mPostData += "}";
+        if (mrConfig.mbNmeaDisplay) {
+            mPostData += ",\"display\": \"NMEA2000\"";
+        }
+        if (mrConfig.mbAlarmSound || mrConfig.msAlarmSms.length()) {
+            mPostData += ",\"alarm\": ";
+            mPostData += "{\"sound\": ";
+            mPostData += mrConfig.mbAlarmSound ? "true": "false";
+            mPostData += ",\"sms\": \"";
+        	mPostData += mrConfig.msAlarmSms;
+            mPostData += "\", \"radius\": ";
+            mPostData += mrConfig.miAlarmRadius;
+            mPostData += ",\"lat\":";
+            mPostData += String(mrConfig.mdAlarmLatitude, 6);
+            mPostData += ",\"lon\":";
+            mPostData += String(mrConfig.mdAlarmLongitude, 6);
+            mPostData += "}";
+        }
         if (mrConfig.miSimulator)
         {
-            mPostData += ", \"simulator: \"";
-            switch (mrConfig.miSimulator)
-            {
-            case WEATHERBUOY_SIMULATOR_MAXIMET_GMX200GPS:
-                mPostData += "\"GMX200GPS\"";
-                break;
-            case WEATHERBUOY_SIMULATOR_MAXIMET_GMX501:
-                mPostData += "\"GMX501\"";
-                break;
-            case WEATHERBUOY_SIMULATOR_MAXIMET_GMX501GPS:
-                mPostData += "\"GMX501GPS\"";
-                break;
-            default:
-                mPostData += "\"unknown\"";
-                break;
-            }
+            mPostData += ", \"simulator\": \"GMX";
+            mPostData += mrConfig.miSimulator / 10;
+            mPostData += mrConfig.miSimulator % 10 ? "GPS\"" : "\"";
         }
         mPostData += ", \"maximet\": {";
         mPostData += "\"avglong\": ";

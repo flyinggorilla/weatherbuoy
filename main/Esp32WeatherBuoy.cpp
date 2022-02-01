@@ -14,6 +14,7 @@
 #include "nvs_flash.h"
 #include "esp_ota_ops.h"
 #include "NmeaDisplay.h"
+#include "Alarm.h"
 
 static const char tag[] = "WeatherBuoy";
 
@@ -61,6 +62,10 @@ static const char tag[] = "WeatherBuoy";
 #define CONFIG_NMEA_TWAI_RX_PIN GPIO_NUM_22
 #define CONFIG_NMEA_TWAI_TX_PIN GPIO_NUM_21
 #endif
+
+// Optionally drive an Alarm Buzzer at following GPIO (max 30mA)
+#define CONFIG_ALARM_BUZZER_PIN GPIO_NUM_19
+
 
 // Restart ESP32 if there is not data being successfully sent within this period.
 #define CONFIG_WATCHDOG_SECONDS 60 * 125             // 125min - if two hourly sends fail, thats the latest to restart
@@ -204,6 +209,11 @@ void Esp32WeatherBuoy::Start()
         ESP_LOGI(tag, "Starting: Gill Maximet Wind Sensor Simulator GMX%d%s", config.miSimulator / 10, config.miSimulator % 10 ? "GPS" : "");
         RunSimulator(tempSensors, dataQueue, max471Meter, sendData, maximet, static_cast<MaximetModel>(config.miSimulator));
     } else {
+        Alarm *alarm = nullptr;
+        if (config.mbAlarmSound || config.msAlarmSms.length()) {
+            ESP_LOGI(tag, "Starting: Alarm system");
+            alarm = new Alarm(CONFIG_ALARM_BUZZER_PIN, dataQueue);
+        }
         ESP_LOGI(tag, "Starting: Weatherbuoy %s", maximet.GetUserinf().c_str());
         RunBuoy(tempSensors, dataQueue, max471Meter, sendData, maximet);
     }

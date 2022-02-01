@@ -9,7 +9,7 @@
 
 class Alarm {
     public:
-        Alarm(gpio_num_t canTX, gpio_num_t canRX, DataQueue &dataQueue);
+        Alarm(DataQueue &dataQueue, Config &config, gpio_num_t buzzer);
 
         void Start();
    
@@ -19,6 +19,9 @@ class Alarm {
         
         void AlarmTask();
         friend void fAlarmTask(void *pvParameter);
+
+        gpio_num_t mGpioBuzzer;
+        Config &mrConfig;
 
 };
 

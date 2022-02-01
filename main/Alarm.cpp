@@ -4,8 +4,8 @@
 #include "esp_system.h"
 #include "esp_event.h"
 #include "esp_log.h"
-#include "esputil.h"
 #include "math.h"
+
 
 static const char tag[] = "Alarm";
 
@@ -37,6 +37,17 @@ void Alarm::Start()
 
 void Alarm::AlarmTask()
 {
+    if (mrConfig.mbAlarmSound) {
+        gpio_reset_pin(mGpioBuzzer);
+        gpio_set_direction(mGpioBuzzer, GPIO_MODE_OUTPUT);
+        gpio_set_drive_capability(mGpioBuzzer, GPIO_DRIVE_CAP_MAX);
+        ESP_LOGI(tag, "Buzzer enabled");
+    }
+
+    if (mrConfig.miAlarmRadius < 10) {
+        //ESP_LOGE(tag, "Alarm Radius too small")
+    }
+
     while (true)
     {
         Data data;
@@ -47,9 +58,18 @@ void Alarm::AlarmTask()
 
 
     } 
+
+    while(1) {
+        gpio_set_level(mGpioBuzzer, 0);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+
+        gpio_set_level(mGpioBuzzer, 1);
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+
 }
 
-Alarm::Alarm(gpio_num_t canTX, gpio_num_t canRX, DataQueue &dataQueue) : mrDataQueue(dataQueue)
+Alarm::Alarm(DataQueue &dataQueue, Config &config, gpio_num_t buzzer) : mrDataQueue(dataQueue), mrConfig(config), mGpioBuzzer(buzzer)
 {
 }
 
