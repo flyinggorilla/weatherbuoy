@@ -423,7 +423,7 @@ bool SendData::PerformHttpPost()
             value = ReadMessageValue("set-display:");
             if (value.length())
             {
-                mrConfig.mbNmeaDisplay = value.equalsIgnoreCase("true");
+                mrConfig.mbNmeaDisplay = value.equalsIgnoreCase("true") || value.equalsIgnoreCase("NMEA2000");
                 updateConfig = true;
             };
 

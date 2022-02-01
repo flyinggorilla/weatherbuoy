@@ -212,7 +212,7 @@ void Esp32WeatherBuoy::Start()
         Alarm *alarm = nullptr;
         if (config.mbAlarmSound || config.msAlarmSms.length()) {
             ESP_LOGI(tag, "Starting: Alarm system");
-            alarm = new Alarm(CONFIG_ALARM_BUZZER_PIN, dataQueue);
+            alarm = new Alarm(dataQueue, config, CONFIG_ALARM_BUZZER_PIN);
         }
         ESP_LOGI(tag, "Starting: Weatherbuoy %s", maximet.GetUserinf().c_str());
         RunBuoy(tempSensors, dataQueue, max471Meter, sendData, maximet);
