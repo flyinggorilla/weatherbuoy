@@ -64,10 +64,10 @@ public:
 
     int uptime;
 
-    float speed; // required for Display
+    float speed; // required for NmeaDisplay
     //float gspeed;
     //float avgspeed;
-    short dir; // required for Display
+    short dir; // required for NmeaDisplay
     //short gdir;
     //short avgdir;
 

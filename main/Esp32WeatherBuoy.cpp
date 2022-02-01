@@ -13,7 +13,7 @@
 #include "TemperatureSensors.h"
 #include "nvs_flash.h"
 #include "esp_ota_ops.h"
-#include "Display.h"
+#include "NmeaDisplay.h"
 
 static const char tag[] = "WeatherBuoy";
 
@@ -104,20 +104,13 @@ void Esp32WeatherBuoy::Start()
         ESP_LOGE(tag, "Error, could not load configuration.");
     }
 
-    switch (config.miMode)
+    if (config.miSimulator)
     {
-    case WEATHERBUOY_MODE_NMEA2000_DISPLAY:
-        ESP_LOGI(tag, "Operating mode: Racing Committee Boat with Garmin GNX130 NMEA200 Display");
-        break;
-    case WEATHERBUOY_MODE_MAXIMET_GMX200GPS:
-        ESP_LOGI(tag, "Operating mode: Gill Maximet Wind Sensor GMX200GPS Simulator");
-        break;
-    case WEATHERBUOY_MODE_MAXIMET_GMX501:
-        ESP_LOGI(tag, "Operating mode: Gill Maximet Wind Sensor GMX501 Simulator");
-        break;
-    default:
-        ESP_LOGI(tag, "Operating mode: Buoy");
-        break;
+        ESP_LOGI(tag, "Maximet Simulation: GMX%d%s", config.miSimulator / 10, config.miSimulator % 10 ? "GPS" : "");
+    }
+
+    if (config.mbNmeaDisplay) {
+        ESP_LOGI(tag, "NMEA2000 Display output activated (i.e. Garmin GNX130).");
     }
 
     #ifdef TESTVELOCITYVECTOR
@@ -142,8 +135,8 @@ void Esp32WeatherBuoy::Start()
     DataQueue dataQueue;
 
     // allocate NMEA2000 display output on heap as moving averages require some memory
-    if (config.miMode == WEATHERBUOY_MODE_NMEA2000_DISPLAY) {
-        mpDisplay = new Display(CONFIG_NMEA_TWAI_TX_PIN, CONFIG_NMEA_TWAI_RX_PIN, dataQueue);
+    if (config.mbNmeaDisplay) {
+        mpDisplay = new NmeaDisplay(CONFIG_NMEA_TWAI_TX_PIN, CONFIG_NMEA_TWAI_RX_PIN, dataQueue);
         mpDisplay->Start();
     }
 
@@ -203,25 +196,16 @@ void Esp32WeatherBuoy::Start()
 
     SendData sendData(config, dataQueue, cellular, watchdog);
 
-    switch (config.miMode)
-    {
-    case WEATHERBUOY_MODE_NMEA2000_DISPLAY:
+    if (config.mbNmeaDisplay)
     {
         ESP_LOGI(tag, "Racing Committee Boat with Garmin GNX130 NMEA200 Display");
         RunDisplay(tempSensors, dataQueue, max471Meter, sendData, maximet);
-        break;
-    }
-    case WEATHERBUOY_MODE_MAXIMET_GMX200GPS:
-        ESP_LOGI(tag, "Starting: Gill Maximet Wind Sensor GMX200GPS Simulator");
-        RunSimulator(tempSensors, dataQueue, max471Meter, sendData, maximet, gmx200gps);
-        break;
-    case WEATHERBUOY_MODE_MAXIMET_GMX501:
-        ESP_LOGI(tag, "Starting: Gill Maximet Wind Sensor GMX501 Simulator");
-        RunSimulator(tempSensors, dataQueue, max471Meter, sendData, maximet, gmx501);
-        break;
-    default:
+    } else if (config.miSimulator) {
+        ESP_LOGI(tag, "Starting: Gill Maximet Wind Sensor Simulator GMX%d%s", config.miSimulator / 10, config.miSimulator % 10 ? "GPS" : "");
+        RunSimulator(tempSensors, dataQueue, max471Meter, sendData, maximet, static_cast<MaximetModel>(config.miSimulator));
+    } else {
+        ESP_LOGI(tag, "Starting: Weatherbuoy %s", maximet.GetUserinf().c_str());
         RunBuoy(tempSensors, dataQueue, max471Meter, sendData, maximet);
-        break;
     }
 }
 
@@ -403,8 +387,8 @@ void Esp32WeatherBuoy::RunSimulator(TemperatureSensors &tempSensors, DataQueue &
         latitude -= 0.000101; // move south (towards equator)
         //longitude = 0.123456;
         //latitude = 7.654321;
-        unsigned int voltage = max471Meter.Voltage();
-        unsigned int current = max471Meter.Current();
+        //unsigned int voltage = max471Meter.Voltage();
+        //unsigned int current = max471Meter.Current();
         float boardtemp = tempSensors.GetBoardTemp();
         float watertemp = tempSensors.GetWaterTemp();
 

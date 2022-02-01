@@ -575,27 +575,23 @@ void Maximet::MaximetTask()
 
                 mrDataQueue.PutLatestData(data);
 
-                shortAvgCSpeedVector.add(data.cspeed, data.cdir);
-                //shortAvgCGSpeedVector.add(data.cspeed, data.cdir);
-
-///////////// TODO avgspeedvector not needed when maximet sends only once per minute!!!
-                ESP_LOGI(tag, "data.speed: %0.2f data.dir: %d, data.compassh: %d, data.cspeed: %0.2f data.cdir: %d, data.cgspeed: %0.2f data.cgdir: %d, avgspeed: %0.2f avggdir: %d, data.avgcspeed: %0.2f data.avgcdir: %d", 
-                            data.speed, data.dir, data.compassh, data.cspeed, data.cdir, data.cgspeed, data.cgdir, maximetAvgSpeed, maximetAvgDir, data.avgcspeed, data.avgcdir);
+                bool is1HzOutput = muiOutputIntervalSec == 1;
+                if (is1HzOutput) {
+                    shortAvgCSpeedVector.add(data.cspeed, data.cdir);
+                    ESP_LOGD(tag, "data.speed: %0.2f data.dir: %d, data.compassh: %d, data.cspeed: %0.2f data.cdir: %d, data.cgspeed: %0.2f data.cgdir: %d, avgspeed: %0.2f avggdir: %d, data.avgcspeed: %0.2f data.avgcdir: %d", 
+                                data.speed, data.dir, data.compassh, data.cspeed, data.cdir, data.cgspeed, data.cgdir, maximetAvgSpeed, maximetAvgDir, data.avgcspeed, data.avgcdir);
+                }
 
                 // Put data not more frequent than every 30 seconds into queue
-                if (data.uptime >= (lastUptime + 30))
+                if (data.uptime >= (lastUptime + 60) || !is1HzOutput)
                 {
-                    ESP_LOGW(tag, "A: data.cspeed: %0.2f data.cdir: %d", data.cspeed, data.cdir);
-                    data.cspeed = shortAvgCSpeedVector.getSpeed();
-                    data.cdir = shortAvgCSpeedVector.getDir();
-                    shortAvgCSpeedVector.clear();
-                    ESP_LOGW(tag, "B: data.cspeed: %0.2f data.cdir: %d", data.cspeed, data.cdir);
-
-                    /*ESP_LOGW(tag, "1: data.cgspeed: %0.2f data.cgdir: %d", data.cgspeed, data.cgdir);
-                    data.cgspeed = shortAvgCGSpeedVector.getSpeed();
-                    data.cgdir = shortAvgCGSpeedVector.getDir();
-                    shortAvgCGSpeedVector.clear();
-                    ESP_LOGW(tag, "2: data.cgspeed: %0.2f data.cgdir: %d", data.cgspeed, data.cgdir); */
+                    if (is1HzOutput) {
+                        ESP_LOGW(tag, "Last records data.cspeed: %0.2f data.cdir: %d", data.cspeed, data.cdir);
+                        data.cspeed = shortAvgCSpeedVector.getSpeed();
+                        data.cdir = shortAvgCSpeedVector.getDir();
+                        shortAvgCSpeedVector.clear();
+                        ESP_LOGW(tag, "Averaged data.cspeed: %0.2f data.cdir: %d", data.cspeed, data.cdir);
+                    }
 
                     ESP_LOGI(tag, "Pushing measurement data to queue: '%s', %d seconds since start (%d..%d)", line.c_str(cposDataStart), data.uptime, cposDataStart, cposDataEnd);
 

@@ -41,6 +41,10 @@ private:
     unsigned int muiMaximetAvgLong = 0;
     String msMaximetUserinfo;
     String msMaximetReport;
+
+private:
+    double mdCurrentLocationLatitude = 0;
+    double mdCurrentLocationLongitude = 0;
 };
 
 

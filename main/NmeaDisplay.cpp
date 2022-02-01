@@ -1,4 +1,4 @@
-#include "Display.h"
+#include "NmeaDisplay.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
@@ -7,7 +7,7 @@
 #include "esputil.h"
 #include "math.h"
 
-static const char tag[] = "Display";
+static const char tag[] = "NmeaDisplay";
 
 // calculate rolling average
 // https://tttapa.github.io/Pages/Mathematics/Systems-and-Control-Theory/Digital-filters/Simple%20Moving%20Average/C++Implementation.html
@@ -33,7 +33,7 @@ extern "C"
 
 void fDisplayTask(void *pvParameter)
 {
-    ((Display *)pvParameter)->DisplayTask();
+    ((NmeaDisplay *)pvParameter)->DisplayTask();
     vTaskDelete(NULL);
 }
 
@@ -48,7 +48,7 @@ void fDisplayTask(void *pvParameter)
         //ESP_LOGI(tag, "SOG: %.2Lf, AWS: %.2Lf, AWA: %.2Lf, TWS: %.2Lf, TWD: %.2Lf, COG: %.2Lf", sog, aws, awa, tws, twd, cog);
 }*/
 
-void Display::Start()
+void NmeaDisplay::Start()
 {
     /// PGNS
     // https://static.garmin.com/pumac/Tech_Ref_for_Garmin_NMEA2k_EN.pdf
@@ -87,12 +87,12 @@ void Display::Start()
     mNmea.ExtendTransmitMessages(TransmitMessages);
     mNmea.Open();
 
-    xTaskCreate(&fDisplayTask, "Display", 1024 * 16, this, ESP_TASK_MAIN_PRIO, NULL); // large stack is needed
+    xTaskCreate(&fDisplayTask, "NmeaDisplay", 1024 * 16, this, ESP_TASK_MAIN_PRIO, NULL); // large stack is needed
 }
 
 int cnt = 0;
 
-void Display::DisplayTask()
+void NmeaDisplay::DisplayTask()
 {
     while (true)
     {
@@ -200,7 +200,7 @@ void Display::DisplayTask()
     } 
 }
 
-Display::Display(gpio_num_t canTX, gpio_num_t canRX, DataQueue &dataQueue) : mrDataQueue(dataQueue), mNmea(canTX, canRX)
+NmeaDisplay::NmeaDisplay(gpio_num_t canTX, gpio_num_t canRX, DataQueue &dataQueue) : mrDataQueue(dataQueue), mNmea(canTX, canRX)
 {
 }
 

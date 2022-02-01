@@ -7,9 +7,10 @@
 #include "Serial.h"
 
 enum MaximetModel {
-    gmx501,
-    gmx200gps,
-    gmx501gps
+    none = 0,
+    gmx200gps = 2001,
+    gmx501    = 5010,
+    gmx501gps = 5011
 };
 
 class Maximet {

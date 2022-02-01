@@ -13,9 +13,9 @@
 // For that purpose, we use the ESP32 CAN Bus capability, and an additional CAN tranceiver (e.g. SN65HVD230)
 // to send data to an NMEA2000 capable display such as Garmin GNX130
 
-class Display {
+class NmeaDisplay {
     public:
-        Display(gpio_num_t canTX, gpio_num_t canRX, DataQueue &dataQueue);
+        NmeaDisplay(gpio_num_t canTX, gpio_num_t canRX, DataQueue &dataQueue);
 
         // starts the thread to refresh display data in 1s interval. 
         void Start();
