@@ -104,17 +104,17 @@ void Esp32WeatherBuoy::Start()
 {
 
     ESP_LOGI(tag, "Atterwind WeatherBuoy starting!");
-    if (!config.Load())
+    if (!mConfig.Load())
     {
         ESP_LOGE(tag, "Error, could not load configuration.");
     }
 
-    if (config.miSimulator)
+    if (mConfig.miSimulator)
     {
-        ESP_LOGI(tag, "Maximet Simulation: GMX%d%s", config.miSimulator / 10, config.miSimulator % 10 ? "GPS" : "");
+        ESP_LOGI(tag, "Maximet Simulation: GMX%d%s", mConfig.miSimulator / 10, mConfig.miSimulator % 10 ? "GPS" : "");
     }
 
-    if (config.mbNmeaDisplay) {
+    if (mConfig.mbNmeaDisplay) {
         ESP_LOGI(tag, "NMEA2000 Display output activated (i.e. Garmin GNX130).");
     }
 
@@ -127,11 +127,11 @@ void Esp32WeatherBuoy::Start()
     Watchdog watchdog(watchdogSeconds);
     ESP_LOGI(tag, "Watchdog started and adjusted to %d seconds.", watchdogSeconds);
 
-    TemperatureSensors tempSensors(config);
+    TemperatureSensors tempSensors(mConfig);
     tempSensors.Init(CONFIG_TEMPERATURESENSOR_GPIO_ONEWIRE);
 
-    ESP_LOGI(tag, "Hostname: %s", config.msHostname.c_str());
-    ESP_LOGI(tag, "Target URL: %s", config.msTargetUrl.c_str());
+    ESP_LOGI(tag, "Hostname: %s", mConfig.msHostname.c_str());
+    ESP_LOGI(tag, "Target URL: %s", mConfig.msTargetUrl.c_str());
     ESP_LOGI(tag, "App Version: %s", esp_ota_get_app_description()->version);
 
     Max471Meter max471Meter(CONFIG_MAX471METER_GPIO_VOLTAGE, CONFIG_MAX471METER_GPIO_CURRENT);
@@ -140,7 +140,7 @@ void Esp32WeatherBuoy::Start()
     DataQueue dataQueue;
 
     // allocate NMEA2000 display output on heap as moving averages require some memory
-    if (config.mbNmeaDisplay) {
+    if (mConfig.mbNmeaDisplay) {
         mpDisplay = new NmeaDisplay(CONFIG_NMEA_TWAI_TX_PIN, CONFIG_NMEA_TWAI_RX_PIN, dataQueue);
         mpDisplay->Start();
     }
@@ -150,8 +150,6 @@ void Esp32WeatherBuoy::Start()
     int maximetTxPin = CONFIG_WEATHERBUOY_READMAXIMET_TX_PIN;
     Maximet maximet(dataQueue);
     maximet.Start(maximetRxPin, maximetTxPin);
-    //maximet.Start(maximetRxPin, maximetTxPin, mOnlineMode == MODE_CELLULAR);
-
 
     // ESP_LOGI(tag, "SetAvgLong");
     // maximet.SetAvgLong(5);
@@ -160,11 +158,34 @@ void Esp32WeatherBuoy::Start()
     // ESP_LOGI(tag, "done");
 
     // detect available Simcom 7600E Modem, such as on Lillygo PCI board
-    if (cellular.InitModem())
+    if (mCellular.InitModem())
     {
-        cellular.Start(config.msCellularApn, config.msCellularUser, config.msCellularPass, config.msCellularOperator, config.miCellularNetwork);
+        mCellular.Start(mConfig.msCellularApn, mConfig.msCellularUser, mConfig.msCellularPass, mConfig.msCellularOperator, mConfig.miCellularNetwork);
         mOnlineMode = MODE_CELLULAR;
-        // cellular.ReadSMS(); use only during firmware setup to receive a SIM based code
+        
+        // mCellular.ReadSMS(); // use only during firmware setup to receive a SIM based code
+
+        ESP_LOGI(tag, "SMS Numbers: %s", mConfig.msAlarmSms.c_str());
+        /*String msg("Weatherbuoy Test Message!");
+        int startPos = 0;
+        int endPos = 0;
+        while (endPos < mConfig.msAlarmSms.length()) {
+            endPos = mConfig.msAlarmSms.indexOf(',');
+            if (endPos < 0) {
+                endPos = mConfig.msAlarmSms.length();
+            } 
+            String to = mConfig.msAlarmSms.substring(startPos, endPos);
+            to = "+436645356751";
+            ESP_LOGI(tag, "Sending SMS: to: %s msg: %s", to.c_str(), msg.c_str());
+            mCellular.SendSMS(to, msg);
+            startPos = endPos+1;
+        } */
+
+        String msg("Weatherbuoy Test Message!");
+        String to("+436645356751");
+        mCellular.SendSMS(to, msg);
+
+
     }
     else // try wifi if configured
     {
@@ -173,23 +194,23 @@ void Esp32WeatherBuoy::Start()
         maximetRxPin = 16;
         maximetTxPin = 17;
 
-        if (config.msSTASsid.length())
+        if (mConfig.msSTASsid.length())
         {
             //config.msSTASsid = "";
             //config.msSTAPass = "";
             //config.msTargetUrl = "http://10.10.14.195:3000/weatherbuoy";
             //config.Save();
-            ESP_LOGI(tag, "sssi %s pass %s host %s", config.msSTASsid.c_str(), config.msSTAPass.c_str(), config.msHostname.c_str());
-            wifi.StartSTAMode(config.msSTASsid, config.msSTAPass, config.msHostname);
-            wifi.StartTimeSync(config.msNtpServer);
-        	ESP_LOGI(tag, "NTP Time Syncronization enabled: %s", config.msNtpServer.c_str());
+            ESP_LOGI(tag, "sssi %s pass %s host %s", mConfig.msSTASsid.c_str(), mConfig.msSTAPass.c_str(), mConfig.msHostname.c_str());
+            mWifi.StartSTAMode(mConfig.msSTASsid, mConfig.msSTAPass, mConfig.msHostname);
+            mWifi.StartTimeSync(mConfig.msNtpServer);
+        	ESP_LOGI(tag, "NTP Time Syncronization enabled: %s", mConfig.msNtpServer.c_str());
 
             mOnlineMode = MODE_WIFISTA;
         }
-        else if (config.msAPSsid.length())
+        else if (mConfig.msAPSsid.length())
         {
-            ESP_LOGI(tag, "sssi %s pass %s host %s", config.msAPSsid.c_str(), config.msAPPass.c_str(), config.msHostname.c_str());
-            wifi.StartAPMode(config.msAPSsid, config.msAPPass, config.msHostname);
+            ESP_LOGI(tag, "sssi %s pass %s host %s", mConfig.msAPSsid.c_str(), mConfig.msAPPass.c_str(), mConfig.msHostname.c_str());
+            mWifi.StartAPMode(mConfig.msAPSsid, mConfig.msAPPass, mConfig.msHostname);
             mOnlineMode = MODE_WIFIAP;
         }
         else
@@ -199,20 +220,21 @@ void Esp32WeatherBuoy::Start()
         }
     }
 
-    SendData sendData(config, dataQueue, cellular, watchdog);
+    SendData sendData(mConfig, dataQueue, mCellular, watchdog);
 
-    if (config.mbNmeaDisplay)
+    if (mConfig.mbNmeaDisplay)
     {
         ESP_LOGI(tag, "Racing Committee Boat with Garmin GNX130 NMEA200 Display");
         RunDisplay(tempSensors, dataQueue, max471Meter, sendData, maximet);
-    } else if (config.miSimulator) {
-        ESP_LOGI(tag, "Starting: Gill Maximet Wind Sensor Simulator GMX%d%s", config.miSimulator / 10, config.miSimulator % 10 ? "GPS" : "");
-        RunSimulator(tempSensors, dataQueue, max471Meter, sendData, maximet, static_cast<MaximetModel>(config.miSimulator));
+    } else if (mConfig.miSimulator) {
+        ESP_LOGI(tag, "Starting: Gill Maximet Wind Sensor Simulator GMX%d%s", mConfig.miSimulator / 10, mConfig.miSimulator % 10 ? "GPS" : "");
+        RunSimulator(tempSensors, dataQueue, max471Meter, sendData, maximet, static_cast<MaximetModel>(mConfig.miSimulator));
     } else {
         Alarm *alarm = nullptr;
-        if (config.mbAlarmSound || config.msAlarmSms.length()) {
+        if (mConfig.mbAlarmSound || mConfig.msAlarmSms.length()) {
             ESP_LOGI(tag, "Starting: Alarm system");
-            alarm = new Alarm(dataQueue, config, CONFIG_ALARM_BUZZER_PIN);
+            alarm = new Alarm(dataQueue, mConfig, CONFIG_ALARM_BUZZER_PIN);
+            alarm->Start();
         }
         ESP_LOGI(tag, "Starting: Weatherbuoy %s", maximet.GetUserinf().c_str());
         RunBuoy(tempSensors, dataQueue, max471Meter, sendData, maximet);
@@ -282,10 +304,10 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
         if (mOnlineMode == MODE_CELLULAR)
         {
             ESP_LOGI(tag, "switching to full power mode next...");
-            if (!cellular.SwitchToFullPowerMode())
+            if (!mCellular.SwitchToFullPowerMode())
             {
                 ESP_LOGW(tag, "Retrying switching to full power mode ...");
-                if (!cellular.SwitchToFullPowerMode())
+                if (!mCellular.SwitchToFullPowerMode())
                 {
                     ESP_LOGE(tag, "Switching to full power mode failed");
                 }
@@ -293,10 +315,10 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
 
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             ESP_LOGI(tag, "switching to PPP mode next...");
-            if (!cellular.SwitchToPppMode())
+            if (!mCellular.SwitchToPppMode())
             {
                 ESP_LOGW(tag, "Retrying switching to PPP mode next...");
-                if (!cellular.SwitchToPppMode())
+                if (!mCellular.SwitchToPppMode())
                 {
                     ESP_LOGE(tag, "Failed to switch to PPP mode.");
                 }
@@ -331,7 +353,7 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
         if (mOnlineMode == MODE_CELLULAR)
         {
             ESP_LOGI(tag, "switching to low power mode...");
-            cellular.SwitchToLowPowerMode();
+            mCellular.SwitchToLowPowerMode();
         }
 
         // determine nighttime by low solar radiation
@@ -488,10 +510,10 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
 
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             ESP_LOGI(tag, "switching to PPP mode next...");
-            if (!cellular.SwitchToPppMode())
+            if (!mCellular.SwitchToPppMode())
             {
                 ESP_LOGW(tag, "Retrying switching to PPP mode next...");
-                if (!cellular.SwitchToPppMode())
+                if (!mCellular.SwitchToPppMode())
                 {
                     ESP_LOGE(tag, "Failed to switch to PPP mode.");
                 }

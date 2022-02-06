@@ -24,6 +24,8 @@ public:
 	virtual ~Cellular();
     void Start(String apn, String user, String pass, String preferredOperator, int preferredNetwork); // call after Init()
     void ReadSMS();
+    bool SendSMS(String &rsTo, String &rsMsg);
+
     bool Command(const char *sCommand,const char *sSuccess, String *sResponse = nullptr, const char *sInfo = nullptr, unsigned short maxLines = 100);
     bool SwitchToCommandMode(); // todo, move to private
     bool SwitchToPppMode(); // can be moved to private

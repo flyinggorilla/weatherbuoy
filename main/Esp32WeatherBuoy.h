@@ -28,16 +28,16 @@ public:
 	};
 
 	void Restart(int seconds);
-	Config& GetConfig() { return config; }
+	Config& GetConfig() { return mConfig; }
 
 	void RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet);
 	void RunDisplay(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet);
 	void RunSimulator(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet, MaximetModel model);
 
 private:
-	Config config;
-	Wifi wifi;
-	Cellular cellular;
+	Config mConfig;
+	Wifi mWifi;
+	Cellular mCellular;
 	OnlineMode mOnlineMode;
 	bool mbCellular;
 	NmeaDisplay *mpDisplay = nullptr;

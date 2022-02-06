@@ -47,6 +47,10 @@ public:
     String& GetUserinf() { return msUserinfo; };
     String& GetReport() { return msReport; };
 
+    // set columns maximet should send e.g. "USERINF,SPEED,GSPEED,AVGSPEED,DIR" --- this will send "REPORT USERINF SPEED .... " (no comma!) to maximet
+    void SetReport(String columns);
+
+
 private:
     //main loop run by the task
     void MaximetTask();

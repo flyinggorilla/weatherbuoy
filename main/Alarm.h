@@ -6,23 +6,37 @@
 #include "DataQueue.h"
 #include "driver/gpio.h"
 
+enum AlarmTrigger {
+    NONE = 0,
+    TILT = 1,
+    ORIENT = 2,
+    UNPLUGGED = 4,
+    GEOFENCE = 8
+};
 
 class Alarm {
     public:
         Alarm(DataQueue &dataQueue, Config &config, gpio_num_t buzzer);
 
         void Start();
+
+        void BuzzerOff();
+        void BuzzerOn();
+
+        void GetAlarmInfo(String &info);
    
-    private:
+    private: 
         void Write();
         DataQueue &mrDataQueue;
+        String msAlarmInfo;
         
         void AlarmTask();
         friend void fAlarmTask(void *pvParameter);
 
-        gpio_num_t mGpioBuzzer;
         Config &mrConfig;
+        gpio_num_t mGpioBuzzer;
 
+        int miTiltThreshold = 80;
 };
 
 

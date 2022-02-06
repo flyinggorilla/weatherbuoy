@@ -435,6 +435,39 @@ void Cellular::ReadSMS() {
     ESP_LOGI(tag, "SMS '%s'", response.c_str());    
 }
 
+bool Cellular::SendSMS(String &rsTo, String &rsMsg) {
+    // SEND SMS
+    ESP_LOGI(tag, "enabling text mode");    
+    String response;
+    bool ret = Command("AT+CMGF=1", "OK", &response, "Switch modem to sending SMS in text.");
+    ESP_LOGI(tag, "enabling text mode %s. response %s", ret ? "succeeded" : "failed", response.c_str());    
+
+    ret = Command("AT+CMGS=?", "OK", &response, "Query SMS sending capability SMS.");
+    ESP_LOGI(tag, "query SMS sending %s. response %s", ret ? "succeeded" : "failed", response.c_str());    
+
+
+    String command;
+    static const char CTRLZ = 0x1A;
+    static const char ESC = 0x1B;
+    ESP_LOGI(tag, "Sending SMS to:%s, message:%s", rsTo.c_str(), rsMsg.c_str());    
+    command.printf("AT+CMGS=\"%s\"\r", rsTo.c_str());
+    if(!Command(command.c_str(), ">", &response, "prepare to send SMS text.")) {
+        ESP_LOGE(tag, "ERROR preparing SMS to: %s, response: %s", rsTo.c_str(), response.c_str());     
+        return false;
+    }
+    command.printf("%s\x1A\x1B", rsMsg.c_str());
+    if(!Command(command.c_str(), "OK", &response, "Sending SMS message.")) {
+        ESP_LOGE(tag, "ERROR sending SMS to: %s, msg: %s, response: %s", rsTo.c_str(), rsMsg.c_str(), response.c_str());     
+        return false;
+    }
+    ESP_LOGE(tag, "Successfully sent SMS to: %s, msg: %s, response: %s", rsTo.c_str(), rsMsg.c_str(), response.c_str());     
+    return true;
+}
+// "+491575123456"
+// > Testing message, let's hope this works... [Ctrl+Z]
+// +CMGS: 1
+
+
 void Cellular::ReceiverTask() {
     ESP_LOGD(tag, "Started Modem Receiver task");
     while(true) {
@@ -847,11 +880,17 @@ bool Cellular::ModemReadLine(String& line) {
             unsigned char c = mpBuffer[muiBufferPos++];
             if (c == 0x0D || c ==0x0A) {  // skip trailing line feeds \r\n
                 if (line.length()) {
-                    //ESP_LOGI(tag, "ModemReadLine(): %s", line.c_str());
+                    ESP_LOGD(tag, "ModemReadLine(): %s", line.c_str());
                     return true;
                 }
             } else {
                 line += (char)c;
+   
+                // SMS sending stuff!!!  
+                if (line.equals(">")) {
+                   ESP_LOGW(tag, "ModemReadLine Ready for Input: %s", line.c_str());
+                   return true;
+                }
             }
         } 
         maxLineLength--;
@@ -900,7 +939,7 @@ bool Cellular::ModemReadResponse(String &sResponse, const char *expectedLastLine
             continue;
         
         sResponse += sLine;
-        //ESP_LOGI(tag, "LINE: '%s', '%s'", sLine.c_str(), sResponse.c_str());
+        ESP_LOGD(tag, "LINE: '%s', '%s'", sLine.c_str(), sResponse.c_str());
         if (sLine.startsWith(expectedLastLineResponse)) {
             //ESP_LOGI(tag, "Success: '%s', '%s'", sLine.c_str(), sResponse.c_str());
             return true;

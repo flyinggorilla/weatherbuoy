@@ -49,6 +49,7 @@ public:
         // status
         xtilt = 0;
         ytilt = 0;
+        zorient = 0; // +1 upright, -1 upside down
         status[0] = 0;
         windstat[0] = 0;
 
@@ -89,8 +90,9 @@ public:
     short solarrad;
 
     // status
-    float xtilt;
-    float ytilt;
+    short xtilt;
+    short ytilt;
+    short zorient;
     static const int statuslen = 5;
     char status[statuslen];
     char windstat[statuslen];
@@ -111,13 +113,14 @@ public:
     DataQueue();
     virtual ~DataQueue();
 
+public: // data queue
+
+    // adds a data element to the queue
+    bool PutData(Data &data);
+
     // read data from queue;
     // returns false if no data available
     bool GetData(Data &data);
-
-    // read data from latest data queue ;
-    // returns false if no data available
-    bool GetLatestData(Data &data, unsigned int timeoutSeconds);
 
     // peeks into queue, but doesnt return pointer to not accidentally delete data
     bool WaitForData(unsigned int timeoutSeconds);
@@ -128,15 +131,28 @@ public:
     // returns true when the queue is full
     bool IsFull();
 
-    // adds a data element to the queue
-    bool PutData(Data &data);
+public: // latest data
 
     // adds data to a 1-sized queue, contains always the latest data
     bool PutLatestData(Data &data);
 
+    // read data from latest data queue ;
+    // returns false if no data available
+    bool GetLatestData(Data &data, unsigned int timeoutSeconds);
+
+public: // alerting
+
+    // adds data to a 1-sized queue, contains always the latest data
+    bool PutAlarmData(Data &data);
+
+    // read data from latest data queue ;
+    // returns false if no data available
+    bool GetAlarmData(Data &data, unsigned int timeoutSeconds);
+
 private:
     QueueHandle_t mxDataQueue;
     QueueHandle_t mxDataLatest;
+    QueueHandle_t mxDataAlarm;
 
     //bool mbRun = true;
 };

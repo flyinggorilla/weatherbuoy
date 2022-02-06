@@ -5,23 +5,11 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "math.h"
-
+#include <cmath>
+#include "stdlib.h"
+#include "GeoUtil.h"
 
 static const char tag[] = "Alarm";
-
-extern "C"
-{
-    // Application execution delay. Must be implemented by application.
-    void delay(uint32_t ms)
-    {
-        vTaskDelay(ms / portTICK_PERIOD_MS);
-    };
-    // Current uptime in milliseconds. Must be implemented by application.
-    uint32_t millis()
-    {
-        return esp_timer_get_time() / 1000;
-    };
-}
 
 void fAlarmTask(void *pvParameter)
 {
@@ -34,44 +22,259 @@ void Alarm::Start()
     xTaskCreate(&fAlarmTask, "Alarm", 1024 * 4, this, ESP_TASK_MAIN_PRIO, NULL); // large stack is needed
 }
 
-
 void Alarm::AlarmTask()
 {
-    if (mrConfig.mbAlarmSound) {
-        gpio_reset_pin(mGpioBuzzer);
-        gpio_set_direction(mGpioBuzzer, GPIO_MODE_OUTPUT);
-        gpio_set_drive_capability(mGpioBuzzer, GPIO_DRIVE_CAP_MAX);
-        ESP_LOGI(tag, "Buzzer enabled");
+    if (mrConfig.mbAlarmSound)
+    {
+        gpio_config_t gpioConfig;
+        gpioConfig.mode = GPIO_MODE_OUTPUT;
+        gpioConfig.intr_type = GPIO_INTR_DISABLE;
+        gpioConfig.pull_down_en = GPIO_PULLDOWN_DISABLE;
+        gpioConfig.pull_up_en = GPIO_PULLUP_DISABLE;
+        gpioConfig.pin_bit_mask = (1ULL<<mGpioBuzzer);
+        gpio_config(&gpioConfig);
+        gpio_set_drive_capability(mGpioBuzzer, GPIO_DRIVE_CAP_3);
+        ESP_LOGI(tag, "Buzzer enabled on GPIO%d", mGpioBuzzer);
+        BuzzerOff();
     }
 
-    if (mrConfig.miAlarmRadius < 10) {
-        //ESP_LOGE(tag, "Alarm Radius too small")
+    if (mrConfig.miAlarmRadius < 10)
+    {
+        // ESP_LOGE(tag, "Alarm Radius too small")
     }
 
+    static const short ARMING_SECONDS = 10;   // 60 counts = 60 seconds
+    static const short COOLDOWN_SECONDS = 30; // 30 seconds
+
+    unsigned int countArming = 0;
+    unsigned int countTilt = 0;
+    unsigned int countOrient = 0;
+    unsigned int countUnplugged = 0;
+    unsigned int countGeoFence = 0;
+
+    unsigned int alarmTriggers = 0;
+
+    int timestampAlarmTriggered = 0;
+    int timestampAlarmCooldown = 0;
     while (true)
     {
         Data data;
-        if (!mrDataQueue.GetLatestData(data, 90)) {
-            delay(500);
+        unsigned short absTilt = 0;
+        unsigned int geoDislocation = 0;
+        msAlarmInfo.setlength(0);
+
+        if (mrDataQueue.GetAlarmData(data, 3))
+        {
+
+            // 60 seconds of data before arming system
+            if (countArming < ARMING_SECONDS)
+            {
+                //ESP_LOGI(tag, "Arming %d", countArming);
+                countArming++;
+            }
+            else if (countArming == ARMING_SECONDS)
+            {
+                countArming++;
+                ESP_LOGW(tag, "ARMED! Buzzer %s", mrConfig.mbAlarmSound ? "activated" : "muted");
+            }
+
+            countUnplugged = 0;
+
+            absTilt = abs(data.xtilt) + abs(data.ytilt);
+
+            // if zorient is -1 then maximet is tilted upside down (more than 90° tilt)
+            if (data.zorient < 0)
+            {
+                countOrient++;
+                //ESP_LOGW(tag, "UPSIDE DOWN!");
+            }
+            else
+            {
+                countOrient = 0;
+            }
+
+            // the sum of both tilts is max 90°
+            if (absTilt > miTiltThreshold)
+            {
+                countTilt++;
+                ESP_LOGI(tag, "TILT! %d°/%d° (%d°)", data.xtilt, data.ytilt, absTilt);
+            }
+            else
+            {
+                countTilt = 0;
+            }
+
+            // geofence
+            if (mrConfig.mdAlarmLatitude && mrConfig.mdAlarmLongitude && data.lat && data.lon && !isnan(mrConfig.mdAlarmLatitude) && !isnan(mrConfig.mdAlarmLongitude) && !isnan(data.lat) && !isnan(data.lon))
+            {
+                geoDislocation = geoDistance(mrConfig.mdAlarmLatitude, mrConfig.mdAlarmLongitude, data.lat, data.lon);
+                if (geoDislocation > mrConfig.miAlarmRadius)
+                {
+                    // if bogus distance of >100km reset geofence
+                    if (geoDislocation > 100000)
+                    {
+                        countGeoFence = 0;
+                    }
+                    else
+                    {
+                        countGeoFence++;
+                    }
+                }
+                else
+                {
+                    countGeoFence = 0;
+                }
+            }
+
+            if (countTilt >= 5)
+            {
+                alarmTriggers |= TILT;
+            }
+
+            if (countOrient >= 2)
+            {
+                alarmTriggers |= ORIENT;
+            }
+            if (countGeoFence >= 5)
+            {
+                alarmTriggers |= GEOFENCE;
+            }
+        }
+        else
+        {
+            countUnplugged++;
+        }
+
+        if (countUnplugged >= 2)
+        {
+            alarmTriggers |= UNPLUGGED;
+        }
+
+        if (countArming < ARMING_SECONDS)
+        {
+            // reset triggers during arming phase, extend arming --> arm only if all is good
+            if (countUnplugged || countGeoFence || countOrient || countTilt || alarmTriggers) {
+                countArming = 0;
+                alarmTriggers = 0;
+                countGeoFence = 0;
+                countUnplugged = 0;
+                countOrient = 0;
+                countTilt = 0;
+            }
             continue;
         }
 
+        int timestampSecondsNow = esp_timer_get_time() / 1000000;                   // seconds since start (good enough as int can store seconds over 68 years in 31 bits)
+        int secondsAlarmActive = timestampSecondsNow - timestampAlarmTriggered + 1; // add one second to be sure value > 0
+        if (alarmTriggers)
+        {
+            if (timestampAlarmTriggered)
+            {
+                // turn off buzzer in any case after this #seconds
+                if (secondsAlarmActive > 60)
+                {
+                    //ESP_LOGW(tag, "BUZZER DURATION EXCEEDED. TURNING OFF!");
+                    BuzzerOff();
+                }
+            }
+            else
+            {
+                timestampAlarmTriggered = timestampSecondsNow;
+                timestampAlarmCooldown = 0;
+                if (mrConfig.mbAlarmSound)
+                {
+                    BuzzerOn();
+                }
+                if (alarmTriggers & GEOFENCE)
+                {
+                    ESP_LOGE(tag, "GEOFENCE ALARM: %.0dm is outside of %d radius", geoDislocation, mrConfig.miAlarmRadius);
+                    String info;
+                    info.printf("BUOY OUTSIDE GEOFENCE ALARM: %.0dm is outside of %d radius", geoDislocation, mrConfig.miAlarmRadius);
+                    info += "\r\n";
+                    msAlarmInfo += info;
+                }
+                if (alarmTriggers & TILT)
+                {
+                    ESP_LOGE(tag, "TILT ALARM: %d° (%d°/%d°) %s", absTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
+                    String info;
+                    info.printf("MAST MANIPULATION - TILT ALARM: %d° (%d°/%d°) %s", data.xtilt, data.ytilt, absTilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
+                    info += "\r\n";
+                    msAlarmInfo += info;
+                }
+                if (alarmTriggers & ORIENT)
+                {
+                    ESP_LOGE(tag, "ORIENT ALARM: %d° (%d°/%d°) %s", absTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
+                    String info;
+                    info.printf("MAST MANIPULATION - MAXIMET UPSIDE DOWN ALARM: %d° (%d°/%d°) %s", data.xtilt, data.ytilt, absTilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
+                    info += "\r\n";
+                    msAlarmInfo += info;
+                }
+                if (alarmTriggers & UNPLUGGED)
+                {
+                    ESP_LOGE(tag, "UNPLUGGED ALARM!");
+                    String info;
+                    info.printf("WEATHERSTATION SABOTAGE ALARM! NO MAXIMET DATA.");
+                    info += "\r\n";
+                    msAlarmInfo += info;
+                }
+                ESP_LOGE(tag, "ALARM INFO: %s", msAlarmInfo.c_str());
 
-    } 
+            }
 
-    while(1) {
-        gpio_set_level(mGpioBuzzer, 0);
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        }
+        else
+        {
+            if (timestampAlarmTriggered)
+            {
+                // start cooldown-phase
+                if (!timestampAlarmCooldown)
+                {
+                    timestampAlarmCooldown = timestampSecondsNow;
+                }
 
-        gpio_set_level(mGpioBuzzer, 1);
+                int secondsCooldownActive = timestampSecondsNow - timestampAlarmCooldown;
+                if (secondsCooldownActive > COOLDOWN_SECONDS)
+                {
+                    timestampAlarmTriggered = 0;
+                    timestampAlarmCooldown = 0;
+                    countGeoFence = 0;
+                    countOrient = 0;
+                    countTilt = 0;
+                    countUnplugged = 0;
+                    countArming = 0;
+                    alarmTriggers = 0;
+                    BuzzerOff();
+                    ESP_LOGW(tag, "DISARMED!");
+                }
+            }
+            else
+            {
+                BuzzerOff();
+            }
+        }
+
         vTaskDelay(100 / portTICK_PERIOD_MS);
     }
+}
 
+void Alarm::BuzzerOn()
+{
+    if (mrConfig.mbAlarmSound)
+    {
+        gpio_set_level(mGpioBuzzer, 1);
+    }
+};
+
+void Alarm::BuzzerOff()
+{
+    gpio_set_level(mGpioBuzzer, 0);
+};
+
+void Alarm::GetAlarmInfo(String &info)
+{
+    info = msAlarmInfo;
 }
 
 Alarm::Alarm(DataQueue &dataQueue, Config &config, gpio_num_t buzzer) : mrDataQueue(dataQueue), mrConfig(config), mGpioBuzzer(buzzer)
 {
 }
-
-
-

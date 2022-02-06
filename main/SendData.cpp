@@ -122,6 +122,8 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += maximetData.xtilt;
         mPostData += ",\"ytilt\":";
         mPostData += maximetData.ytilt;
+        mPostData += ",\"zorient\":";
+        mPostData += maximetData.zorient;
         mPostData += ",\"status\":\"";
         mPostData += maximetData.status;
         mPostData += "\",\"windstat\":\"";
@@ -423,11 +425,11 @@ bool SendData::PerformHttpPost()
             value = ReadMessageValue("set-display:");
             if (value.length())
             {
-                mrConfig.mbNmeaDisplay = value.equalsIgnoreCase("true") || value.equalsIgnoreCase("NMEA2000");
+                mrConfig.mbNmeaDisplay = value.equalsIgnoreCase("NMEA2000") || value.equalsIgnoreCase("on") || value.equalsIgnoreCase("true");
                 updateConfig = true;
             };
 
-            value = ReadMessageValue("set-alarmcenter:");
+            value = ReadMessageValue("set-alarmgps:");
             if (value.length())
             {
                 if (!isnan(mdCurrentLocationLongitude) && !isnan(mdCurrentLocationLatitude) && !(mdCurrentLocationLatitude == 0) && !(mdCurrentLocationLongitude == 0))
@@ -452,7 +454,7 @@ bool SendData::PerformHttpPost()
             value = ReadMessageValue("set-alarmsound:");
             if (value.length())
             {
-                mrConfig.mbAlarmSound = value.equalsIgnoreCase("true");
+                mrConfig.mbAlarmSound = value.equalsIgnoreCase("true") || value.equalsIgnoreCase("on");
                 updateConfig = true;
             };
 

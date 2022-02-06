@@ -36,6 +36,7 @@ void Maximet::Start(int gpioRX, int gpioTX, bool alternateUart)
     xTaskCreate(&fMaximetTask, "Maximet", 1024 * 16, this, ESP_TASK_MAIN_PRIO, NULL); // large stack is needed
 
     vTaskDelay(1000/portTICK_PERIOD_MS);
+    //SetReport("USERINF,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,GPSLOCATION,GPSSTATUS,TIME");
     ReadConfig();
 }
 
@@ -159,7 +160,7 @@ void Maximet::MaximetTask()
         ESP_LOGD(tag, "THE LINE: %s", line.c_str());
 
         if (mbCommandline) {
-            //ESP_LOGI(tag, "Commandline reponse: %s", line.c_str());
+            ESP_LOGI(tag, "Commandline reponse: %s", line.c_str());
             if (line.startsWith("AVGLONG = ")) {
                 muiAvgLong = 0;
                 int pos = line.indexOf("=");
@@ -182,6 +183,8 @@ void Maximet::MaximetTask()
                 msUserinfo = line.substring(pos+1);
                 msUserinfo.trim();
                 ESP_LOGI(tag, "USERINFO: %s", msUserinfo.c_str());
+            } else if(line.startsWith("INCORRECT ")) { 
+                ESP_LOGE(tag, "Error setting columns: %s", line.c_str());
             }
             continue;
         }
@@ -323,10 +326,10 @@ void Maximet::MaximetTask()
                             data.compassh = column.toInt();
                             break;
                         case 18:
-                            data.xtilt = column.toFloat();
+                            data.xtilt = column.toInt();
                             break;
                         case 19:
-                            data.ytilt = column.toFloat();
+                            data.ytilt = column.toInt();
                             break;
                         case 20:
                             column.toCharArray(data.status, data.statuslen);
@@ -399,24 +402,27 @@ void Maximet::MaximetTask()
                             data.solarrad = muiSolarradiation = column.toInt();
                             break;
                         case 17:
-                            data.xtilt = column.toFloat();
+                            data.xtilt = column.toInt();
                             break;
                         case 18:
-                            data.ytilt = column.toFloat();
+                            data.ytilt = column.toInt();
                             break;
                         case 19:
-                            column.toCharArray(data.status, data.statuslen);
+                            data.zorient = column.toInt();
                             break;
                         case 20:
-                            column.toCharArray(data.windstat, data.statuslen);
+                            column.toCharArray(data.status, data.statuslen);
                             break;
                         case 21:
-                            ParseGPSLocation(column, data);
+                            column.toCharArray(data.windstat, data.statuslen);
                             break;
                         case 22:
-                            ParseGPSStatus(column, data);
+                            ParseGPSLocation(column, data);
                             break;
                         case 23:
+                            ParseGPSStatus(column, data);
+                            break;
+                        case 24:
                             ParseTime(column, data);
                             break;
                         }
@@ -475,10 +481,10 @@ void Maximet::MaximetTask()
                             data.solarrad = muiSolarradiation = column.toInt();
                             break;
                         case 16:
-                            data.xtilt = column.toFloat();
+                            data.xtilt = column.toInt();
                             break;
                         case 17:
-                            data.ytilt = column.toFloat();
+                            data.ytilt = column.toInt();
                             break;
                         case 18:
                             column.toCharArray(data.status, data.statuslen);
@@ -574,14 +580,18 @@ void Maximet::MaximetTask()
                 } 
 
                 mrDataQueue.PutLatestData(data);
+                mrDataQueue.PutAlarmData(data);
 
-                bool is1HzOutput = muiOutputIntervalSec == 1;
+                bool is1HzOutput = (muiOutputIntervalSec <= 1);
                 if (is1HzOutput) {
                     shortAvgCSpeedVector.add(data.cspeed, data.cdir);
                     ESP_LOGD(tag, "data.speed: %0.2f data.dir: %d, data.compassh: %d, data.cspeed: %0.2f data.cdir: %d, data.cgspeed: %0.2f data.cgdir: %d, avgspeed: %0.2f avggdir: %d, data.avgcspeed: %0.2f data.avgcdir: %d", 
                                 data.speed, data.dir, data.compassh, data.cspeed, data.cdir, data.cgspeed, data.cgdir, maximetAvgSpeed, maximetAvgDir, data.avgcspeed, data.avgcdir);
                 }
 
+// USERINF,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,GPSLOCATION,GPSSTATUS,TIME,CHECK
+// REPORT USERINF SPEED GSPEED AVGSPEED DIR GDIR AVGDIR CDIR AVGCDIR COMPASSH PASL PSTN RH AH TEMP SOLARRAD XTILT YTILT ZORIENT STATUS WINDSTAT GPSLOCATION GPSSTATUS TIME
+/// SOMETHING WRONG HERE ... WHEN QUEUE FULL EVERY SECOND IS PUSHED
                 // Put data not more frequent than every 30 seconds into queue
                 if (data.uptime >= (lastUptime + 60) || !is1HzOutput)
                 {
@@ -762,5 +772,13 @@ void Maximet::SetOutfreq(bool high) {
     {
         command.printf("OUTFREQ 1/MIN\r\nOUTFREQ\r\n");
     } 
+    Command(command);
+}
+
+
+void Maximet::SetReport(String columns) {
+    String command;
+    columns.replace(',', ' ');
+    command.printf("REPORT %s\r\nREPORT\r\n", columns.c_str());
     Command(command);
 }

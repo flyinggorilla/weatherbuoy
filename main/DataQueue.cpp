@@ -49,6 +49,17 @@ bool DataQueue::GetLatestData(Data &data, unsigned int timeoutSeconds)
     return false;
 }
 
+bool DataQueue::GetAlarmData(Data &data, unsigned int timeoutSeconds)
+{
+    if (xQueueReceive(mxDataAlarm, &data, timeoutSeconds * 1000 / portTICK_PERIOD_MS) == pdTRUE)
+    {
+        ESP_LOGD(tag, "Retreiving item from Alarm Queue.");
+        return true;
+    }
+    ESP_LOGD(tag, "No data in Alarm Queue.");
+    return false;
+}
+
 
 bool DataQueue::IsFull()
 {
@@ -65,12 +76,19 @@ bool DataQueue::PutLatestData(Data &data)
     return (xQueueOverwrite(mxDataLatest, &data) == pdTRUE);
 }
 
+bool DataQueue::PutAlarmData(Data &data)
+{
+    return (xQueueOverwrite(mxDataAlarm, &data) == pdTRUE);
+}
+
+
 DataQueue::DataQueue()
 {
     // Create a queue capable of containing 10 uint32_t values.
     mxDataQueue = xQueueCreate(60, sizeof(Data));
     mxDataLatest = xQueueCreate(1, sizeof(Data));
-    if (!mxDataQueue)
+    mxDataAlarm = xQueueCreate(1, sizeof(Data));
+    if (!mxDataQueue || !mxDataLatest || !mxDataAlarm)
     {
         ESP_LOGE(tag, "Could not create Data queue. Data collection not initialized.");
     }
