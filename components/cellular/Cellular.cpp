@@ -455,12 +455,13 @@ bool Cellular::SendSMS(String &rsTo, String &rsMsg) {
         ESP_LOGE(tag, "ERROR preparing SMS to: %s, response: %s", rsTo.c_str(), response.c_str());     
         return false;
     }
-    command.printf("%s\x1A\x1B", rsMsg.c_str());
+    command = rsMsg;
+    command += CTRLZ;
     if(!Command(command.c_str(), "OK", &response, "Sending SMS message.")) {
-        ESP_LOGE(tag, "ERROR sending SMS to: %s, msg: %s, response: %s", rsTo.c_str(), rsMsg.c_str(), response.c_str());     
+        ESP_LOGI(tag, "ERROR sending SMS to: %s, msg: %s, response: %s", rsTo.c_str(), rsMsg.c_str(), response.c_str());     
         return false;
     }
-    ESP_LOGE(tag, "Successfully sent SMS to: %s, msg: %s, response: %s", rsTo.c_str(), rsMsg.c_str(), response.c_str());     
+    ESP_LOGI(tag, "Successfully sent SMS to: %s, msg: %s", rsTo.c_str(), rsMsg.c_str());     
     return true;
 }
 // "+491575123456"

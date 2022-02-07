@@ -187,7 +187,7 @@ void Alarm::AlarmTask()
                 }
                 if (alarmTriggers & GEOFENCE)
                 {
-                    ESP_LOGE(tag, "GEOFENCE ALARM: %.0dm is outside of %d radius", geoDislocation, mrConfig.miAlarmRadius);
+                    //ESP_LOGE(tag, "GEOFENCE ALARM: %.0dm is outside of %d radius", geoDislocation, mrConfig.miAlarmRadius);
                     String info;
                     info.printf("BUOY OUTSIDE GEOFENCE ALARM: %.0dm is outside of %d radius", geoDislocation, mrConfig.miAlarmRadius);
                     info += "\r\n";
@@ -195,7 +195,7 @@ void Alarm::AlarmTask()
                 }
                 if (alarmTriggers & TILT)
                 {
-                    ESP_LOGE(tag, "TILT ALARM: %d° (%d°/%d°) %s", absTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
+                    //ESP_LOGE(tag, "TILT ALARM: %d° (%d°/%d°) %s", absTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
                     String info;
                     info.printf("MAST MANIPULATION - TILT ALARM: %d° (%d°/%d°) %s", data.xtilt, data.ytilt, absTilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
                     info += "\r\n";
@@ -203,7 +203,7 @@ void Alarm::AlarmTask()
                 }
                 if (alarmTriggers & ORIENT)
                 {
-                    ESP_LOGE(tag, "ORIENT ALARM: %d° (%d°/%d°) %s", absTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
+                    //ESP_LOGE(tag, "ORIENT ALARM: %d° (%d°/%d°) %s", absTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
                     String info;
                     info.printf("MAST MANIPULATION - MAXIMET UPSIDE DOWN ALARM: %d° (%d°/%d°) %s", data.xtilt, data.ytilt, absTilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
                     info += "\r\n";
@@ -211,14 +211,16 @@ void Alarm::AlarmTask()
                 }
                 if (alarmTriggers & UNPLUGGED)
                 {
-                    ESP_LOGE(tag, "UNPLUGGED ALARM!");
+                    //ESP_LOGE(tag, "UNPLUGGED ALARM!");
                     String info;
-                    info.printf("WEATHERSTATION SABOTAGE ALARM! NO MAXIMET DATA.");
+                    info.printf("WEATHERSTATION SABOTAGE ALARM! MAXIMET OFFLINE/UNPLUGGED.");
                     info += "\r\n";
                     msAlarmInfo += info;
                 }
                 ESP_LOGE(tag, "ALARM INFO: %s", msAlarmInfo.c_str());
 
+                data.event = Data::Event::ALARM;
+                mrDataQueue.PutData(data);
             }
 
         }

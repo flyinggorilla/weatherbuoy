@@ -166,7 +166,9 @@ void Esp32WeatherBuoy::Start()
         // mCellular.ReadSMS(); // use only during firmware setup to receive a SIM based code
 
         ESP_LOGI(tag, "SMS Numbers: %s", mConfig.msAlarmSms.c_str());
-        /*String msg("Weatherbuoy Test Message!");
+        String msg;
+        msg = mConfig.msHostname;
+        msg += ": Test Message!";
         int startPos = 0;
         int endPos = 0;
         while (endPos < mConfig.msAlarmSms.length()) {
@@ -175,16 +177,12 @@ void Esp32WeatherBuoy::Start()
                 endPos = mConfig.msAlarmSms.length();
             } 
             String to = mConfig.msAlarmSms.substring(startPos, endPos);
-            to = "+436645356751";
             ESP_LOGI(tag, "Sending SMS: to: %s msg: %s", to.c_str(), msg.c_str());
             mCellular.SendSMS(to, msg);
             startPos = endPos+1;
-        } */
+        }
 
-        String msg("Weatherbuoy Test Message!");
-        String to("+436645356751");
-        mCellular.SendSMS(to, msg);
-
+        // AT+CMGD Delete Message (with option 4 to delete all)
 
     }
     else // try wifi if configured
@@ -258,7 +256,8 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
     {
         tempSensors.Read(); // note, this causes approx 700ms delay
         vTaskDelay(1 * 1000 / portTICK_PERIOD_MS);
-        bool isMaximetData = dataQueue.WaitForData(60);
+        Data::Event event = dataQueue.WaitForData(60);
+        bool isMaximetData = event == Data::Event::MAXIMET;
         unsigned int secondsSinceLastSend;
         unsigned int secondsSinceLastDiagnostics;
 

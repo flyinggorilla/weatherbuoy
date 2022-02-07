@@ -13,6 +13,60 @@ bool isnauc(unsigned char uc);
 
 class Data
 {
+
+public:
+    enum Event
+    {
+        NONE = 0,
+        MAXIMET = 1,
+        ALARM = 2
+    };
+
+public:
+    Event event;
+    int uptime;
+
+    float speed; // required for NmeaDisplay
+    // float gspeed;
+    // float avgspeed;
+    short dir; // required for NmeaDisplay
+    // short gdir;
+    // short avgdir;
+
+    // wind
+    float cspeed;    // only avail if GPS, or derived
+    float cgspeed;   // only avail if GPS, or derived
+    float avgcspeed; // only avail if GPS, or derived
+    short compassh;
+    short cdir;    // corrected through compass
+    short cgdir;   // avail if GPS .... otherwise it is CALCULATED!!!  (maximet["GDIR"]+maximet["COMPASSH"]) % 360;
+    short avgcdir; //
+
+    // weather
+    float temp;
+    float pasl;
+    float pstn;
+    float rh;
+    float ah;
+    short solarrad;
+
+    // status
+    short xtilt;
+    short ytilt;
+    short zorient;
+    static const int statuslen = 5;
+    char status[statuslen];
+    char windstat[statuslen];
+
+    // GPS data
+    double lat;       // only avail if GPS
+    double lon;       // only avail if GPS
+    float gpsspeed;   // only avail if GPS
+    short gpsheading; // only avila if GPS
+    unsigned char gpsfix;
+    unsigned char gpssat;
+    time_t time; // only avail if GPS -- 2022-01-21T22:43:11.4
+
 public:
     Data()
     {
@@ -21,13 +75,14 @@ public:
 
     void init()
     {
+        event = NONE;
         uptime = esp_timer_get_time() / 1000;
         speed = nanf();
-        //gspeed = nanf();
-        //avgspeed = nanf();
+        // gspeed = nanf();
+        // avgspeed = nanf();
         dir = 0;
-        //gdir = 0;
-        //avgdir = 0;
+        // gdir = 0;
+        // avgdir = 0;
 
         // wind
         cspeed = 0;
@@ -62,49 +117,6 @@ public:
         gpsheading = 0;
         time = 0;
     }
-
-    int uptime;
-
-    float speed; // required for NmeaDisplay
-    //float gspeed;
-    //float avgspeed;
-    short dir; // required for NmeaDisplay
-    //short gdir;
-    //short avgdir;
-
-    // wind
-    float cspeed;    // only avail if GPS, or derived
-    float cgspeed;   // only avail if GPS, or derived
-    float avgcspeed; // only avail if GPS, or derived
-    short compassh;
-    short cdir; // corrected through compass
-    short cgdir; // avail if GPS .... otherwise it is CALCULATED!!!  (maximet["GDIR"]+maximet["COMPASSH"]) % 360;
-    short avgcdir; // 
-
-    // weather
-    float temp;
-    float pasl;
-    float pstn;
-    float rh;
-    float ah;
-    short solarrad;
-
-    // status
-    short xtilt;
-    short ytilt;
-    short zorient;
-    static const int statuslen = 5;
-    char status[statuslen];
-    char windstat[statuslen];
-
-    // GPS data
-    double lat; // only avail if GPS
-    double lon; // only avail if GPS
-    short gpsheading; // only avila if GPS
-    float gpsspeed; // only avail if GPS
-    unsigned char gpsfix;
-    unsigned char gpssat;
-    time_t time; // only avail if GPS -- 2022-01-21T22:43:11.4
 };
 
 class DataQueue
@@ -114,7 +126,6 @@ public:
     virtual ~DataQueue();
 
 public: // data queue
-
     // adds a data element to the queue
     bool PutData(Data &data);
 
@@ -123,7 +134,7 @@ public: // data queue
     bool GetData(Data &data);
 
     // peeks into queue, but doesnt return pointer to not accidentally delete data
-    bool WaitForData(unsigned int timeoutSeconds);
+    Data::Event WaitForData(unsigned int timeoutSeconds);
 
     // return the number of messages in the queue
     int GetQueueLength();
@@ -132,7 +143,6 @@ public: // data queue
     bool IsFull();
 
 public: // latest data
-
     // adds data to a 1-sized queue, contains always the latest data
     bool PutLatestData(Data &data);
 
@@ -141,7 +151,6 @@ public: // latest data
     bool GetLatestData(Data &data, unsigned int timeoutSeconds);
 
 public: // alerting
-
     // adds data to a 1-sized queue, contains always the latest data
     bool PutAlarmData(Data &data);
 
@@ -154,7 +163,7 @@ private:
     QueueHandle_t mxDataLatest;
     QueueHandle_t mxDataAlarm;
 
-    //bool mbRun = true;
+    // bool mbRun = true;
 };
 
 #endif

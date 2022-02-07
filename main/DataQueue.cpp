@@ -26,16 +26,16 @@ int DataQueue::GetQueueLength()
     return uxQueueMessagesWaiting(mxDataQueue);
 }
 
-bool DataQueue::WaitForData(unsigned int timeoutSeconds)
+Data::Event DataQueue::WaitForData(unsigned int timeoutSeconds)
 {
     Data receivedData;
     if (xQueuePeek(mxDataQueue, &receivedData, timeoutSeconds * 1000 / portTICK_PERIOD_MS) == pdTRUE)
     {
         ESP_LOGD(tag, "Peeking into Queue.");
-        return true;
+        return receivedData.event;
     }
     ESP_LOGD(tag, "No data in Queue.");
-    return false;
+    return Data::NONE;
 }
 
 bool DataQueue::GetLatestData(Data &data, unsigned int timeoutSeconds)

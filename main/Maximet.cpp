@@ -238,6 +238,7 @@ void Maximet::MaximetTask()
                 {
                     parsingState = READCOLUMN;
                     data.init();
+                    data.event = Data::Event::MAXIMET;
                     column.setlength(0);
                     cposDataStart = cpos;
                     cposDataEnd = cpos;
