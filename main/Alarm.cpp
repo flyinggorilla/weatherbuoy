@@ -43,8 +43,9 @@ void Alarm::AlarmTask()
         // ESP_LOGE(tag, "Alarm Radius too small")
     }
 
-    static const short ARMING_SECONDS = 10;   // 60 counts = 60 seconds
-    static const short COOLDOWN_SECONDS = 30; // 30 seconds
+    static const short ARMING_SECONDS = 30;   // 60 counts = 60 seconds
+    static const short COOLDOWN_SECONDS = 60; // 30 seconds
+    static const short MAXALARMACTIVESECONDS = 300; // 5 minutes
 
     unsigned int countArming = 0;
     unsigned int countTilt = 0;
@@ -61,7 +62,6 @@ void Alarm::AlarmTask()
         Data data;
         unsigned short absTilt = 0;
         unsigned int geoDislocation = 0;
-        msAlarmInfo.setlength(0);
 
         if (mrDataQueue.GetAlarmData(data, 3))
         {
@@ -86,7 +86,7 @@ void Alarm::AlarmTask()
             if (data.zorient < 0)
             {
                 countOrient++;
-                //ESP_LOGW(tag, "UPSIDE DOWN!");
+                //ESP_LOGD(tag, "UPSIDE DOWN!");
             }
             else
             {
@@ -97,7 +97,7 @@ void Alarm::AlarmTask()
             if (absTilt > miTiltThreshold)
             {
                 countTilt++;
-                ESP_LOGI(tag, "TILT! %d°/%d° (%d°)", data.xtilt, data.ytilt, absTilt);
+                //ESP_LOGD(tag, "TILT! %d°/%d° (%d°)", data.xtilt, data.ytilt, absTilt);
             }
             else
             {
@@ -171,7 +171,7 @@ void Alarm::AlarmTask()
             if (timestampAlarmTriggered)
             {
                 // turn off buzzer in any case after this #seconds
-                if (secondsAlarmActive > 60)
+                if (secondsAlarmActive > MAXALARMACTIVESECONDS)
                 {
                     //ESP_LOGW(tag, "BUZZER DURATION EXCEEDED. TURNING OFF!");
                     BuzzerOff();
@@ -189,37 +189,38 @@ void Alarm::AlarmTask()
                 {
                     //ESP_LOGE(tag, "GEOFENCE ALARM: %.0dm is outside of %d radius", geoDislocation, mrConfig.miAlarmRadius);
                     String info;
-                    info.printf("BUOY OUTSIDE GEOFENCE ALARM: %.0dm is outside of %d radius", geoDislocation, mrConfig.miAlarmRadius);
-                    info += "\r\n";
+                    info.printf("WEATHERBUOY OUTSIDE GEOFENCE!\rBuoy is %.0dm off! (max: %d)\rhttps://maps.google.com/?q=%0.8f,%0.8f", geoDislocation, mrConfig.miAlarmRadius, data.lat, data.lon);
+                    info += "\r";
                     msAlarmInfo += info;
                 }
                 if (alarmTriggers & TILT)
                 {
                     //ESP_LOGE(tag, "TILT ALARM: %d° (%d°/%d°) %s", absTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
                     String info;
-                    info.printf("MAST MANIPULATION - TILT ALARM: %d° (%d°/%d°) %s", data.xtilt, data.ytilt, absTilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
-                    info += "\r\n";
+                    info.printf("WEATHERBUPY MAST MANIPULATION!\rTILT: %ddeg (%dx/%dy) %s", absTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "UP");
+                    info += "\r";
                     msAlarmInfo += info;
                 }
                 if (alarmTriggers & ORIENT)
                 {
                     //ESP_LOGE(tag, "ORIENT ALARM: %d° (%d°/%d°) %s", absTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
                     String info;
-                    info.printf("MAST MANIPULATION - MAXIMET UPSIDE DOWN ALARM: %d° (%d°/%d°) %s", data.xtilt, data.ytilt, absTilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
-                    info += "\r\n";
+                    info.printf("WEATHERBUOY MAST MANIPULATION!\rMAXIMET UPSIDE DOWN: -%ddeg (%dx/%dy)", absTilt, data.xtilt, data.ytilt );
+                    info += "\r";
                     msAlarmInfo += info;
                 }
                 if (alarmTriggers & UNPLUGGED)
                 {
                     //ESP_LOGE(tag, "UNPLUGGED ALARM!");
                     String info;
-                    info.printf("WEATHERSTATION SABOTAGE ALARM! MAXIMET OFFLINE/UNPLUGGED.");
-                    info += "\r\n";
+                    info.printf("WEATHERBUOY SABOTAGE!\rMAXIMET OFFLINE/UNPLUGGED.");
+                    info += "\r";
                     msAlarmInfo += info;
                 }
                 ESP_LOGE(tag, "ALARM INFO: %s", msAlarmInfo.c_str());
 
-                data.event = Data::Event::ALARM;
+                // trigger main-thread --- dont worry about duplicate data in case of alarm
+                mbAlarm = true;
                 mrDataQueue.PutData(data);
             }
 
@@ -272,9 +273,9 @@ void Alarm::BuzzerOff()
     gpio_set_level(mGpioBuzzer, 0);
 };
 
-void Alarm::GetAlarmInfo(String &info)
+String Alarm::GetAlarmInfo()
 {
-    info = msAlarmInfo;
+    return msAlarmInfo;
 }
 
 Alarm::Alarm(DataQueue &dataQueue, Config &config, gpio_num_t buzzer) : mrDataQueue(dataQueue), mrConfig(config), mGpioBuzzer(buzzer)

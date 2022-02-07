@@ -17,10 +17,13 @@
 // AVG(C)SPEED are calculated as rolling average over 10 minutes (default 10min, Race Commitee Start boat should be set to 5 minutes), and updated once per minute
 // AVGCDIR only calculated when GPS available
 
-
 static const char tag[] = "Maximet";
 #define SERIAL_BUFFER_SIZE (2048)
 #define SERIAL_BAUD_RATE (19200)
+
+static const char REPORT_GMX200GPS[] = "USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,CSPEED,CGSPEED,AVGCSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,CGDIR,AVGCDIR,COMPASSH,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,GPSSTATUS,TIME,CHECK";
+static const char REPORT_GMX501GPS[] = "USERINF,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,GPSLOCATION,GPSSTATUS,TIME,CHECK";
+static const char REPORT_GMX501[] = "USERINF,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,CHECK";
 
 void fMaximetTask(void *pvParameter)
 {
@@ -35,9 +38,51 @@ void Maximet::Start(int gpioRX, int gpioTX, bool alternateUart)
     muiUartNo = alternateUart ? UART_NUM_2 : UART_NUM_1;
     xTaskCreate(&fMaximetTask, "Maximet", 1024 * 16, this, ESP_TASK_MAIN_PRIO, NULL); // large stack is needed
 
-    vTaskDelay(1000/portTICK_PERIOD_MS);
-    //SetReport("USERINF,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,GPSLOCATION,GPSSTATUS,TIME");
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    // read and optionally update Maximet configuration
     ReadConfig();
+    if (!msUserinfo.length())
+    {
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
+        ESP_LOGW(tag, "Could not read Maximet configuraion. Retrying once.");
+        ReadConfig();
+    }
+
+    //ESP_LOGI(tag, "Check config %d, %d", msReport.length(), msUserinfo.length());
+    if (msReport.length() && msUserinfo.length())
+    {
+        const char *sReport = REPORT_GMX501;
+        if (msUserinfo.equals("GMX200GPS"))
+        {
+            sReport = REPORT_GMX200GPS;
+            mMaximetModel = GMX200GPS;
+        }
+        else if (msUserinfo.equals("GMX501GPS"))
+        {
+            sReport = REPORT_GMX501GPS;
+            mMaximetModel = GMX501GPS;
+        }
+        else if (msUserinfo.equals("GMX501"))
+        {
+            sReport = REPORT_GMX501;
+            mMaximetModel = GMX501;
+        } else {
+            ESP_LOGW(tag, "Deprecated USERINFO=%s detected. Setting USERINFO to GMX501.", msUserinfo.c_str());
+            sReport = REPORT_GMX501;
+            mMaximetModel = GMX501;
+            SetUserinf("GMX501");
+            SetOutfreq(true);
+        }
+
+        ESP_LOGI(tag, "Detected Maximet model (USERINFO) %s", msUserinfo.c_str());
+
+        if (!msReport.equals(sReport))
+        {
+            ESP_LOGW(tag, "Configuration mismatch for %s, Columns %s, Updating to %s", msUserinfo.c_str(), msReport.c_str(), sReport);
+            SetReport(sReport);
+        } 
+    }
 }
 
 #define STX (0x02) // ASCII start of text
@@ -113,13 +158,13 @@ void Maximet::MaximetTask()
     // Change ports from default RX/TX to not conflict with Console
     mpSerial = new Serial(muiUartNo, mgpioRX, mgpioTX, SERIAL_BAUD_RATE, SERIAL_BUFFER_SIZE);
 
-    //ESP_LOGI(tag, "Maximet task started. Waiting 30seconds for attaching to serial interface.");
-    //vTaskDelay(30*1000/portTICK_PERIOD_MS);
+    // ESP_LOGI(tag, "Maximet task started. Waiting 30seconds for attaching to serial interface.");
+    // vTaskDelay(30*1000/portTICK_PERIOD_MS);
     mpSerial->Attach();
 
     String line;
     /*     unsigned int uptimeMs = 0;
-    unsigned int lastSendMs = 0; 
+    unsigned int lastSendMs = 0;
     unsigned int intervalMs = 0;
     int skipped = 0; */
 
@@ -147,7 +192,7 @@ void Maximet::MaximetTask()
     int lastUptime = 0;
 
     VelocityVector shortAvgCSpeedVector;
-    //GustVector shortAvgCGSpeedVector;
+    // GustVector shortAvgCGSpeedVector;
 
     ESP_LOGI(tag, "Maximet task started and ready to receive data.");
     while (mbRun)
@@ -159,31 +204,43 @@ void Maximet::MaximetTask()
         }
         ESP_LOGD(tag, "THE LINE: %s", line.c_str());
 
-        if (mbCommandline) {
+        if (mbCommandline)
+        {
             ESP_LOGI(tag, "Commandline reponse: %s", line.c_str());
-            if (line.startsWith("AVGLONG = ")) {
+            if (line.startsWith("AVGLONG = "))
+            {
                 muiAvgLong = 0;
                 int pos = line.indexOf("=");
-                String val = line.substring(pos+1);
+                String val = line.substring(pos + 1);
                 muiAvgLong = val.toInt();
                 ESP_LOGI(tag, "AVGLONG: %d", muiAvgLong);
-            } else if (line.startsWith("REPORT = ")) {
+            }
+            else if (line.startsWith("REPORT = "))
+            {
                 int pos = line.indexOf("=");
-                msReport = line.substring(pos+1);
+                msReport = line.substring(pos + 1);
                 msReport.trim();
                 ESP_LOGI(tag, "REPORT: %s", msReport.c_str());
-            } else if(line.startsWith("OUTFREQ = 1HZ")) { //"1/MIN" or "1HZ"
+            }
+            else if (line.startsWith("OUTFREQ = 1HZ"))
+            { //"1/MIN" or "1HZ"
                 muiOutputIntervalSec = 1;
                 ESP_LOGI(tag, "OUTFREQ: every %d second(s)", muiOutputIntervalSec);
-            } else if(line.startsWith("OUTFREQ = 1/MIN")) { //"1/MIN" or "1HZ"
+            }
+            else if (line.startsWith("OUTFREQ = 1/MIN"))
+            { //"1/MIN" or "1HZ"
                 muiOutputIntervalSec = 60;
                 ESP_LOGI(tag, "OUTFREQ: every %d second(s)", muiOutputIntervalSec);
-            } else if(line.startsWith("USERINF = ")) { 
+            }
+            else if (line.startsWith("USERINF = "))
+            {
                 int pos = line.indexOf("=");
-                msUserinfo = line.substring(pos+1);
+                msUserinfo = line.substring(pos + 1);
                 msUserinfo.trim();
                 ESP_LOGI(tag, "USERINFO: %s", msUserinfo.c_str());
-            } else if(line.startsWith("INCORRECT ")) { 
+            }
+            else if (line.startsWith("INCORRECT "))
+            {
                 ESP_LOGE(tag, "Error setting columns: %s", line.c_str());
             }
             continue;
@@ -202,11 +259,11 @@ void Maximet::MaximetTask()
             continue;
         case COLUMNS:
             maximetState = UNITS;
-            //mrConfig.msMaximetColumns = line;
+            // mrConfig.msMaximetColumns = line;
             continue;
         case UNITS:
             maximetState = ENDSTARTUP;
-            //mrConfig.msMaximetUnits = line;
+            // mrConfig.msMaximetUnits = line;
             continue;
         case ENDSTARTUP:
             maximetState = SENDINGDATA;
@@ -220,7 +277,7 @@ void Maximet::MaximetTask()
 
         int cposDataStart = 0;
         int cposDataEnd = 0;
-        MaximetModel model = gmx501;
+        Model model = GMX501;
 
         float maximetGSpeed;
         float maximetAvgSpeed;
@@ -238,7 +295,6 @@ void Maximet::MaximetTask()
                 {
                     parsingState = READCOLUMN;
                     data.init();
-                    data.event = Data::Event::MAXIMET;
                     column.setlength(0);
                     cposDataStart = cpos;
                     cposDataEnd = cpos;
@@ -259,19 +315,19 @@ void Maximet::MaximetTask()
                     {
                         if (column.equals("GMX200GPS"))
                         {
-                            model = gmx200gps;
+                            model = GMX200GPS;
                         }
                         else if (column.equals("GMX501GPS"))
                         {
-                            model = gmx501gps;
+                            model = GMX501GPS;
                         }
                     }
 
-                    if (model == gmx200gps)
+                    if (model == GMX200GPS)
                     {
-                        // GMX200GPS,+48.339284:+014.309088:+0021.20,000.22,035,000.20,000.00,000.00,000.13,000.00,000.00,038,000,000,249,000,000,287,-02,-01,0004,0100,0104,2022-01-22T14:11:06.8,68
-                        // USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,CSPEED,CGSPEED,AVGCSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,CGDIR,AVGCDIR,COMPASSH,XTILT,YTILT,STATUS,WINDSTAT,GPSSTATUS,TIME,CHECK
-                        // -,-,MS,DEG,MS,MS,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-,-,-
+                        // GMX200GPS,+48.339284:+014.309088:+0021.20,000.22,035,000.20,000.00,000.00,000.13,000.00,000.00,038,000,000,249,000,000,287,-02,-01,1,0004,0100,0104,2022-01-22T14:11:06.8,68
+                        // USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,CSPEED,CGSPEED,AVGCSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,CGDIR,AVGCDIR,COMPASSH,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,GPSSTATUS,TIME,CHECK
+                        // -,-,MS,DEG,MS,MS,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-,-,-,-
 
                         switch (col)
                         {
@@ -333,24 +389,27 @@ void Maximet::MaximetTask()
                             data.ytilt = column.toInt();
                             break;
                         case 20:
-                            column.toCharArray(data.status, data.statuslen);
+                            data.zorient = column.toInt();
                             break;
                         case 21:
-                            column.toCharArray(data.windstat, data.statuslen);
+                            column.toCharArray(data.status, data.statuslen);
                             break;
                         case 22:
-                            ParseGPSStatus(column, data);
+                            column.toCharArray(data.windstat, data.statuslen);
                             break;
                         case 23:
+                            ParseGPSStatus(column, data);
+                            break;
+                        case 24:
                             ParseTime(column, data);
                             break;
                         }
                     }
-                    else if (model == gmx501gps)
+                    else if (model == GMX501GPS)
                     {
-                        // GMX501GPS,002.15,000.81,000.23,140,160,118,290,265,148,1045.0,0987.1,067,05.02,+006.3,0006,+00,+00,0004,0000,+48.336892:+014.306931:+0344.40,0106,2022-01-29T14:23:17.8,45
-                        // USERINF,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,STATUS,WINDSTAT,GPSLOCATION,GPSSTATUS,TIME,CHECK
-                        // -,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,HPA,HPA,%,G/M3,C,WM2,DEG,DEG,-,-,-,-,-,-
+                        // GMX501GPS,002.15,000.81,000.23,140,160,118,290,265,148,1045.0,0987.1,067,05.02,+006.3,0006,+00,+00,+1,0004,0000,+48.336892:+014.306931:+0344.40,0106,2022-01-29T14:23:17.8,45
+                        // USERINF,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,GPSLOCATION,GPSSTATUS,TIME,CHECK
+                        // -,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,HPA,HPA,%,G/M3,C,WM2,DEG,DEG,-,-,-,-,-,-,-
                         switch (col)
                         {
                         case 1:
@@ -431,8 +490,8 @@ void Maximet::MaximetTask()
                     else
                     {
                         // GMX501
-                        // SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,STATUS,WINDSTAT,CHECK
-                        // MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,HPA,HPA,%,G/M3,C,WM2,DEG,DEG,-,-,-
+                        // SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,CHECK
+                        // MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,HPA,HPA,%,G/M3,C,WM2,DEG,DEG,-,-,-,-
                         switch (col)
                         {
                         case 1:
@@ -488,9 +547,12 @@ void Maximet::MaximetTask()
                             data.ytilt = column.toInt();
                             break;
                         case 18:
-                            column.toCharArray(data.status, data.statuslen);
+                            data.zorient = column.toInt();
                             break;
                         case 19:
+                            column.toCharArray(data.status, data.statuslen);
+                            break;
+                        case 20:
                             column.toCharArray(data.windstat, data.statuslen);
                             break;
                         }
@@ -578,25 +640,27 @@ void Maximet::MaximetTask()
                 if (isnans(data.avgcdir))
                 {
                     data.avgcdir = (maximetAvgDir + data.compassh) % 360; // as avgcdir is not populated when GNSS is not available, lets do the math with compass
-                } 
+                }
 
                 mrDataQueue.PutLatestData(data);
                 mrDataQueue.PutAlarmData(data);
 
                 bool is1HzOutput = (muiOutputIntervalSec <= 1);
-                if (is1HzOutput) {
+                if (is1HzOutput)
+                {
                     shortAvgCSpeedVector.add(data.cspeed, data.cdir);
-                    ESP_LOGD(tag, "data.speed: %0.2f data.dir: %d, data.compassh: %d, data.cspeed: %0.2f data.cdir: %d, data.cgspeed: %0.2f data.cgdir: %d, avgspeed: %0.2f avggdir: %d, data.avgcspeed: %0.2f data.avgcdir: %d", 
-                                data.speed, data.dir, data.compassh, data.cspeed, data.cdir, data.cgspeed, data.cgdir, maximetAvgSpeed, maximetAvgDir, data.avgcspeed, data.avgcdir);
+                    ESP_LOGD(tag, "data.speed: %0.2f data.dir: %d, data.compassh: %d, data.cspeed: %0.2f data.cdir: %d, data.cgspeed: %0.2f data.cgdir: %d, avgspeed: %0.2f avggdir: %d, data.avgcspeed: %0.2f data.avgcdir: %d",
+                             data.speed, data.dir, data.compassh, data.cspeed, data.cdir, data.cgspeed, data.cgdir, maximetAvgSpeed, maximetAvgDir, data.avgcspeed, data.avgcdir);
                 }
 
-// USERINF,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,GPSLOCATION,GPSSTATUS,TIME,CHECK
-// REPORT USERINF SPEED GSPEED AVGSPEED DIR GDIR AVGDIR CDIR AVGCDIR COMPASSH PASL PSTN RH AH TEMP SOLARRAD XTILT YTILT ZORIENT STATUS WINDSTAT GPSLOCATION GPSSTATUS TIME
-/// SOMETHING WRONG HERE ... WHEN QUEUE FULL EVERY SECOND IS PUSHED
+                // USERINF,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,GPSLOCATION,GPSSTATUS,TIME,CHECK
+                // REPORT USERINF SPEED GSPEED AVGSPEED DIR GDIR AVGDIR CDIR AVGCDIR COMPASSH PASL PSTN RH AH TEMP SOLARRAD XTILT YTILT ZORIENT STATUS WINDSTAT GPSLOCATION GPSSTATUS TIME
+                /// SOMETHING WRONG HERE ... WHEN QUEUE FULL EVERY SECOND IS PUSHED
                 // Put data not more frequent than every 30 seconds into queue
                 if (data.uptime >= (lastUptime + 60) || !is1HzOutput)
                 {
-                    if (is1HzOutput) {
+                    if (is1HzOutput)
+                    {
                         ESP_LOGW(tag, "Last records data.cspeed: %0.2f data.cdir: %d", data.cspeed, data.cdir);
                         data.cspeed = shortAvgCSpeedVector.getSpeed();
                         data.cdir = shortAvgCSpeedVector.getDir();
@@ -644,10 +708,10 @@ void Maximet::MaximetTask()
     return;
 }
 
-void Maximet::SimulatorStart(MaximetModel maximetModel)
+void Maximet::SimulatorStart(Model maximetModel)
 {
     mMaximetModel = maximetModel;
-    if (mMaximetModel == gmx200gps)
+    if (mMaximetModel == GMX200GPS)
     {
         // GMX200GPS,+48.339284:+014.309088:+0021.20,000.22,035,000.20,000.00,000.00,000.13,000.00,000.00,038,000,000,249,000,000,287,-02,-01,0004,0100,0104,2022-01-22T14:11:06.8,68
         // USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,CSPEED,CGSPEED,AVGCSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,CGDIR,AVGCDIR,COMPASSH,XTILT,YTILT,STATUS,WINDSTAT,GPSSTATUS,TIME,CHECK
@@ -691,7 +755,7 @@ void Maximet::SimulatorDataPoint(float temperature, double longitude, double lat
     isoTime[0] = 0;
     strftime(isoTime, sizeof(isoTime) - 1, "%FT%T.0", pUtcTime);
 
-    if (mMaximetModel == gmx200gps)
+    if (mMaximetModel == GMX200GPS)
     {
 
         // GMX200GPS,+48.339284:+014.309088:+0021.20,000.22,035,000.20,000.00,000.00,000.13,000.00,000.00,038,000,000,249,000,000,287,-02,-01,0004,0100,0104,2022-01-22T14:11:06.8,68
@@ -710,7 +774,7 @@ void Maximet::SimulatorDataPoint(float temperature, double longitude, double lat
     unsigned char checksum = CalculateChecksum(data);
 
     line.printf("\x02%s\x03%02X", data.c_str(), checksum);
-    //ESP_LOG_BUFFER_HEXDUMP(tag, line.c_str(), line.length(), ESP_LOG_INFO);
+    // ESP_LOG_BUFFER_HEXDUMP(tag, line.c_str(), line.length(), ESP_LOG_INFO);
     SendLine(line);
 }
 
@@ -737,49 +801,64 @@ Maximet::~Maximet()
 {
 }
 
-void Maximet::Command(String &command) {
-    String cmd = "*\r\necho off\r\n"; 
+void Maximet::Command(String &command)
+{
+    String cmd = "*\r\necho off\r\n";
     mpSerial->Write(cmd);
-    vTaskDelay(1500/portTICK_PERIOD_MS); // wait 1.5 seconds to ensure no data coming
+    vTaskDelay(1500 / portTICK_PERIOD_MS); // wait 1.5 seconds to ensure no data coming
 
     mbCommandline = true;
     mpSerial->Write(command);
-    vTaskDelay(1500/portTICK_PERIOD_MS); // wait 1.5 seconds to check response data before exiting
+    vTaskDelay(1500 / portTICK_PERIOD_MS); // wait 1.5 seconds to check response data before exiting
 
-    cmd ="\r\nexit\r\n";
+    cmd = "\r\nexit\r\n";
     mpSerial->Write(cmd);
-    vTaskDelay(500/portTICK_PERIOD_MS); // wait 0.5 seconds to allow for full line of data after exiting
+    vTaskDelay(500 / portTICK_PERIOD_MS); // wait 0.5 seconds to allow for full line of data after exiting
     mbCommandline = false;
 }
 
-void Maximet::SetAvgLong(unsigned short avglong) {
+void Maximet::SetAvgLong(unsigned short avglong)
+{
     String command;
     command.printf("AVGLONG %d\r\nAVGLONG\r\n", avglong);
     Command(command);
 }
 
-void Maximet::ReadConfig() {
+void Maximet::ReadConfig()
+{
     String command;
     command.printf("USERINF\r\nREPORT\r\nAVGLONG\r\nOUTFREQ\r\n");
     Command(command);
 }
 
-void Maximet::SetOutfreq(bool high) {
+void Maximet::SetOutfreq(bool high)
+{
     String command;
-    if (high) {
+    if (high)
+    {
         command.printf("OUTFREQ 1HZ\r\nOUTFREQ\r\n");
-    } 
-    else 
+    }
+    else
     {
         command.printf("OUTFREQ 1/MIN\r\nOUTFREQ\r\n");
-    } 
+    }
     Command(command);
 }
 
-
-void Maximet::SetReport(String columns) {
-    String command;
+void Maximet::SetReport(const char *report)
+{
+    String columns(report);
     columns.replace(',', ' ');
-    command.printf("REPORT %s\r\nREPORT\r\n", columns.c_str());
+    int checkPos = columns.indexOf(" CHECK");
+    String command;
+    command = "REPORT ";
+    command += checkPos < 0 ? columns : columns.substring(0, checkPos);
+    command += "\r\nREPORT\r\n";
+    Command(command);
+}
+
+void Maximet::SetUserinf(const char *userinf) {
+    String command;
+    command.printf("USERINF %s\r\nUSERINF\r\n", userinf);
     Command(command);
 }

@@ -26,7 +26,9 @@ public:
     void BuzzerOff();
     void BuzzerOn();
 
-    void GetAlarmInfo(String &info);
+    bool IsAlarm() { return mbAlarm && !mbAlarmConfirmed; }; // trigger only once
+    void ConfirmAlarm() { msAlarmInfo.reset(); mbAlarmConfirmed = true; };
+    String GetAlarmInfo();
 
 private:
     void Write();
@@ -40,6 +42,9 @@ private:
     gpio_num_t mGpioBuzzer;
 
     int miTiltThreshold = 80;
+
+    bool mbAlarm = false;
+    bool mbAlarmConfirmed = false;
 };
 
 #endif

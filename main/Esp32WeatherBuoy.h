@@ -10,6 +10,7 @@
 #include "SendData.h"
 #include "NmeaDisplay.h"
 #include "TemperatureSensors.h"
+#include "Alarm.h"
 
 #define FIRMWARE_VERSION __DATE__ " " __TIME__
 
@@ -30,9 +31,10 @@ public:
 	void Restart(int seconds);
 	Config& GetConfig() { return mConfig; }
 
-	void RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet);
+	void HandleAlarm(Alarm *pAlarm);
+	void RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet, Alarm *pAlarm);
 	void RunDisplay(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet);
-	void RunSimulator(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet, MaximetModel model);
+	void RunSimulator(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet, Maximet::Model model);
 
 private:
 	Config mConfig;

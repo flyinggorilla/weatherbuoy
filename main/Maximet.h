@@ -6,14 +6,15 @@
 #include "DataQueue.h"
 #include "Serial.h"
 
-enum MaximetModel {
-    none = 0,
-    gmx200gps = 2001,
-    gmx501    = 5010,
-    gmx501gps = 5011
-};
-
 class Maximet {
+public:
+    enum Model {
+        NONE      = 0,
+        GMX200GPS = 2001,
+        GMX501    = 5010,
+        GMX501GPS = 5011
+    };
+
 public:
 	Maximet(DataQueue &dataQueue);
 	virtual ~Maximet();
@@ -25,7 +26,7 @@ public:
     void Stop() { mbRun = false; }; 
 
     // weatherbuoy electronics can be used to simulator a Gill Maximet Weatherstation via its RS232 serial interface. good for testing other weatherbuoys
-    void SimulatorStart(MaximetModel maximetModel);
+    void SimulatorStart(Model maximetModel);
 
     unsigned int SolarRadiation() { return muiSolarradiation; };
 
@@ -48,7 +49,8 @@ public:
     String& GetReport() { return msReport; };
 
     // set columns maximet should send e.g. "USERINF,SPEED,GSPEED,AVGSPEED,DIR" --- this will send "REPORT USERINF SPEED .... " (no comma!) to maximet
-    void SetReport(String columns);
+    void SetReport(const char* report);
+    void SetUserinf(const char* userinf);
 
 
 private:
@@ -63,7 +65,7 @@ private:
     // calls "exit" automatically at the end to continue data sending
     void Command(String &command);
 
-    MaximetModel mMaximetModel;
+    Model mMaximetModel;
     Serial *mpSerial;
     int mgpioRX;
     int mgpioTX;

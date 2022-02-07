@@ -15,15 +15,6 @@ class Data
 {
 
 public:
-    enum Event
-    {
-        NONE = 0,
-        MAXIMET = 1,
-        ALARM = 2
-    };
-
-public:
-    Event event;
     int uptime;
 
     float speed; // required for NmeaDisplay
@@ -75,7 +66,6 @@ public:
 
     void init()
     {
-        event = NONE;
         uptime = esp_timer_get_time() / 1000;
         speed = nanf();
         // gspeed = nanf();
@@ -134,7 +124,7 @@ public: // data queue
     bool GetData(Data &data);
 
     // peeks into queue, but doesnt return pointer to not accidentally delete data
-    Data::Event WaitForData(unsigned int timeoutSeconds);
+    bool WaitForData(unsigned int timeoutSeconds);
 
     // return the number of messages in the queue
     int GetQueueLength();
@@ -162,8 +152,6 @@ private:
     QueueHandle_t mxDataQueue;
     QueueHandle_t mxDataLatest;
     QueueHandle_t mxDataAlarm;
-
-    // bool mbRun = true;
 };
 
 #endif

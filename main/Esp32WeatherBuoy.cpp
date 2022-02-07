@@ -66,7 +66,6 @@ static const char tag[] = "WeatherBuoy";
 // Optionally drive an Alarm Buzzer at following GPIO (max 30mA)
 #define CONFIG_ALARM_BUZZER_PIN GPIO_NUM_19
 
-
 // Restart ESP32 if there is not data being successfully sent within this period.
 #define CONFIG_WATCHDOG_SECONDS 60 * 125             // 125min - if two hourly sends fail, thats the latest to restart
 #define CONFIG_SENDDATA_INTERVAL_DAYTIME 60          // seconds
@@ -114,14 +113,14 @@ void Esp32WeatherBuoy::Start()
         ESP_LOGI(tag, "Maximet Simulation: GMX%d%s", mConfig.miSimulator / 10, mConfig.miSimulator % 10 ? "GPS" : "");
     }
 
-    if (mConfig.mbNmeaDisplay) {
+    if (mConfig.mbNmeaDisplay)
+    {
         ESP_LOGI(tag, "NMEA2000 Display output activated (i.e. Garmin GNX130).");
     }
 
-    #ifdef TESTVELOCITYVECTOR
+#ifdef TESTVELOCITYVECTOR
     TestVelocityVector();
-    #endif
-
+#endif
 
     int watchdogSeconds = CONFIG_WATCHDOG_SECONDS;
     Watchdog watchdog(watchdogSeconds);
@@ -140,7 +139,8 @@ void Esp32WeatherBuoy::Start()
     DataQueue dataQueue;
 
     // allocate NMEA2000 display output on heap as moving averages require some memory
-    if (mConfig.mbNmeaDisplay) {
+    if (mConfig.mbNmeaDisplay)
+    {
         mpDisplay = new NmeaDisplay(CONFIG_NMEA_TWAI_TX_PIN, CONFIG_NMEA_TWAI_RX_PIN, dataQueue);
         mpDisplay->Start();
     }
@@ -162,28 +162,9 @@ void Esp32WeatherBuoy::Start()
     {
         mCellular.Start(mConfig.msCellularApn, mConfig.msCellularUser, mConfig.msCellularPass, mConfig.msCellularOperator, mConfig.miCellularNetwork);
         mOnlineMode = MODE_CELLULAR;
-        
+
         // mCellular.ReadSMS(); // use only during firmware setup to receive a SIM based code
-
-        ESP_LOGI(tag, "SMS Numbers: %s", mConfig.msAlarmSms.c_str());
-        String msg;
-        msg = mConfig.msHostname;
-        msg += ": Test Message!";
-        int startPos = 0;
-        int endPos = 0;
-        while (endPos < mConfig.msAlarmSms.length()) {
-            endPos = mConfig.msAlarmSms.indexOf(',');
-            if (endPos < 0) {
-                endPos = mConfig.msAlarmSms.length();
-            } 
-            String to = mConfig.msAlarmSms.substring(startPos, endPos);
-            ESP_LOGI(tag, "Sending SMS: to: %s msg: %s", to.c_str(), msg.c_str());
-            mCellular.SendSMS(to, msg);
-            startPos = endPos+1;
-        }
-
         // AT+CMGD Delete Message (with option 4 to delete all)
-
     }
     else // try wifi if configured
     {
@@ -194,14 +175,14 @@ void Esp32WeatherBuoy::Start()
 
         if (mConfig.msSTASsid.length())
         {
-            //config.msSTASsid = "";
-            //config.msSTAPass = "";
-            //config.msTargetUrl = "http://10.10.14.195:3000/weatherbuoy";
-            //config.Save();
+            // config.msSTASsid = "";
+            // config.msSTAPass = "";
+            // config.msTargetUrl = "http://10.10.14.195:3000/weatherbuoy";
+            // config.Save();
             ESP_LOGI(tag, "sssi %s pass %s host %s", mConfig.msSTASsid.c_str(), mConfig.msSTAPass.c_str(), mConfig.msHostname.c_str());
             mWifi.StartSTAMode(mConfig.msSTASsid, mConfig.msSTAPass, mConfig.msHostname);
             mWifi.StartTimeSync(mConfig.msNtpServer);
-        	ESP_LOGI(tag, "NTP Time Syncronization enabled: %s", mConfig.msNtpServer.c_str());
+            ESP_LOGI(tag, "NTP Time Syncronization enabled: %s", mConfig.msNtpServer.c_str());
 
             mOnlineMode = MODE_WIFISTA;
         }
@@ -224,22 +205,73 @@ void Esp32WeatherBuoy::Start()
     {
         ESP_LOGI(tag, "Racing Committee Boat with Garmin GNX130 NMEA200 Display");
         RunDisplay(tempSensors, dataQueue, max471Meter, sendData, maximet);
-    } else if (mConfig.miSimulator) {
+    }
+    else if (mConfig.miSimulator)
+    {
         ESP_LOGI(tag, "Starting: Gill Maximet Wind Sensor Simulator GMX%d%s", mConfig.miSimulator / 10, mConfig.miSimulator % 10 ? "GPS" : "");
-        RunSimulator(tempSensors, dataQueue, max471Meter, sendData, maximet, static_cast<MaximetModel>(mConfig.miSimulator));
-    } else {
-        Alarm *alarm = nullptr;
-        if (mConfig.mbAlarmSound || mConfig.msAlarmSms.length()) {
+        RunSimulator(tempSensors, dataQueue, max471Meter, sendData, maximet, static_cast<Maximet::Model>(mConfig.miSimulator));
+    }
+    else
+    {
+        Alarm *pAlarm = nullptr;
+        if (mConfig.mbAlarmSound || mConfig.msAlarmSms.length())
+        {
             ESP_LOGI(tag, "Starting: Alarm system");
-            alarm = new Alarm(dataQueue, mConfig, CONFIG_ALARM_BUZZER_PIN);
-            alarm->Start();
+            pAlarm = new Alarm(dataQueue, mConfig, CONFIG_ALARM_BUZZER_PIN);
+            pAlarm->Start();
         }
         ESP_LOGI(tag, "Starting: Weatherbuoy %s", maximet.GetUserinf().c_str());
-        RunBuoy(tempSensors, dataQueue, max471Meter, sendData, maximet);
+        RunBuoy(tempSensors, dataQueue, max471Meter, sendData, maximet, pAlarm);
     }
 }
 
-void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet)
+void Esp32WeatherBuoy::HandleAlarm(Alarm *pAlarm)
+{
+    if (mOnlineMode != MODE_CELLULAR || !pAlarm || !pAlarm->IsAlarm())
+        return;
+
+    ESP_LOGI(tag, "switching to full power mode next...");
+    if (!mCellular.SwitchToFullPowerMode())
+    {
+        ESP_LOGW(tag, "Retrying switching to full power mode ...");
+        if (!mCellular.SwitchToFullPowerMode())
+        {
+            ESP_LOGE(tag, "Switching to full power mode failed");
+            return;
+        }
+    }
+
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    ESP_LOGI(tag, "SMS Numbers: %s", mConfig.msAlarmSms.c_str());
+    String msg;
+    msg = "ALARM ";
+    msg += mConfig.msHostname;
+    msg += " !\r";
+    msg += pAlarm->GetAlarmInfo();
+
+    int startPos = 0;
+    int endPos = 0;
+    int sent = 0;
+    while (endPos < mConfig.msAlarmSms.length())
+    {
+        endPos = mConfig.msAlarmSms.indexOf(',');
+        if (endPos < 0)
+        {
+            endPos = mConfig.msAlarmSms.length();
+        }
+        String to = mConfig.msAlarmSms.substring(startPos, endPos);
+        ESP_LOGI(tag, "Sending SMS: to: %s msg: %s", to.c_str(), msg.c_str());
+        if(mCellular.SendSMS(to, msg))
+            sent++;
+
+        startPos = endPos + 1;
+    }
+
+    pAlarm->ConfirmAlarm();
+};
+
+void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet, Alarm *pAlarm)
 {
     ESP_LOGI(tag, "Starting Weatherbuoy main task.");
 
@@ -254,10 +286,11 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
 
     while (true)
     {
+        HandleAlarm(pAlarm); // check for alarm before and after waiting for the queue to minimize latency
         tempSensors.Read(); // note, this causes approx 700ms delay
         vTaskDelay(1 * 1000 / portTICK_PERIOD_MS);
-        Data::Event event = dataQueue.WaitForData(60);
-        bool isMaximetData = event == Data::Event::MAXIMET;
+        bool isMaximetData = dataQueue.WaitForData(60);
+        HandleAlarm(pAlarm); // check for alarm
         unsigned int secondsSinceLastSend;
         unsigned int secondsSinceLastDiagnostics;
 
@@ -324,8 +357,9 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
             };
         }
 
-        if (bDiagnostics) {
-            sendData.SetMaximetDiagnostics(maximet.GetReport(), maximet.GetAvgLong(), maximet.GetOutfreq(), maximet.GetUserinf() );
+        if (bDiagnostics)
+        {
+            sendData.SetMaximetDiagnostics(maximet.GetReport(), maximet.GetAvgLong(), maximet.GetOutfreq(), maximet.GetUserinf());
         }
 
         // read maximet data queue and create a HTTP POST message
@@ -359,12 +393,12 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
         ESP_LOGI(tag, "Solarradiation: %d W/m²  Voltage: %.02fV", maximet.SolarRadiation(), voltage / 1000.0);
         if (maximet.SolarRadiation() > 2 && voltage > 13100)
         {
-            secondsToSleep = CONFIG_SENDDATA_INTERVAL_DAYTIME; //s;
+            secondsToSleep = CONFIG_SENDDATA_INTERVAL_DAYTIME; // s;
             ESP_LOGI(tag, "Sending data at daytime interval every %d seconds", secondsToSleep);
         }
         else if (voltage > 12750)
         {
-            secondsToSleep = CONFIG_SENDDATA_INTERVAL_NIGHTTIME; //s;
+            secondsToSleep = CONFIG_SENDDATA_INTERVAL_NIGHTTIME; // s;
             ESP_LOGI(tag, "Sending data at nighttime interval every %d minutes", secondsToSleep / 60);
         }
         else
@@ -375,11 +409,11 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
     }
 }
 
-void Esp32WeatherBuoy::RunSimulator(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet, MaximetModel model)
+void Esp32WeatherBuoy::RunSimulator(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet, Maximet::Model model)
 {
     maximet.SimulatorStart(model);
 
-    unsigned int maximetDataIntervalSeconds = model == gmx501 ? 60 : 1;
+    unsigned int maximetDataIntervalSeconds = model == Maximet::GMX501 ? 60 : 1;
     unsigned int httpPostDataIntervalSeconds = 30;
     unsigned int lastSendTimestamp = 0;
 
@@ -393,10 +427,10 @@ void Esp32WeatherBuoy::RunSimulator(TemperatureSensors &tempSensors, DataQueue &
     // 0.01° ~= 1.1km
     // 0.1° ~= 11km
 
-    //const double minLatitude = 47.81358410627437;
-    //const double maxLatitude = 47.95123189196899;
-    //const double minLongitude = 13.50722014276939;
-    //const double maxLongitude = 13.5951846390785;
+    // const double minLatitude = 47.81358410627437;
+    // const double maxLatitude = 47.95123189196899;
+    // const double minLongitude = 13.50722014276939;
+    // const double maxLongitude = 13.5951846390785;
     const double minLatitude = 47.81358410627437;
     const double maxLatitude = 47.92123189196899;
     const double minLongitude = 13.54722014276939;
@@ -406,23 +440,24 @@ void Esp32WeatherBuoy::RunSimulator(TemperatureSensors &tempSensors, DataQueue &
     {
         tempSensors.Read(); // note, this causes approx 700ms delay
         vTaskDelay((maximetDataIntervalSeconds * 1000 - 700) / portTICK_PERIOD_MS);
-        //ESP_LOGI(tag, "Sending temperature %.2f", tempSensors.GetBoardTemp());
-        if (latitude < minLatitude || latitude > maxLatitude) {
+        // ESP_LOGI(tag, "Sending temperature %.2f", tempSensors.GetBoardTemp());
+        if (latitude < minLatitude || latitude > maxLatitude)
+        {
             latitude = maxLatitude;
         }
-        if (longitude < minLongitude || longitude > maxLongitude) {
+        if (longitude < minLongitude || longitude > maxLongitude)
+        {
             longitude = minLongitude;
         }
 
         longitude += 0.000011; // move east
-        latitude -= 0.000101; // move south (towards equator)
-        //longitude = 0.123456;
-        //latitude = 7.654321;
-        //unsigned int voltage = max471Meter.Voltage();
-        //unsigned int current = max471Meter.Current();
+        latitude -= 0.000101;  // move south (towards equator)
+        // longitude = 0.123456;
+        // latitude = 7.654321;
+        // unsigned int voltage = max471Meter.Voltage();
+        // unsigned int current = max471Meter.Current();
         float boardtemp = tempSensors.GetBoardTemp();
         float watertemp = tempSensors.GetWaterTemp();
-
 
         maximet.SimulatorDataPoint(tempSensors.GetBoardTemp(), longitude, latitude);
 
@@ -436,7 +471,8 @@ void Esp32WeatherBuoy::RunSimulator(TemperatureSensors &tempSensors, DataQueue &
     }
 }
 
-void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet){
+void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet)
+{
     ESP_LOGI(tag, "Starting: Startboat NMEA 2000 Display main task.");
 
     bool bDiagnostics;
@@ -519,8 +555,9 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
             };
         }
 
-        if (bDiagnostics) {
-            sendData.SetMaximetDiagnostics(maximet.GetReport(), maximet.GetAvgLong(), maximet.GetOutfreq(), maximet.GetUserinf() );
+        if (bDiagnostics)
+        {
+            sendData.SetMaximetDiagnostics(maximet.GetReport(), maximet.GetAvgLong(), maximet.GetOutfreq(), maximet.GetUserinf());
         }
 
         // read maximet data queue and create a HTTP POST message
@@ -553,7 +590,6 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
 
         secondsToSleep = CONFIG_SENDDATA_INTERVAL_DAYTIME;
     }
-
 };
 
 void TestHttp()
@@ -561,7 +597,7 @@ void TestHttp()
     for (int i = 0; i < 5; i++)
     {
         //        cellular.Command("AT+CGDCONT=1,\"IP\",\"webapn.at\"", "Define PDP Context");
-        //cellular.Command("ATD*99#", "setup data connection");
+        // cellular.Command("ATD*99#", "setup data connection");
 
         vTaskDelay(10000 / portTICK_PERIOD_MS);
 
@@ -570,7 +606,7 @@ void TestHttp()
 
         httpConfig.method = HTTP_METHOD_GET;
         esp_http_client_handle_t httpClient = esp_http_client_init(&httpConfig);
-        //esp_http_client_set_header(httpClient, "Content-Type", "text/plain");
+        // esp_http_client_set_header(httpClient, "Content-Type", "text/plain");
         esp_err_t err;
         err = esp_http_client_open(httpClient, 0);
         if (err != ESP_OK)
@@ -681,36 +717,37 @@ void TestATCommands(Cellular &cellular)
     // cellular.Command("AT+CREG=1", "OK", nullptr,  "Register on home network");  // OK
     // cellular.Command("AT+CGATT=?", "OK", nullptr,  "Attach/Detach to GPRS. List of supported states"); // +CGATT: (0,1)
 
-    //Command("AT+CNMP=?", "OK", nullptr, "List of preferred modes"); // +CNMP: (2,9,10,13,14,19,22,38,39,48,51,54,59,60,63,67)
-    //Command("AT+CNMP?", "OK", nullptr, "Preferred mode");
-    //Command("AT+CNMP=13", "OK", &response, "Preferred mode"); // +CNMP: 2 // 2 = automatic
-    //  Command("AT+CNMP=38", "OK", &response, "Preferred mode"); // +CNMP: 2 // 2 = automatic
-    //        Command("AT+CNSMOD=2", "OK", nullptr, "Set GPRS mode");
+    // Command("AT+CNMP=?", "OK", nullptr, "List of preferred modes"); // +CNMP: (2,9,10,13,14,19,22,38,39,48,51,54,59,60,63,67)
+    // Command("AT+CNMP?", "OK", nullptr, "Preferred mode");
+    // Command("AT+CNMP=13", "OK", &response, "Preferred mode"); // +CNMP: 2 // 2 = automatic
+    //   Command("AT+CNMP=38", "OK", &response, "Preferred mode"); // +CNMP: 2 // 2 = automatic
+    //         Command("AT+CNSMOD=2", "OK", nullptr, "Set GPRS mode");
 
-    //Command("AT+CEREG=?", "OK", nullptr, "List of EPS registration stati");
-    //Command("AT+CEREG?", "OK", nullptr, "EPS registration status"); // +CEREG: 0,4
-    // 4 – unknown (e.g. out of E-UTRAN coverage)
-    // 5 - roaming
+    // Command("AT+CEREG=?", "OK", nullptr, "List of EPS registration stati");
+    // Command("AT+CEREG?", "OK", nullptr, "EPS registration status"); // +CEREG: 0,4
+    //  4 – unknown (e.g. out of E-UTRAN coverage)
+    //  5 - roaming
 
-    //Command("AT+NETMODE?", "OK", nullptr, "EPS registration status"); // 2 – WCDMA mode(default)
-    //Command("AT+CPOL?", "OK", nullptr, "Preferred operator list"); //
-    //Command("AT+COPN", "OK", nullptr, "Read operator names"); // ... +COPN: "23201","A1" ... // list of thousands!!!!!
+    // Command("AT+NETMODE?", "OK", nullptr, "EPS registration status"); // 2 – WCDMA mode(default)
+    // Command("AT+CPOL?", "OK", nullptr, "Preferred operator list"); //
+    // Command("AT+COPN", "OK", nullptr, "Read operator names"); // ... +COPN: "23201","A1" ... // list of thousands!!!!!
 
-    //Command("AT+CGDATA=?", "OK", nullptr, "Read operator names"); //
-    //    Command("AT+IPR=?", "OK", &response,  "Operator Selection"); // AT+IPR=?
-    // +IPR: (0,300,600,1200,2400,4800,9600,19200,38400,57600,115200,230400,460800,921600,3000000,3200000,3686400)
+    // Command("AT+CGDATA=?", "OK", nullptr, "Read operator names"); //
+    //     Command("AT+IPR=?", "OK", &response,  "Operator Selection"); // AT+IPR=?
+    //  +IPR: (0,300,600,1200,2400,4800,9600,19200,38400,57600,115200,230400,460800,921600,3000000,3200000,3686400)
 }
 
 #ifdef TESTVELOCITYVECTOR
-void TestVelocityVector() {
+void TestVelocityVector()
+{
     VelocityVector v;
     ESP_LOGI("TESTVV", "New: [%0.6f, %d]", v.getSpeed(), v.getDir());
     v.add(10, 45);
     ESP_LOGI("TESTVV", "Add [10, 45°]: [%0.6f, %d]", v.getSpeed(), v.getDir());
-    v.add(10, 360-45);
+    v.add(10, 360 - 45);
     ESP_LOGI("TESTVV", "Add [10, -45°]: [%0.6f, %d]", v.getSpeed(), v.getDir());
-    v.add(10, 90+45);
-    v.add(10, 180+45);
+    v.add(10, 90 + 45);
+    v.add(10, 180 + 45);
     ESP_LOGI("TESTVV", "Add [10, 135°], Add [10, 225°]: [%0.6f, %d]", v.getSpeed(), v.getDir());
     v.add(5, 180);
     ESP_LOGI("TESTVV", "Add [5, 180°]: [%0.6f, %d]", v.getSpeed(), v.getDir());
@@ -736,6 +773,5 @@ void TestVelocityVector() {
     ESP_LOGI("TESTVV", "Clear: [%0.6f, %d]", v.getSpeed(), v.getDir());
     v.add(10, 360);
     ESP_LOGI("TESTVV", "Add [10, 360°]: [%0.6f, %d]", v.getSpeed(), v.getDir());
-
 }
 #endif
