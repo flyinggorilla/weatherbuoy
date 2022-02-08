@@ -536,8 +536,19 @@ bool Cellular::ReadIntoBuffer() {
             be full.*/
             case UART_DATA: {
                     //int length = 0;
-                    //ESP_ERROR_CHECK(uart_get_buffered_data_len(muiUartNo, (size_t*)&length));        
-                    int len = uart_read_bytes(muiUartNo, mpBuffer, muiBufferSize, 100 / portTICK_RATE_MS); 
+
+                    size_t maxBytesToRead = 0;
+                    if (ESP_OK != uart_get_buffered_data_len(muiUartNo, &maxBytesToRead)) {
+                        return false;
+                    }
+
+                    if (!maxBytesToRead) {
+                        maxBytesToRead = 1;
+                    } else if (maxBytesToRead > muiBufferSize) {
+                        maxBytesToRead = muiBufferSize;
+                    }
+
+                    int len = uart_read_bytes(muiUartNo, mpBuffer, maxBytesToRead, 5000 / portTICK_RATE_MS); 
                     if (len < 0) {
                         ESP_LOGE(tag, "Error reading from serial interface #%d", muiUartNo);
                         return false;
@@ -886,12 +897,6 @@ bool Cellular::ModemReadLine(String& line) {
                 }
             } else {
                 line += (char)c;
-   
-                // SMS sending stuff!!!  
-                if (line.equals(">")) {
-                   ESP_LOGW(tag, "ModemReadLine Ready for Input: %s", line.c_str());
-                   return true;
-                }
             }
         } 
         maxLineLength--;
