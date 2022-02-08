@@ -12,16 +12,18 @@ public:
 	Serial(unsigned int uartNo, unsigned int gpioRx, unsigned int gpioTx, int baudRate = 115200, unsigned int bufferSize = 1024);
 	virtual ~Serial();
     
-    bool ReadLine(String& line);
+    bool ReadLine(String& line, unsigned int timeoutms = 250);
     bool Attach();
     bool Release();
     //bool ReadLine();
     //String& data() { return mData; }; 
 
-    bool Write(String& buffer);
+    bool Write(const String& buffer);
 
 private:
-    bool ReadIntoBuffer();
+    bool ReadIntoBuffer(unsigned int timeoutms); // timeout 0 = try forever by default
+    bool ReadIntoBuffer(); // timeout 0 = try forever by default
+    //void FlushBuffer();
     unsigned char *mpBuffer;
     unsigned int muiBufferSize;
     unsigned int muiBufferPos;

@@ -37,52 +37,6 @@ void Maximet::Start(int gpioRX, int gpioTX, bool alternateUart)
     mgpioTX = gpioTX;
     muiUartNo = alternateUart ? UART_NUM_2 : UART_NUM_1;
     xTaskCreate(&fMaximetTask, "Maximet", 1024 * 16, this, ESP_TASK_MAIN_PRIO, NULL); // large stack is needed
-
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-
-    // read and optionally update Maximet configuration
-    ReadConfig();
-    if (!msUserinfo.length())
-    {
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
-        ESP_LOGW(tag, "Could not read Maximet configuraion. Retrying once.");
-        ReadConfig();
-    }
-
-    //ESP_LOGI(tag, "Check config %d, %d", msReport.length(), msUserinfo.length());
-    if (msReport.length() && msUserinfo.length())
-    {
-        const char *sReport = REPORT_GMX501;
-        if (msUserinfo.equals("GMX200GPS"))
-        {
-            sReport = REPORT_GMX200GPS;
-            mMaximetModel = GMX200GPS;
-        }
-        else if (msUserinfo.equals("GMX501GPS"))
-        {
-            sReport = REPORT_GMX501GPS;
-            mMaximetModel = GMX501GPS;
-        }
-        else if (msUserinfo.equals("GMX501"))
-        {
-            sReport = REPORT_GMX501;
-            mMaximetModel = GMX501;
-        } else {
-            ESP_LOGW(tag, "Deprecated USERINFO=%s detected. Setting USERINFO to GMX501.", msUserinfo.c_str());
-            sReport = REPORT_GMX501;
-            mMaximetModel = GMX501;
-            SetUserinf("GMX501");
-            SetOutfreq(true);
-        }
-
-        ESP_LOGI(tag, "Detected Maximet model (USERINFO) %s", msUserinfo.c_str());
-
-        if (!msReport.equals(sReport))
-        {
-            ESP_LOGW(tag, "Configuration mismatch for %s, Columns %s, Updating to %s", msUserinfo.c_str(), msReport.c_str(), sReport);
-            SetReport(sReport);
-        } 
-    }
 }
 
 #define STX (0x02) // ASCII start of text
@@ -147,6 +101,107 @@ void ParseTime(String &column, Data &data)
     }
 }
 
+/* void Maximet::MaximetConfig() {
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    // read and optionally update Maximet configuration
+    ReadConfig();
+    if (!msUserinfo.length())
+    {
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
+        ESP_LOGW(tag, "Could not read Maximet configuraion. Retrying once.");
+        ReadConfig();
+    }
+
+    //ESP_LOGI(tag, "Check config %d, %d", msReport.length(), msUserinfo.length());
+    if (msReport.length() && msUserinfo.length())
+    {
+        const char *sReport = REPORT_GMX501;
+        if (msUserinfo.equals("GMX200GPS"))
+        {
+            sReport = REPORT_GMX200GPS;
+            mMaximetModel = GMX200GPS;
+        }
+        else if (msUserinfo.equals("GMX501GPS"))
+        {
+            sReport = REPORT_GMX501GPS;
+            mMaximetModel = GMX501GPS;
+        }
+        else if (msUserinfo.equals("GMX501"))
+        {
+            sReport = REPORT_GMX501;
+            mMaximetModel = GMX501;
+        } else {
+            ESP_LOGW(tag, "Deprecated USERINFO=%s detected. Setting USERINFO to GMX501.", msUserinfo.c_str());
+            sReport = REPORT_GMX501;
+            mMaximetModel = GMX501;
+            SetUserinf("GMX501");
+            SetOutfreq(true);
+        }
+
+        ESP_LOGI(tag, "Detected Maximet model (USERINFO) %s", msUserinfo.c_str());
+
+        if (!msReport.equals(sReport))
+        {
+            ESP_LOGW(tag, "Configuration mismatch for %s, Columns %s, Updating to %s", msUserinfo.c_str(), msReport.c_str(), sReport);
+            SetReport(sReport);
+        }
+    }
+} */
+
+void Maximet::MaximetConfig()
+{
+    //vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    // read and optionally update Maximet configuration
+    EnterCommandLine();
+    ReadUserinf();
+    ReadReport();
+    ReadOutfreq();
+    ReadAvgLong();
+    
+    // ESP_LOGI(tag, "Check config %d, %d", msReport.length(), msUserinfo.length());
+    if (msReport.length() && msUserinfo.length())
+    {
+        const char *sReport = REPORT_GMX501;
+        if (msUserinfo.equals("GMX200GPS"))
+        {
+            sReport = REPORT_GMX200GPS;
+            mMaximetModel = GMX200GPS;
+        }
+        else if (msUserinfo.equals("GMX501GPS"))
+        {
+            sReport = REPORT_GMX501GPS;
+            mMaximetModel = GMX501GPS;
+        }
+        else if (msUserinfo.equals("GMX501"))
+        {
+            sReport = REPORT_GMX501;
+            mMaximetModel = GMX501;
+        }
+        else
+        {
+            ESP_LOGW(tag, "Deprecated USERINFO=%s detected. Setting USERINFO to GMX501.", msUserinfo.c_str());
+            sReport = REPORT_GMX501;
+            mMaximetModel = GMX501;
+            WriteUserinf("GMX501");
+            ReadUserinf();
+
+            WriteOutfreq(true);
+            ReadOutfreq();
+        }
+
+        ESP_LOGI(tag, "Detected Maximet model (USERINFO) %s", msUserinfo.c_str());
+        if (!msReport.equals(sReport))
+        {
+            ESP_LOGW(tag, "Configuration mismatch for %s, Columns %s, Updating to %s", msUserinfo.c_str(), msReport.c_str(), sReport);
+            WriteReport(sReport);
+            ReadReport();
+        }
+    }
+    ExitCommandLine();
+}
+
 void Maximet::MaximetTask()
 {
 
@@ -194,12 +249,14 @@ void Maximet::MaximetTask()
     VelocityVector shortAvgCSpeedVector;
     // GustVector shortAvgCGSpeedVector;
 
+    MaximetConfig();
+
     ESP_LOGI(tag, "Maximet task started and ready to receive data.");
     while (mbRun)
     {
         if (!mpSerial->ReadLine(line))
         {
-            ESP_LOGE(tag, "Could not read line from serial");
+            // ESP_LOGE(tag, "Could not read line from serial");
             continue;
         }
         ESP_LOGD(tag, "THE LINE: %s", line.c_str());
@@ -801,64 +858,152 @@ Maximet::~Maximet()
 {
 }
 
-void Maximet::Command(String &command)
+static const unsigned int COMMANDLINE_TIMEOUT_MS = 5000;
+
+bool Maximet::EnterCommandLine()
 {
-    String cmd = "*\r\necho off\r\n";
+    String cmd("*\r\necho off\r\n");
+    String line;
     mpSerial->Write(cmd);
-    vTaskDelay(1500 / portTICK_PERIOD_MS); // wait 1.5 seconds to ensure no data coming
 
-    mbCommandline = true;
-    mpSerial->Write(command);
-    vTaskDelay(1500 / portTICK_PERIOD_MS); // wait 1.5 seconds to check response data before exiting
+    while (mpSerial->ReadLine(line, COMMANDLINE_TIMEOUT_MS))
+    {
+        ESP_LOGI(tag, "ReadConfig ReadLine: %s", line.c_str());
+        if (line.startsWith("SETUP MODE"))
+        {
+            ESP_LOGI(tag, "Commandline mode entered.");
+            return mbCommandline = true;
+        } else if(line.startsWith("UNNECESSARY COMMAND")) {
+            ESP_LOGI(tag, "Already in commandline mode.");
+            return mbCommandline = true;
+        }
+    }
 
-    cmd = "\r\nexit\r\n";
+    return mbCommandline = false;
+}
+
+void Maximet::ExitCommandLine()
+{
+    String cmd("\r\nexit\r\n");
     mpSerial->Write(cmd);
-    vTaskDelay(500 / portTICK_PERIOD_MS); // wait 0.5 seconds to allow for full line of data after exiting
     mbCommandline = false;
+    ESP_LOGI(tag, "Commandline mode exited.");
 }
 
-void Maximet::SetAvgLong(unsigned short avglong)
+void Maximet::WriteAvgLong(unsigned short avglong)
 {
-    String command;
-    command.printf("AVGLONG %d\r\nAVGLONG\r\n", avglong);
-    Command(command);
+    WriteConfig("AVGLONG", String(avglong));
 }
 
-void Maximet::ReadConfig()
+bool Maximet::ReadConfig(String &value, const char *sConfig)
 {
-    String command;
-    command.printf("USERINF\r\nREPORT\r\nAVGLONG\r\nOUTFREQ\r\n");
-    Command(command);
+    String cmd(sConfig);
+    cmd += "\r\n";
+    mpSerial->Write(cmd);
+
+    cmd = sConfig;
+    cmd += " = ";
+
+    String line;
+    while (mpSerial->ReadLine(line, COMMANDLINE_TIMEOUT_MS))
+    {
+        if (line.startsWith(cmd))
+        {
+            value = line.substring(cmd.length());
+            //ESP_LOGI(tag, "ReadConfig ReadLine Value: %s", value.c_str());
+            return true;
+        }
+    }
+    return false;
 }
 
-void Maximet::SetOutfreq(bool high)
+bool Maximet::ReadUserinf()
 {
-    String command;
+    if (ReadConfig(msUserinfo, "USERINF"))
+    {
+        ESP_LOGI(tag, "USERINF: %s", msUserinfo.c_str());
+        return true;
+    }
+    return false;
+};
+
+bool Maximet::ReadReport()
+{
+    if (ReadConfig(msReport, "REPORT"))
+    {
+        ESP_LOGI(tag, "REPORT: %s", msReport.c_str());
+        return true;
+    }
+    return false;
+};
+
+bool Maximet::ReadOutfreq()
+{
+    String val;
+    muiOutputIntervalSec = 0;
+    if (ReadConfig(val, "OUTFREQ"))
+    {
+        if (val.equals("1HZ"))
+        {
+            muiOutputIntervalSec = 1;
+        }
+        else if (val.equals("1/MIN"))
+        {
+            muiOutputIntervalSec = 60;
+        } else {
+            return false;
+        }
+        ESP_LOGI(tag, "OUTFREQ: every %d second(s)", muiOutputIntervalSec);
+        return true;
+    }
+    return false;
+};
+
+bool Maximet::ReadAvgLong()
+{
+    muiAvgLong = 0;
+    String val;
+    if (ReadConfig(val, "AVGLONG"))
+    {
+        muiAvgLong = val.toInt();
+        ESP_LOGI(tag, "AVGLONG: %d", muiAvgLong);
+        return true;
+    }
+    return false;
+};
+
+bool Maximet::WriteConfig(const char *sConfig, const String &value) {
+    String cmd(sConfig);
+    cmd += " ";
+    cmd += value;
+    cmd += "\r\n";
+    return mpSerial->Write(cmd);
+}
+
+void Maximet::WriteOutfreq(bool high)
+{
     if (high)
     {
-        command.printf("OUTFREQ 1HZ\r\nOUTFREQ\r\n");
+        WriteConfig("OUTFREQ", "1HZ");
     }
     else
     {
-        command.printf("OUTFREQ 1/MIN\r\nOUTFREQ\r\n");
+        WriteConfig("OUTFREQ", "1/MIN");
     }
-    Command(command);
 }
 
-void Maximet::SetReport(const char *report)
+void Maximet::WriteReport(const char *report)
 {
     String columns(report);
     columns.replace(',', ' ');
     int checkPos = columns.indexOf(" CHECK");
-    String command;
-    command = "REPORT ";
-    command += checkPos < 0 ? columns : columns.substring(0, checkPos);
-    command += "\r\nREPORT\r\n";
-    Command(command);
+    if(checkPos >= 0) {
+        columns.setlength(checkPos);
+    }
+    WriteConfig("REPORT", columns);
 }
 
-void Maximet::SetUserinf(const char *userinf) {
-    String command;
-    command.printf("USERINF %s\r\nUSERINF\r\n", userinf);
-    Command(command);
+void Maximet::WriteUserinf(const char *userinf)
+{
+    WriteConfig("USERINF", userinf);
 }

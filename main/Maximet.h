@@ -32,38 +32,44 @@ public:
 
     void SimulatorDataPoint(float temperature, double longitude, double latitude);
 
-    // reconfigure Maximet long 
-    void SetAvgLong(unsigned short avglong);
-
-    // reconfigure Maximet output frequency
-    // high = true: 1 output per second
-    // high = false: 1 output per minute
-    void SetOutfreq(bool high);  
-
-    // read maximet key configuration fields
-    void ReadConfig();
-
     unsigned int GetOutfreq() { return muiOutputIntervalSec; };
     unsigned int GetAvgLong() { return muiAvgLong; };
     String& GetUserinf() { return msUserinfo; };
     String& GetReport() { return msReport; };
 
-    // set columns maximet should send e.g. "USERINF,SPEED,GSPEED,AVGSPEED,DIR" --- this will send "REPORT USERINF SPEED .... " (no comma!) to maximet
-    void SetReport(const char* report);
-    void SetUserinf(const char* userinf);
-
-
 private:
     //main loop run by the task
     void MaximetTask();
     friend void fMaximetTask(void *pvParameter);
+    void MaximetConfig();
 
     void SendLine(const char* text);
     void SendLine(String &line);
 
+
     // enters Maximet commmandline mode with *\r\n and allows to send config; 
     // calls "exit" automatically at the end to continue data sending
-    void Command(String &command);
+    bool EnterCommandLine();
+    void ExitCommandLine();
+    bool ReadConfig(String &value, const char *sConfig);
+    bool WriteConfig(const char *sConfig, const String &value);
+    bool ReadUserinf();
+    bool ReadReport();
+    bool ReadOutfreq();
+    bool ReadAvgLong();
+
+    // configure Maximet long average interval - 
+    // default is 10 minutes (10 times short interval of default 60 seconds)
+    void WriteAvgLong(unsigned short avglong);
+
+    // reconfigure Maximet output frequency
+    // high = true: 1 output per second
+    // high = false: 1 output per minute
+    void WriteOutfreq(bool high);  
+    // set columns maximet should send e.g. "USERINF,SPEED,GSPEED,AVGSPEED,DIR" --- this will send "REPORT USERINF SPEED .... " (no comma!) to maximet
+    void WriteReport(const char* report);
+    // set
+    void WriteUserinf(const char* userinf);
 
     Model mMaximetModel;
     Serial *mpSerial;

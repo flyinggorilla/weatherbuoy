@@ -69,6 +69,7 @@ Serial::~Serial() {
     free(mpBuffer);
 }
 
+// try forever until 1 byte arrives
 bool Serial::ReadIntoBuffer() {
     muiBufferPos = 0;
     muiBufferLen = 0;
@@ -83,14 +84,46 @@ bool Serial::ReadIntoBuffer() {
     return true;
 }
 
-bool Serial::ReadLine(String& line) {
+// timeout 0 = try forever by default
+bool Serial::ReadIntoBuffer(unsigned int timeoutms) {
+    muiBufferPos = 0;
+    muiBufferLen = 0;
+    size_t maxBytesToRead = 0;
+    if (ESP_OK != uart_get_buffered_data_len(muiUartNo, &maxBytesToRead)) {
+        return false;
+    }
+
+    //ESP_LOGI(tag, "Data in Buffer %d bytes", (unsigned int)maxBytesToRead);
+
+    // if nothing is in buffer, then wait for timeout, otherwise read only whats in buffer
+    if (!maxBytesToRead) {
+        maxBytesToRead = 1;
+    } else if (maxBytesToRead > muiBufferSize) {
+        maxBytesToRead = muiBufferSize;
+    }
+
+    int len = uart_read_bytes(muiUartNo, mpBuffer, maxBytesToRead, timeoutms / portTICK_RATE_MS);
+    if (len < 0) {
+        ESP_LOGE(tag, "Error reading from serial interface #%d", muiUartNo);
+        return false;
+    }
+    muiBufferLen = len;
+    //ESP_LOG_BUFFER_HEXDUMP(tag, mpBuffer, len, ESP_LOG_INFO);
+    return true;
+}
+
+
+bool Serial::ReadLine(String& line, unsigned int timeoutms) {
     line = "";
 
     int maxLineLength = muiBufferSize;
     while(maxLineLength) {
         if (muiBufferPos == muiBufferLen) {
-            if (!ReadIntoBuffer())
+            if (!ReadIntoBuffer(timeoutms))
                 return false;
+            if(!muiBufferLen) {
+                return false;                
+            }
         }
         if (muiBufferPos < muiBufferLen) {
             unsigned char c = mpBuffer[muiBufferPos++];
@@ -107,7 +140,7 @@ bool Serial::ReadLine(String& line) {
     return false;
 }
 
-bool Serial::Write(String &buffer) {
+bool Serial::Write(const String &buffer) {
     if (uart_write_bytes(muiUartNo, buffer.c_str(), buffer.length()) >= 0) {
         ESP_LOGD(tag, "Sent to UART: \"%s\"", buffer.c_str());
         //ESP_LOG_BUFFER_HEXDUMP(tag, buffer.c_str(), buffer.length(), ESP_LOG_INFO);

@@ -151,12 +151,6 @@ void Esp32WeatherBuoy::Start()
     Maximet maximet(dataQueue);
     maximet.Start(maximetRxPin, maximetTxPin);
 
-    // ESP_LOGI(tag, "SetAvgLong");
-    // maximet.SetAvgLong(5);
-    // ESP_LOGI(tag, "SetOutfreq(high)");
-    // maximet.SetOutfreq(true);
-    // ESP_LOGI(tag, "done");
-
     // detect available Simcom 7600E Modem, such as on Lillygo PCI board
     if (mCellular.InitModem())
     {
