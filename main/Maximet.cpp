@@ -101,106 +101,6 @@ void ParseTime(String &column, Data &data)
     }
 }
 
-/* void Maximet::MaximetConfig() {
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-
-    // read and optionally update Maximet configuration
-    ReadConfig();
-    if (!msUserinfo.length())
-    {
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
-        ESP_LOGW(tag, "Could not read Maximet configuraion. Retrying once.");
-        ReadConfig();
-    }
-
-    //ESP_LOGI(tag, "Check config %d, %d", msReport.length(), msUserinfo.length());
-    if (msReport.length() && msUserinfo.length())
-    {
-        const char *sReport = REPORT_GMX501;
-        if (msUserinfo.equals("GMX200GPS"))
-        {
-            sReport = REPORT_GMX200GPS;
-            mMaximetModel = GMX200GPS;
-        }
-        else if (msUserinfo.equals("GMX501GPS"))
-        {
-            sReport = REPORT_GMX501GPS;
-            mMaximetModel = GMX501GPS;
-        }
-        else if (msUserinfo.equals("GMX501"))
-        {
-            sReport = REPORT_GMX501;
-            mMaximetModel = GMX501;
-        } else {
-            ESP_LOGW(tag, "Deprecated USERINFO=%s detected. Setting USERINFO to GMX501.", msUserinfo.c_str());
-            sReport = REPORT_GMX501;
-            mMaximetModel = GMX501;
-            SetUserinf("GMX501");
-            SetOutfreq(true);
-        }
-
-        ESP_LOGI(tag, "Detected Maximet model (USERINFO) %s", msUserinfo.c_str());
-
-        if (!msReport.equals(sReport))
-        {
-            ESP_LOGW(tag, "Configuration mismatch for %s, Columns %s, Updating to %s", msUserinfo.c_str(), msReport.c_str(), sReport);
-            SetReport(sReport);
-        }
-    }
-} */
-
-void Maximet::MaximetConfig()
-{
-    //vTaskDelay(1000 / portTICK_PERIOD_MS);
-
-    // read and optionally update Maximet configuration
-    EnterCommandLine();
-    ReadUserinf();
-    ReadReport();
-    ReadOutfreq();
-    ReadAvgLong();
-    
-    // ESP_LOGI(tag, "Check config %d, %d", msReport.length(), msUserinfo.length());
-    if (msReport.length() && msUserinfo.length())
-    {
-        const char *sReport = REPORT_GMX501;
-        if (msUserinfo.equals("GMX200GPS"))
-        {
-            sReport = REPORT_GMX200GPS;
-            mMaximetModel = GMX200GPS;
-        }
-        else if (msUserinfo.equals("GMX501GPS"))
-        {
-            sReport = REPORT_GMX501GPS;
-            mMaximetModel = GMX501GPS;
-        }
-        else if (msUserinfo.equals("GMX501"))
-        {
-            sReport = REPORT_GMX501;
-            mMaximetModel = GMX501;
-        }
-        else
-        {
-            ESP_LOGW(tag, "Deprecated USERINFO=%s detected. Setting USERINFO to GMX501.", msUserinfo.c_str());
-            sReport = REPORT_GMX501;
-            mMaximetModel = GMX501;
-            WriteUserinf("GMX501");
-            ReadUserinf();
-
-            WriteOutfreq(true);
-            ReadOutfreq();
-        }
-
-        ESP_LOGI(tag, "Detected Maximet model (USERINFO) %s", msUserinfo.c_str());
-        if (!msReport.equals(sReport))
-        {
-            ESP_LOGW(tag, "Configuration mismatch for %s, Columns %s, Updating to %s", msUserinfo.c_str(), msReport.c_str(), sReport);
-            WriteReport(sReport);
-            ReadReport();
-        }
-    }
-    ExitCommandLine();
-}
 
 void Maximet::MaximetTask()
 {
@@ -247,7 +147,6 @@ void Maximet::MaximetTask()
     int lastUptime = 0;
 
     VelocityVector shortAvgCSpeedVector;
-    // GustVector shortAvgCGSpeedVector;
 
     MaximetConfig();
 
@@ -256,52 +155,9 @@ void Maximet::MaximetTask()
     {
         if (!mpSerial->ReadLine(line))
         {
-            // ESP_LOGE(tag, "Could not read line from serial");
             continue;
         }
         ESP_LOGD(tag, "THE LINE: %s", line.c_str());
-
-        if (mbCommandline)
-        {
-            ESP_LOGI(tag, "Commandline reponse: %s", line.c_str());
-            if (line.startsWith("AVGLONG = "))
-            {
-                muiAvgLong = 0;
-                int pos = line.indexOf("=");
-                String val = line.substring(pos + 1);
-                muiAvgLong = val.toInt();
-                ESP_LOGI(tag, "AVGLONG: %d", muiAvgLong);
-            }
-            else if (line.startsWith("REPORT = "))
-            {
-                int pos = line.indexOf("=");
-                msReport = line.substring(pos + 1);
-                msReport.trim();
-                ESP_LOGI(tag, "REPORT: %s", msReport.c_str());
-            }
-            else if (line.startsWith("OUTFREQ = 1HZ"))
-            { //"1/MIN" or "1HZ"
-                muiOutputIntervalSec = 1;
-                ESP_LOGI(tag, "OUTFREQ: every %d second(s)", muiOutputIntervalSec);
-            }
-            else if (line.startsWith("OUTFREQ = 1/MIN"))
-            { //"1/MIN" or "1HZ"
-                muiOutputIntervalSec = 60;
-                ESP_LOGI(tag, "OUTFREQ: every %d second(s)", muiOutputIntervalSec);
-            }
-            else if (line.startsWith("USERINF = "))
-            {
-                int pos = line.indexOf("=");
-                msUserinfo = line.substring(pos + 1);
-                msUserinfo.trim();
-                ESP_LOGI(tag, "USERINFO: %s", msUserinfo.c_str());
-            }
-            else if (line.startsWith("INCORRECT "))
-            {
-                ESP_LOGE(tag, "Error setting columns: %s", line.c_str());
-            }
-            continue;
-        }
 
         if (line.startsWith("STARTUP: OK"))
         {
@@ -316,11 +172,9 @@ void Maximet::MaximetTask()
             continue;
         case COLUMNS:
             maximetState = UNITS;
-            // mrConfig.msMaximetColumns = line;
             continue;
         case UNITS:
             maximetState = ENDSTARTUP;
-            // mrConfig.msMaximetUnits = line;
             continue;
         case ENDSTARTUP:
             maximetState = SENDINGDATA;
@@ -857,6 +711,60 @@ Maximet::Maximet(DataQueue &dataQueue) : mrDataQueue(dataQueue)
 Maximet::~Maximet()
 {
 }
+
+void Maximet::MaximetConfig()
+{
+    //vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    // read and optionally update Maximet configuration
+    EnterCommandLine();
+    ReadUserinf();
+    ReadReport();
+    ReadOutfreq();
+    ReadAvgLong();
+    
+    // ESP_LOGI(tag, "Check config %d, %d", msReport.length(), msUserinfo.length());
+    if (msReport.length() && msUserinfo.length())
+    {
+        const char *sReport = REPORT_GMX501;
+        if (msUserinfo.equals("GMX200GPS"))
+        {
+            sReport = REPORT_GMX200GPS;
+            mMaximetModel = GMX200GPS;
+        }
+        else if (msUserinfo.equals("GMX501GPS"))
+        {
+            sReport = REPORT_GMX501GPS;
+            mMaximetModel = GMX501GPS;
+        }
+        else if (msUserinfo.equals("GMX501"))
+        {
+            sReport = REPORT_GMX501;
+            mMaximetModel = GMX501;
+        }
+        else
+        {
+            ESP_LOGW(tag, "Deprecated USERINFO=%s detected. Setting USERINFO to GMX501.", msUserinfo.c_str());
+            sReport = REPORT_GMX501;
+            mMaximetModel = GMX501;
+            WriteUserinf("GMX501");
+            ReadUserinf();
+
+            WriteOutfreq(true);
+            ReadOutfreq();
+        }
+
+        ESP_LOGI(tag, "Detected Maximet model (USERINFO) %s", msUserinfo.c_str());
+        if (!msReport.equals(sReport))
+        {
+            ESP_LOGW(tag, "Configuration mismatch for %s, Columns %s, Updating to %s", msUserinfo.c_str(), msReport.c_str(), sReport);
+            WriteReport(sReport);
+            ReadReport();
+        }
+    }
+    ExitCommandLine();
+}
+
 
 static const unsigned int COMMANDLINE_TIMEOUT_MS = 5000;
 
