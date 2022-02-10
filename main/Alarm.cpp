@@ -197,7 +197,7 @@ void Alarm::AlarmTask()
                 {
                     //ESP_LOGE(tag, "TILT ALARM: %d° (%d°/%d°) %s", absTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
                     String info;
-                    info.printf("WEATHERBUPY MAST MANIPULATION!\rTILT: %ddeg (%dx/%dy) %s", absTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "UP");
+                    info.printf("WEATHERBUOY MAST MANIPULATION!\rTILT: %ddeg (%dx/%dy) %s", absTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "UP");
                     info += "\r";
                     msAlarmInfo += info;
                 }

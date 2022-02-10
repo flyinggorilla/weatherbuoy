@@ -785,6 +785,7 @@ bool Maximet::EnterCommandLine()
             ESP_LOGI(tag, "Already in commandline mode.");
             return mbCommandline = true;
         }
+        mpSerial->Write(cmd);
     }
 
     return mbCommandline = false;
