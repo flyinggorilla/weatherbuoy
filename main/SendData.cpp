@@ -1,4 +1,4 @@
-#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "SendData.h"
 #include "EspString.h"
 #include "freertos/FreeRTOS.h"
@@ -193,7 +193,15 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += mrConfig.msSTASsid;
         mPostData += "\",\"stapass\": \"";
         mPostData += mrConfig.msSTAPass.length() ? "*****" : "";
-        mPostData += "\",\"cellular\": {\"datasent\":";
+        mPostData += "\", \"intervalday\": ";
+        mPostData += mrConfig.miIntervalDay;
+        mPostData += ", \"intervalnight\": ";
+        mPostData += mrConfig.miIntervalNight;
+        mPostData += ", \"intervallowbat\": ";
+        mPostData += mrConfig.miIntervalLowbattery;
+        mPostData += ", \"intervaldiag\": ";
+        mPostData += mrConfig.miIntervalDiagnostics;
+        mPostData += ",\"cellular\": {\"datasent\":";
         mPostData += (unsigned long)(mrCellular.getDataSent() / 1024); // convert to kB
         mPostData += ",\"datareceived\":";
         mPostData += (unsigned long)(mrCellular.getDataReceived() / 1024); // convert to kB
@@ -511,7 +519,7 @@ bool SendData::PerformHttpPost()
                     mEspHttpClientConfig.cert_pem = pem.c_str();
                 }
                 ESP_LOGI(tag, "OTA Url: %s", mEspHttpClientConfig.url);
-                ESP_LOGI(tag, "OTA PEM %s certificate: %d bytes\r\n%s", pem.length() ? "custom" : "embedded", strlen(mEspHttpClientConfig.cert_pem), mEspHttpClientConfig.cert_pem);
+                ESP_LOGD(tag, "OTA PEM %s certificate: %d bytes\r\n%s", pem.length() ? "custom" : "embedded", strlen(mEspHttpClientConfig.cert_pem), mEspHttpClientConfig.cert_pem);
                 err = esp_https_ota(&mEspHttpClientConfig);
                 if (err == ESP_OK)
                 {

@@ -32,6 +32,11 @@ Config::Config()
 	miAlarmRadius = 100; // 100m
 	mdAlarmLatitude = 0.0;
 	mdAlarmLongitude = 0.0;
+	miIntervalDay = CONFIG_WEATHERBUOY_SENDDATA_INTERVAL_DAY; // seconds
+	miIntervalNight = CONFIG_WEATHERBUOY_SENDDATA_INTERVAL_NIGHT; // seconds
+	miIntervalDiagnostics = CONFIG_WEATHERBUOY_SENDDATA_INTERVAL_DIAGNOSTICS; // seconds
+	miIntervalLowbattery = CONFIG_WEATHERBUOY_SENDDATA_INTERVAL_LOWBATTERY; // seconds
+
 }
 
 Config::~Config()
@@ -67,6 +72,10 @@ bool Config::Load()
 	ReadDouble(h, "AlarmLatitude", mdAlarmLatitude);
 	ReadDouble(h, "AlarmLongitude", mdAlarmLatitude);
 	ReadString(h, "AlarmSms", msAlarmSms);
+	ReadInt(h, "IntervalDay", miIntervalDay);
+	ReadInt(h, "IntervalNight", miIntervalNight);
+	ReadInt(h, "IntervalDiag", miIntervalDiagnostics);
+	ReadInt(h, "IntervalLowbat", miIntervalLowbattery);
 	nvs_close(h);
 	return true;
 }
@@ -122,6 +131,14 @@ bool Config::Save()
 	if (WriteDouble(h, "AlarmLongitude", mdAlarmLatitude))
 		ret = false;
 	if (WriteString(h, "AlarmSms", msAlarmSms))
+		ret = false;
+	if (!WriteInt(h, "IntervalDay", miIntervalDay))
+		ret = false;
+	if (!WriteInt(h, "IntervalNight", miIntervalNight))
+		ret = false;
+	if (!WriteInt(h, "IntervalDiag", miIntervalDiagnostics))
+		ret = false;
+	if (!WriteInt(h, "IntervalLowbat", miIntervalLowbattery))
 		ret = false;
 
 	nvs_commit(h);

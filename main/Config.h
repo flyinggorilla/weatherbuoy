@@ -53,6 +53,10 @@ public:
 	String msCellularOperator;
 	String msNtpServer;
 	int miCellularNetwork;
+	int miIntervalDay;
+	int miIntervalNight;
+	int miIntervalDiagnostics;
+	int miIntervalLowbattery;
 	String msBoardTempSensorId;
 };
 

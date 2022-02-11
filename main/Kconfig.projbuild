@@ -70,5 +70,22 @@ menu "Weatherbuoy"
                 5011 - Maximet GMX501 with GPS
         default 0
 
+    config WEATHERBUOY_SENDDATA_INTERVAL_DAY
+        int "Interval in seconds to send data at daytime. default = 60 seconds."
+        default 60   
+
+    config WEATHERBUOY_SENDDATA_INTERVAL_NIGHT
+        int "Interval in seconds to send data at daytime. default = 300 seconds."
+        default 300   
+
+    config WEATHERBUOY_SENDDATA_INTERVAL_DIAGNOSTICS
+        int "Interval in seconds to send data at daytime. default = 900 seconds."
+        default 900   
+
+    config WEATHERBUOY_SENDDATA_INTERVAL_LOWBATTERY
+        int "Interval in seconds to send data at daytime. default = 3600 seconds."
+        default 3600   
+            
+       
 
 endmenu

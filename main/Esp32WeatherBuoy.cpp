@@ -68,10 +68,7 @@ static const char tag[] = "WeatherBuoy";
 
 // Restart ESP32 if there is not data being successfully sent within this period.
 #define CONFIG_WATCHDOG_SECONDS 60 * 125             // 125min - if two hourly sends fail, thats the latest to restart
-#define CONFIG_SENDDATA_INTERVAL_DAYTIME 60          // seconds
-#define CONFIG_SENDDATA_INTERVAL_NIGHTTIME 60 * 5    // 5 minutes
-#define CONFIG_SENDDATA_INTERVAL_DIAGNOSTICS 60 * 15 // every 15min
-#define CONFIG_SENDDATA_INTERVAL_LOWBATTERY 60 * 60  // hourly
+#define CONFIG_SOLARRADIATIONMIN_DAYTIME 2           // >2W/m2 solar radiation to declare DAYTIME
 
 Esp32WeatherBuoy::Esp32WeatherBuoy()
 {
@@ -305,7 +302,7 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
 
         // when sending, add diagnostics information after 300 seconds
         secondsSinceLastDiagnostics = uptimeSeconds - lastDiagnosticsTimestamp;
-        if (secondsSinceLastDiagnostics > CONFIG_SENDDATA_INTERVAL_DIAGNOSTICS || bDiagnosticsAtStartup)
+        if (secondsSinceLastDiagnostics > mConfig.miIntervalDiagnostics || bDiagnosticsAtStartup)
         {
             bDiagnostics = true;
             bDiagnosticsAtStartup = false;
@@ -385,19 +382,19 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
 
         // determine nighttime by low solar radiation
         ESP_LOGI(tag, "Solarradiation: %d W/m²  Voltage: %.02fV", maximet.SolarRadiation(), voltage / 1000.0);
-        if (maximet.SolarRadiation() > 2 && voltage > 13100)
+        if (maximet.SolarRadiation() > CONFIG_SOLARRADIATIONMIN_DAYTIME && voltage > 13100)
         {
-            secondsToSleep = CONFIG_SENDDATA_INTERVAL_DAYTIME; // s;
+            secondsToSleep = mConfig.miIntervalDay; // s;
             ESP_LOGI(tag, "Sending data at daytime interval every %d seconds", secondsToSleep);
         }
         else if (voltage > 12750)
         {
-            secondsToSleep = CONFIG_SENDDATA_INTERVAL_NIGHTTIME; // s;
+            secondsToSleep = mConfig.miIntervalNight; // s;
             ESP_LOGI(tag, "Sending data at nighttime interval every %d minutes", secondsToSleep / 60);
         }
         else
         { // got into low battery mode if voltage is below 12.5V
-            secondsToSleep = CONFIG_SENDDATA_INTERVAL_LOWBATTERY;
+            secondsToSleep = mConfig.miIntervalLowbattery;
             ESP_LOGI(tag, "Sending data in low-battery mode every %d minutes", secondsToSleep / 60);
         }
     }
@@ -502,7 +499,7 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
 
         // when sending, add diagnostics information after 300 seconds
         secondsSinceLastDiagnostics = uptimeSeconds - lastDiagnosticsTimestamp;
-        if (secondsSinceLastDiagnostics > CONFIG_SENDDATA_INTERVAL_DIAGNOSTICS || bDiagnosticsAtStartup)
+        if (secondsSinceLastDiagnostics > mConfig.miIntervalDiagnostics || bDiagnosticsAtStartup)
         {
             bDiagnostics = true;
             bDiagnosticsAtStartup = false;
@@ -582,7 +579,7 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
             cellular.SwitchToLowPowerMode();
         } */
 
-        secondsToSleep = CONFIG_SENDDATA_INTERVAL_DAYTIME;
+        secondsToSleep = mConfig.miIntervalDay;
     }
 };
 
