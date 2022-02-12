@@ -480,6 +480,34 @@ bool SendData::PerformHttpPost()
                 updateConfig = true;
             };
 
+            value = ReadMessageValue("set-intervalday:");
+            if (value.length())
+            {
+                mrConfig.miIntervalDay = value.toInt();
+                updateConfig = true;
+            };
+
+            value = ReadMessageValue("set-intervalnight:");
+            if (value.length())
+            {
+                mrConfig.miIntervalNight = value.toInt();
+                updateConfig = true;
+            };
+
+            value = ReadMessageValue("set-intervaldiag:");
+            if (value.length())
+            {
+                mrConfig.miIntervalDiagnostics = value.toInt();
+                updateConfig = true;
+            };
+
+            value = ReadMessageValue("set-intervallowbat:");
+            if (value.length())
+            {
+                mrConfig.miIntervalLowbattery = value.toInt();
+                updateConfig = true;
+            };
+
             mbRestart = false;
             if (command.equals("restart") || command.equals("config") || command.equals("udpate"))
             {

@@ -1,4 +1,4 @@
-//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include "sdkconfig.h"
 #include "Cellular.h"
 #include "EspString.h"
@@ -52,6 +52,31 @@ static const TickType_t UART_TIMEOUT = 180 * 1000 / portTICK_PERIOD_MS;
 #define CELLULAR_UART_SEND_BUFFER_SIZE 1024 * 2
 #endif
 
+#ifdef UCS2SMS // to send SMS with non-ASCII characters
+#include <locale>
+#include <codecvt>
+
+std::string wstringToUtf8(const std::wstring& str)
+
+{
+
+	std::wstring_convert<std::codecvt_utf8<wchar_t> > strCnv;
+
+	return strCnv.to_bytes(str);
+
+}
+
+
+std::wstring utf8ToWstring(const std::string& str)
+
+{
+
+	std::wstring_convert< std::codecvt_utf8<wchar_t> > strCnv;
+
+	return strCnv.from_bytes(str);
+
+}
+#endif
 
 
 /* TODO to keep up with buffer performance issues? intterrupt handler and copy buffer myself?
@@ -479,16 +504,45 @@ bool Cellular::SendSMS(String &rsTo, String &rsMsg)
     ret = Command("AT+CMGS=?", "OK", &response, "Query SMS sending capability SMS.");
     ESP_LOGI(tag, "query SMS sending %s. response %s", ret ? "succeeded" : "failed", response.c_str());
 
+    ret = Command("AT+CSCS=?", "OK", &response, "Query SMS character sets.");
+    ESP_LOGI(tag, "query SMS character sets %s. response %s", ret ? "succeeded" : "failed", response.c_str());
+    String characterSets;
+    if (response.startsWith("+CSCS: "))
+    {
+        characterSets = response.substring(7);
+        ESP_LOGI(tag, "Possible SMS character sets %s", characterSets.c_str());
+    }
+    ret = Command("AT+CSCS?", "OK", &response, "Query SMS character set.");
+    ESP_LOGI(tag, "query SMS character sets %s. response %s", ret ? "succeeded" : "failed", response.c_str());
+    if (response.startsWith("+CSCS: "))
+    {
+        characterSets = response.substring(7);
+        ESP_LOGI(tag, "Configured SMS character sets %s", characterSets.c_str());
+    }
+    ret = Command("AT+CSCS=\"UCS2\"", "OK", &response, "Query SMS character set.");
+    ESP_LOGI(tag, "query SMS character sets %s. response %s", ret ? "succeeded" : "failed", response.c_str());
+
+
     String command;
     static const char CTRLZ = 0x1A;
     static const char ESC = 0x1B;
-    ESP_LOGI(tag, "Sending SMS to:%s, message:%s", rsTo.c_str(), rsMsg.c_str());
-    command.printf("AT+CMGS=\"%s\"\r", rsTo.c_str());
-    if (!Command(command.c_str(), ">", &response, "prepare to send SMS text."))
+    String printableMsg = rsMsg;
+    //printableMsg.replace("\r", "\r\n");
+    ESP_LOGI(tag, "Sending SMS to:%s, message:%s", rsTo.c_str(), printableMsg.c_str());
+    command.printf("AT+CMGS=\"%s\"\r\n", rsTo.c_str());
+    if (!Command(command.c_str(), ">", &response, "prepare to send SMS text"))
     {
-        ESP_LOGE(tag, "ERROR preparing SMS to: %s, response: %s", rsTo.c_str(), response.c_str());
+        ESP_LOGE(tag, "ERROR preparing SMS to: %s, response: %s", printableMsg.c_str(), response.c_str());
         return false;
     }
+    #ifdef UCS2SMS   
+    String hexUcs2Msg;
+    //convert UTF-8 to UCS-2
+    std::wstring ucs2Msg = utf8ToWstring("testmsg😁");
+    // convert bytes to hex 
+    // limit to 70 UCS-2 chars
+    command = hexUcs2Msg;
+    #endif
     command = rsMsg;
     command += CTRLZ;
     if (!Command(command.c_str(), "OK", &response, "Sending SMS message."))
@@ -599,8 +653,8 @@ bool Cellular::ReadIntoBuffer()
         if (len)
         {
             mullReceivedTotal += len;
-            ESP_LOGD(tag, "<<< UART in %s mode bytes received: %d", mbCommandMode ? "COMMAND"  : "DATA", len);
-            ESP_LOG_BUFFER_HEXDUMP(tag, mpBuffer, len, ESP_LOG_VERBOSE);
+            ESP_LOGD(tag, "UART %s received: %d", mbCommandMode ? "RESPONSE"  : "DATA", len);
+            ESP_LOG_BUFFER_HEXDUMP(tag, mpBuffer, len, ESP_LOG_DEBUG);
         } 
         return true;
     }
@@ -912,11 +966,15 @@ bool Cellular::SwitchToPppMode()
     return false;
 }
 
+
+
 bool Cellular::ModemReadLine(String &line)
 {
     line = "";
 
     int maxLineLength = muiBufferSize;
+    bool cr = false;
+    bool crlf = false;
     while (maxLineLength)
     {
         if (muiBufferPos == muiBufferLen)
@@ -927,17 +985,29 @@ bool Cellular::ModemReadLine(String &line)
         if (muiBufferPos < muiBufferLen)
         {
             unsigned char c = mpBuffer[muiBufferPos++];
-            if (c == 0x0D || c == 0x0A)
-            { // skip trailing line feeds \r\n
-                if (line.length())
-                {
-                    ESP_LOGD(tag, "ModemReadLine(): %s", line.c_str());
-                    return true;
-                }
-            }
-            else
+
+            switch (c) 
             {
-                line += (char)c;
+                case 0x0D: 
+                    cr = true;
+                    break;
+                case 0x0A:
+                    crlf = cr;
+                    if (line.length())
+                    {
+                        ESP_LOGD(tag, "ModemReadLine(): %s", line.c_str());
+                        return true;
+                    }
+                    break;
+                case '>': // modem waits for input!
+                    if(!line.length() && crlf) {
+                        line += (char)c;
+                        return true;
+                    }
+                    // intentionally fall through!
+                default:                                    
+                    line += (char)c;
+                    cr = crlf = false;
             }
         }
         maxLineLength--;
@@ -1031,7 +1101,7 @@ bool Cellular::ModemReadResponse(String &sResponse, const char *expectedLastLine
 
 bool Cellular::Command(const char *sCommand, const char *sSuccess, String *spResponse, const char *sInfo, unsigned short maxLines)
 {
-    ESP_LOGI(tag, "%s %s", sCommand, sInfo);
+    ESP_LOGD(tag, "Command(%s) %s", sCommand, sInfo);
     String response;
     if (!spResponse)
     {
@@ -1041,7 +1111,7 @@ bool Cellular::Command(const char *sCommand, const char *sSuccess, String *spRes
     {
         if (ModemReadResponse(*spResponse, sSuccess, maxLines))
         {
-            ESP_LOGD(tag, "%s --> Command(%s):\r\n%s", sInfo ? sInfo : "", sCommand, spResponse->c_str());
+            ESP_LOGD(tag, "%s %s:\r\n%s", sCommand, sInfo ? sInfo : "", spResponse->c_str());
             return true;
         }
     }
