@@ -833,7 +833,10 @@ bool Maximet::ReadConfig(String &value, const char *sConfig)
             value = line.substring(cmd.length());
             // ESP_LOGI(tag, "ReadConfig ReadLine Value: %s", value.c_str());
             return true;
+        } else if (line.startsWith("ILLEGAL ") || line.startsWith("INCORRECT ") ) {
+            ESP_LOGW(tag, "%s: %s", sConfig, line.c_str());
         }
+
     }
     return false;
 }
