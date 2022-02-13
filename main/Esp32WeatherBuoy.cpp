@@ -190,7 +190,7 @@ void Esp32WeatherBuoy::Start()
         }
     }
 
-    SendData sendData(mConfig, dataQueue, mCellular, watchdog);
+    SendData sendData(mConfig, dataQueue, mCellular, watchdog, maximet);
 
     if (mConfig.mbNmeaDisplay)
     {
@@ -211,7 +211,7 @@ void Esp32WeatherBuoy::Start()
             pAlarm = new Alarm(dataQueue, mConfig, CONFIG_ALARM_BUZZER_PIN);
             pAlarm->Start();
         }
-        ESP_LOGI(tag, "Starting: Weatherbuoy %s", maximet.GetUserinf().c_str());
+        ESP_LOGI(tag, "Starting: Weatherbuoy %s", maximet.GetConfig().sUserinfo.c_str());
         RunBuoy(tempSensors, dataQueue, max471Meter, sendData, maximet, pAlarm);
     }
 }
@@ -238,8 +238,9 @@ void Esp32WeatherBuoy::HandleAlarm(Alarm *pAlarm)
     String msg;
     msg = "ALARM ";
     msg += mConfig.msHostname;
-    msg += " !\r";
+    msg += "!\r\n";
     msg += pAlarm->GetAlarmInfo();
+    msg += "\r\n";
 
     int startPos = 0;
     int endPos = 0;
@@ -346,11 +347,6 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
                     ESP_LOGE(tag, "Failed to switch to PPP mode.");
                 }
             };
-        }
-
-        if (bDiagnostics)
-        {
-            sendData.SetMaximetDiagnostics(maximet.GetReport(), maximet.GetAvgLong(), maximet.GetOutfreq(), maximet.GetUserinf());
         }
 
         // read maximet data queue and create a HTTP POST message
@@ -544,11 +540,6 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
                     ESP_LOGE(tag, "Failed to switch to PPP mode.");
                 }
             };
-        }
-
-        if (bDiagnostics)
-        {
-            sendData.SetMaximetDiagnostics(maximet.GetReport(), maximet.GetAvgLong(), maximet.GetOutfreq(), maximet.GetUserinf());
         }
 
         // read maximet data queue and create a HTTP POST message

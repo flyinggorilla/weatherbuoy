@@ -6,13 +6,34 @@
 #include "DataQueue.h"
 #include "Serial.h"
 
+
+
+
+
 class Maximet {
 public:
     enum Model {
-        NONE      = 0,
-        GMX200GPS = 2001,
-        GMX501    = 5010,
-        GMX501GPS = 5011
+        NONE       = 0,
+        GMX200GPS  = 2001,
+        GMX501     = 5010,
+        GMX501GPS  = 5011,
+        GMX501RAIN = 5012
+    };
+
+    class Config {
+    public:
+        String sReport;
+        String sUserinfo;
+        String sSensor;
+        String sSerial;
+        String sSWVer;
+        int iAvgLong = 0;
+        int iOutputIntervalSec = 0;
+        float fCompassdecl = 0;
+        float fHastn = 0;
+        float fHasl = 0;
+        float fLat = 0; 
+        float fLong = 0; 
     };
 
 public:
@@ -32,10 +53,7 @@ public:
 
     void SimulatorDataPoint(float temperature, double longitude, double latitude);
 
-    unsigned int GetOutfreq() { return muiOutputIntervalSec; };
-    unsigned int GetAvgLong() { return muiAvgLong; };
-    String& GetUserinf() { return msUserinfo; };
-    String& GetReport() { return msReport; };
+    Config& GetConfig() { return mMaximetConfig; };
 
 private:
     //main loop run by the task
@@ -53,10 +71,36 @@ private:
     void ExitCommandLine();
     bool ReadConfig(String &value, const char *sConfig);
     bool WriteConfig(const char *sConfig, const String &value);
+    bool ReadConfigFloat(float &val, const char* cmd);
+    bool ReadConfigString(String &val, const char* cmd);
+    bool ReadConfigInt(int &val, const char* cmd);
+
     bool ReadUserinf();
+    bool ReadSensor();
     bool ReadReport();
     bool ReadOutfreq();
     bool ReadAvgLong();
+    bool ReadSerial();
+    bool ReadSWVer();
+    bool ReadHasl();
+    bool ReadHastn();
+    bool ReadLat();
+    bool ReadLong();
+    bool ReadCompassdecl();
+
+    // compass declination
+    void WriteCompassdecl(float compassdecl);
+
+    // height above sea level
+    void WriteHasl(float hasl);
+
+    // height above/of station
+    void WriteHastn(float hastn);
+
+    // set latitude if not GPS
+    void WriteLat(float lat);
+    // set longitude if not GPS
+    void WriteLong(float lon);
 
     // configure Maximet long average interval - 
     // default is 10 minutes (10 times short interval of default 60 seconds)
@@ -78,16 +122,13 @@ private:
     unsigned int muiUartNo;
 
     DataQueue &mrDataQueue;
+    Config mMaximetConfig;
     
     bool mbRun = true;
     bool mbCommandline = false;
-    String msReport;
-    String msUserinfo;
-    unsigned int muiAvgLong = 0;
-    unsigned int muiOutputIntervalSec = 0;
 
+    // cached data
     unsigned int muiSolarradiation = 999;
-
 };
 
 #endif 

@@ -189,32 +189,28 @@ void Alarm::AlarmTask()
                 {
                     //ESP_LOGE(tag, "GEOFENCE ALARM: %.0dm is outside of %d radius", geoDislocation, mrConfig.miAlarmRadius);
                     String info;
-                    info.printf("WEATHERBUOY OUTSIDE GEOFENCE!\rBuoy is %.0dm off! (max: %d)\rhttps://maps.google.com/?q=%0.8f,%0.8f", geoDislocation, mrConfig.miAlarmRadius, data.lat, data.lon);
-                    info += "\r";
+                    info.printf("WEATHERBUOY OUTSIDE GEOFENCE!\r\nBuoy is %.0dm off! (max: %d)\r\nhttps://maps.google.com/?q=%0.8f,%0.8f", geoDislocation, mrConfig.miAlarmRadius, data.lat, data.lon);
                     msAlarmInfo += info;
                 }
                 if (alarmTriggers & TILT)
                 {
                     //ESP_LOGE(tag, "TILT ALARM: %d° (%d°/%d°) %s", absTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
                     String info;
-                    info.printf("WEATHERBUOY MAST MANIPULATION!\rTILT: %ddeg (%dx/%dy) %s", absTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "UP");
-                    info += "\r";
+                    info.printf("WEATHERBUOY MAST MANIPULATION!\r\nTILT: %ddeg (%dx/%dy) %s", absTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "UP");
                     msAlarmInfo += info;
                 }
                 if (alarmTriggers & ORIENT)
                 {
                     //ESP_LOGE(tag, "ORIENT ALARM: %d° (%d°/%d°) %s", absTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
                     String info;
-                    info.printf("WEATHERBUOY MAST MANIPULATION!\rMAXIMET UPSIDE DOWN: -%ddeg (%dx/%dy)", absTilt, data.xtilt, data.ytilt );
-                    info += "\r";
+                    info.printf("WEATHERBUOY MAST MANIPULATION!\r\nMAXIMET UPSIDE DOWN: -%ddeg (%dx/%dy)", absTilt, data.xtilt, data.ytilt );
                     msAlarmInfo += info;
                 }
                 if (alarmTriggers & UNPLUGGED)
                 {
                     //ESP_LOGE(tag, "UNPLUGGED ALARM!");
                     String info;
-                    info.printf("WEATHERBUOY SABOTAGE!\rMAXIMET OFFLINE/UNPLUGGED.");
-                    info += "\r";
+                    info.printf("WEATHERBUOY SABOTAGE!\r\nMAXIMET OFFLINE/UNPLUGGED.");
                     msAlarmInfo += info;
                 }
                 ESP_LOGE(tag, "ALARM INFO: %s", msAlarmInfo.c_str());

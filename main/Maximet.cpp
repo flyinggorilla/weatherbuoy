@@ -1,15 +1,15 @@
-//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
-#include "Maximet.h"
-#include "DataQueue.h"
-#include "Serial.h"
-#include "EspString.h"
-#include "VelocityVector.h"
+#include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esputil.h"
+#include "Maximet.h"
+#include "DataQueue.h"
+#include "Serial.h"
+#include "EspString.h"
+#include "VelocityVector.h"
 
 //====================================================================================
 // Maximet Notes:
@@ -101,7 +101,6 @@ void ParseTime(String &column, Data &data)
     }
 }
 
-
 void Maximet::MaximetTask()
 {
 
@@ -148,6 +147,8 @@ void Maximet::MaximetTask()
 
     VelocityVector shortAvgCSpeedVector;
 
+    //esp_log_level_set(tag, ESP_LOG_DEBUG);
+    //esp_log_level_set("Serial", ESP_LOG_DEBUG);
     MaximetConfig();
 
     ESP_LOGI(tag, "Maximet task started and ready to receive data.");
@@ -556,7 +557,7 @@ void Maximet::MaximetTask()
                 mrDataQueue.PutLatestData(data);
                 mrDataQueue.PutAlarmData(data);
 
-                bool is1HzOutput = (muiOutputIntervalSec <= 1);
+                bool is1HzOutput = (mMaximetConfig.iOutputIntervalSec <= 1);
                 if (is1HzOutput)
                 {
                     shortAvgCSpeedVector.add(data.cspeed, data.cdir);
@@ -714,57 +715,66 @@ Maximet::~Maximet()
 
 void Maximet::MaximetConfig()
 {
-    //vTaskDelay(1000 / portTICK_PERIOD_MS);
+    // vTaskDelay(1000 / portTICK_PERIOD_MS);
 
     // read and optionally update Maximet configuration
     EnterCommandLine();
+    // LAT = +47.944191                                                                                                                                      
+    // LONG = +013.584622
+    //WriteLat(47.944191);
+    //WriteLong(013.584622);
+    //WriteCompassdecl(4.0);
     ReadUserinf();
     ReadReport();
     ReadOutfreq();
     ReadAvgLong();
-    
+    ReadHasl();
+    ReadHastn();
+    ReadCompassdecl();
+    ReadSensor();
+    ReadSerial();
+    ReadSWVer();
+    ReadLat();
+    ReadLong();
+
     // ESP_LOGI(tag, "Check config %d, %d", msReport.length(), msUserinfo.length());
-    if (msReport.length() && msUserinfo.length())
+    if (mMaximetConfig.sReport.length() && mMaximetConfig.sUserinfo.length())
     {
         const char *sReport = REPORT_GMX501;
-        if (msUserinfo.equals("GMX200GPS"))
+        if (mMaximetConfig.sUserinfo.equals("GMX200GPS"))
         {
             sReport = REPORT_GMX200GPS;
             mMaximetModel = GMX200GPS;
         }
-        else if (msUserinfo.equals("GMX501GPS"))
+        else if (mMaximetConfig.sUserinfo.equals("GMX501GPS"))
         {
             sReport = REPORT_GMX501GPS;
             mMaximetModel = GMX501GPS;
         }
-        else if (msUserinfo.equals("GMX501"))
+        else if (mMaximetConfig.sUserinfo.equals("GMX501"))
         {
             sReport = REPORT_GMX501;
             mMaximetModel = GMX501;
         }
         else
         {
-            ESP_LOGW(tag, "Deprecated USERINFO=%s detected. Setting USERINFO to GMX501.", msUserinfo.c_str());
+            ESP_LOGW(tag, "Deprecated USERINFO=%s detected. Setting USERINFO to GMX501.", mMaximetConfig.sUserinfo.c_str());
             sReport = REPORT_GMX501;
             mMaximetModel = GMX501;
             WriteUserinf("GMX501");
-            ReadUserinf();
 
             WriteOutfreq(true);
-            ReadOutfreq();
         }
 
-        ESP_LOGI(tag, "Detected Maximet model (USERINFO) %s", msUserinfo.c_str());
-        if (!msReport.equals(sReport))
+        ESP_LOGI(tag, "Detected Maximet model (USERINFO) %s", mMaximetConfig.sUserinfo.c_str());
+        if (!mMaximetConfig.sReport.equals(sReport))
         {
-            ESP_LOGW(tag, "Configuration mismatch for %s, Columns %s, Updating to %s", msUserinfo.c_str(), msReport.c_str(), sReport);
+            ESP_LOGW(tag, "Configuration mismatch for %s, Columns %s, Updating to %s", mMaximetConfig.sUserinfo.c_str(), mMaximetConfig.sReport.c_str(), sReport);
             WriteReport(sReport);
-            ReadReport();
         }
     }
     ExitCommandLine();
 }
-
 
 static const unsigned int COMMANDLINE_TIMEOUT_MS = 5000;
 
@@ -781,7 +791,9 @@ bool Maximet::EnterCommandLine()
         {
             ESP_LOGI(tag, "Commandline mode entered.");
             return mbCommandline = true;
-        } else if(line.startsWith("UNNECESSARY COMMAND")) {
+        }
+        else if (line.startsWith("UNNECESSARY COMMAND"))
+        {
             ESP_LOGI(tag, "Already in commandline mode.");
             return mbCommandline = true;
         }
@@ -819,74 +831,135 @@ bool Maximet::ReadConfig(String &value, const char *sConfig)
         if (line.startsWith(cmd))
         {
             value = line.substring(cmd.length());
-            //ESP_LOGI(tag, "ReadConfig ReadLine Value: %s", value.c_str());
+            // ESP_LOGI(tag, "ReadConfig ReadLine Value: %s", value.c_str());
             return true;
         }
     }
     return false;
 }
 
-bool Maximet::ReadUserinf()
+bool Maximet::ReadConfigInt(int &val, const char* cmd)
 {
-    if (ReadConfig(msUserinfo, "USERINF"))
+    String response;
+    if (ReadConfig(response, cmd))
     {
-        ESP_LOGI(tag, "USERINF: %s", msUserinfo.c_str());
+        val = response.toInt();
+        ESP_LOGI(tag, "%s: %d", cmd, val);
         return true;
     }
     return false;
+};
+
+bool Maximet::ReadConfigString(String &val, const char* cmd)
+{
+    String response;
+    if (ReadConfig(response, cmd))
+    {
+        val = response;
+        val.trim();
+        ESP_LOGI(tag, "%s: %s", cmd, val.c_str());
+        return true;
+    }
+    return false;
+};
+
+
+bool Maximet::ReadConfigFloat(float &val, const char* cmd){
+    String response;
+    if (ReadConfig(response, cmd))
+    {
+        val = response.toFloat();
+        ESP_LOGI(tag, "%s: %f", cmd, val);
+        return true;
+    }
+    return false;
+
+};
+
+bool Maximet::ReadUserinf()
+{
+    return ReadConfig(mMaximetConfig.sUserinfo, "USERINF");
+};
+
+bool Maximet::ReadSensor()
+{
+    return ReadConfigString(mMaximetConfig.sSensor, "SENSOR");
 };
 
 bool Maximet::ReadReport()
 {
-    if (ReadConfig(msReport, "REPORT"))
-    {
-        ESP_LOGI(tag, "REPORT: %s", msReport.c_str());
-        return true;
-    }
-    return false;
+    return ReadConfigString(mMaximetConfig.sReport, "REPORT");
 };
+
+bool Maximet::ReadSerial()
+{
+    return ReadConfigString(mMaximetConfig.sSerial, "SERIAL");
+};
+
+bool Maximet::ReadSWVer()
+{
+    return ReadConfigString(mMaximetConfig.sSWVer, "SWVER");
+};
+
+
+bool Maximet::ReadHastn(){
+    return ReadConfigFloat(mMaximetConfig.fHastn, "HASTN");
+}
+
+bool Maximet::ReadHasl(){
+    return ReadConfigFloat(mMaximetConfig.fHasl, "HASL");
+}
+
+bool Maximet::ReadCompassdecl(){
+    return ReadConfigFloat(mMaximetConfig.fCompassdecl, "COMPASSDECL");
+}
+
+bool Maximet::ReadLat(){
+    return ReadConfigFloat(mMaximetConfig.fLat, "LAT");
+}
+
+bool Maximet::ReadLong(){
+    return ReadConfigFloat(mMaximetConfig.fLong, "LONG");
+}
+
+bool Maximet::ReadAvgLong()
+{
+    return ReadConfigInt(mMaximetConfig.iAvgLong, "AVGLONG");
+}
 
 bool Maximet::ReadOutfreq()
 {
     String val;
-    muiOutputIntervalSec = 0;
     if (ReadConfig(val, "OUTFREQ"))
     {
         if (val.equals("1HZ"))
         {
-            muiOutputIntervalSec = 1;
+            mMaximetConfig.iOutputIntervalSec = 1;
         }
         else if (val.equals("1/MIN"))
         {
-            muiOutputIntervalSec = 60;
-        } else {
+            mMaximetConfig.iOutputIntervalSec = 60;
+        }
+        else
+        {
             return false;
         }
-        ESP_LOGI(tag, "OUTFREQ: every %d second(s)", muiOutputIntervalSec);
+        ESP_LOGI(tag, "OUTFREQ: every %d second(s)", mMaximetConfig.iOutputIntervalSec);
         return true;
     }
     return false;
 };
 
-bool Maximet::ReadAvgLong()
+
+bool Maximet::WriteConfig(const char *sConfig, const String &value)
 {
-    muiAvgLong = 0;
-    String val;
-    if (ReadConfig(val, "AVGLONG"))
-    {
-        muiAvgLong = val.toInt();
-        ESP_LOGI(tag, "AVGLONG: %d", muiAvgLong);
-        return true;
-    }
-    return false;
-};
-
-bool Maximet::WriteConfig(const char *sConfig, const String &value) {
     String cmd(sConfig);
     cmd += " ";
     cmd += value;
     cmd += "\r\n";
-    return mpSerial->Write(cmd);
+    mpSerial->Write(cmd);
+    String line;
+    return mpSerial->ReadMultiLine(line);
 }
 
 void Maximet::WriteOutfreq(bool high)
@@ -899,6 +972,7 @@ void Maximet::WriteOutfreq(bool high)
     {
         WriteConfig("OUTFREQ", "1/MIN");
     }
+    ReadOutfreq();
 }
 
 void Maximet::WriteReport(const char *report)
@@ -906,13 +980,47 @@ void Maximet::WriteReport(const char *report)
     String columns(report);
     columns.replace(',', ' ');
     int checkPos = columns.indexOf(" CHECK");
-    if(checkPos >= 0) {
+    if (checkPos >= 0)
+    {
         columns.setlength(checkPos);
     }
     WriteConfig("REPORT", columns);
+    ReadReport();
 }
 
 void Maximet::WriteUserinf(const char *userinf)
 {
     WriteConfig("USERINF", userinf);
+    ReadUserinf();
 }
+
+// compass declination
+void Maximet::WriteCompassdecl(float compassdecl){
+    WriteConfig("COMPASSDECL", String(compassdecl, 1));
+    ReadCompassdecl();
+};
+
+// height above sea level
+void Maximet::WriteHasl(float hasl){
+    WriteConfig("HASL", String(hasl, 2));
+    ReadHasl();
+};
+
+// height above/of station
+void Maximet::WriteHastn(float hastn){
+    WriteConfig("HASTN", String(hastn, 2));
+    ReadHastn();
+};
+
+// latitude
+void Maximet::WriteLat(float lat){
+    WriteConfig("LAT", String(lat, 6));
+    ReadLat();
+};
+
+// longitude
+void Maximet::WriteLong(float lon){
+    WriteConfig("LONG", String(lon, 6));
+    ReadLong();
+};
+

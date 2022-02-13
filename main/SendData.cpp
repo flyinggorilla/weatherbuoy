@@ -57,14 +57,6 @@ void SendData::Cleanup()
     mhEspHttpClient = nullptr;
 }
 
-void SendData::SetMaximetDiagnostics(String &report, unsigned int avglong, unsigned int outfreq, String &userinf)
-{
-    msMaximetReport = report;
-    muiMaximetAvgLong = avglong;
-    muiMaximetOutfreqSeconds = outfreq;
-    msMaximetUserinfo = userinf;
-};
-
 bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics)
 {
     bSendDiagnostics = bSendDiagnostics || mbSendDiagnostics;
@@ -243,14 +235,28 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         }
         mPostData += ", \"maximet\": {";
         mPostData += "\"avglong\": ";
-        mPostData += muiMaximetAvgLong;
+        mPostData += mrMaximetConfig.iAvgLong;
         mPostData += ",\"outfreq\": ";
-        mPostData += muiMaximetOutfreqSeconds;
+        mPostData += mrMaximetConfig.iOutputIntervalSec;
         mPostData += ",\"userinf\": \"";
-        mPostData += msMaximetUserinfo;
+        mPostData += mrMaximetConfig.sUserinfo;
         mPostData += "\",\"report\": \"";
-        mPostData += msMaximetReport;
-        mPostData += "\"}}";
+        mPostData += mrMaximetConfig.sReport;
+        mPostData += "\",\"sensor\": \"";
+        mPostData += mrMaximetConfig.sSensor;
+        mPostData += "\",\"serial\": \"";
+        mPostData += mrMaximetConfig.sSerial;
+        mPostData += "\",\"hasl\": ";
+        mPostData += mrMaximetConfig.fHasl;
+        mPostData += ",\"hastn\": ";
+        mPostData += mrMaximetConfig.fHastn;
+        mPostData += ",\"compassdecl\": ";
+        mPostData += mrMaximetConfig.fCompassdecl;
+        mPostData += ",\"lat\": ";
+        mPostData += String(mrMaximetConfig.fLat, 6);
+        mPostData += ",\"lon\": ";
+        mPostData += String(mrMaximetConfig.fLong, 6);
+        mPostData += "}}";
         mbSendDiagnostics = false;
     }
     mPostData += "}";
@@ -586,7 +592,7 @@ bool SendData::PerformHttpPost()
     return true;
 }
 
-SendData::SendData(Config &config, DataQueue &dataQueue, Cellular &cellular, Watchdog &watchdog) : mrConfig(config), mrDataQueue(dataQueue), mrCellular(cellular), mrWatchdog(watchdog)
+SendData::SendData(Config &config, DataQueue &dataQueue, Cellular &cellular, Watchdog &watchdog, Maximet &maximet) : mrConfig(config), mrDataQueue(dataQueue), mrCellular(cellular), mrWatchdog(watchdog), mrMaximet(maximet), mrMaximetConfig(maximet.GetConfig())
 {
     mhEspHttpClient = nullptr;
 }

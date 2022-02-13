@@ -12,7 +12,10 @@ public:
 	Serial(unsigned int uartNo, unsigned int gpioRx, unsigned int gpioTx, int baudRate = 115200, unsigned int bufferSize = 1024);
 	virtual ~Serial();
     
+    // read until CRLF
     bool ReadLine(String& line, unsigned int timeoutms = 250);
+    // read until data and CRLF
+    bool ReadMultiLine(String& line, unsigned int timeoutms = 250);
     bool Attach();
     bool Release();
     //bool ReadLine();

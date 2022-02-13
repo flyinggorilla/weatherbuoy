@@ -504,6 +504,7 @@ bool Cellular::SendSMS(String &rsTo, String &rsMsg)
     ret = Command("AT+CMGS=?", "OK", &response, "Query SMS sending capability SMS.");
     ESP_LOGI(tag, "query SMS sending %s. response %s", ret ? "succeeded" : "failed", response.c_str());
 
+    #ifdef UCS2SMS   
     ret = Command("AT+CSCS=?", "OK", &response, "Query SMS character sets.");
     ESP_LOGI(tag, "query SMS character sets %s. response %s", ret ? "succeeded" : "failed", response.c_str());
     String characterSets;
@@ -521,18 +522,16 @@ bool Cellular::SendSMS(String &rsTo, String &rsMsg)
     }
     ret = Command("AT+CSCS=\"UCS2\"", "OK", &response, "Query SMS character set.");
     ESP_LOGI(tag, "query SMS character sets %s. response %s", ret ? "succeeded" : "failed", response.c_str());
-
+    #endif
 
     String command;
     static const char CTRLZ = 0x1A;
     static const char ESC = 0x1B;
-    String printableMsg = rsMsg;
-    //printableMsg.replace("\r", "\r\n");
-    ESP_LOGI(tag, "Sending SMS to:%s, message:%s", rsTo.c_str(), printableMsg.c_str());
+    ESP_LOGI(tag, "Sending SMS to:%s, message:%s", rsTo.c_str(), rsMsg.c_str());
     command.printf("AT+CMGS=\"%s\"\r\n", rsTo.c_str());
     if (!Command(command.c_str(), ">", &response, "prepare to send SMS text"))
     {
-        ESP_LOGE(tag, "ERROR preparing SMS to: %s, response: %s", printableMsg.c_str(), response.c_str());
+        ESP_LOGE(tag, "ERROR preparing SMS to: %s, response: %s", rsMsg.c_str(), response.c_str());
         return false;
     }
     #ifdef UCS2SMS   
@@ -543,7 +542,9 @@ bool Cellular::SendSMS(String &rsTo, String &rsMsg)
     // limit to 70 UCS-2 chars
     command = hexUcs2Msg;
     #endif
-    command = rsMsg;
+    String smsMsg = rsMsg;
+    smsMsg.replace("\r\n", "\r");
+    command = smsMsg;
     command += CTRLZ;
     if (!Command(command.c_str(), "OK", &response, "Sending SMS message."))
     {
@@ -677,7 +678,7 @@ bool Cellular::ReadIntoBuffer()
         return false;
     // Event of UART RX break detected
     case UART_BREAK:
-        ESP_LOGW(tag, "uart break.");
+        ESP_LOGI(tag, "uart break."); 
         //ResetInputBuffers();
         //return false;
         break;

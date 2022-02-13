@@ -8,12 +8,12 @@
 #include "Cellular.h"
 #include "Watchdog.h"
 #include "DataQueue.h"
+#include "Maximet.h"
 
 class SendData {
 public:
-	SendData(Config &config, DataQueue &dataQueue, Cellular &cellular, Watchdog &watchdog);
+	SendData(Config &config, DataQueue &dataQueue, Cellular &cellular, Watchdog &watchdog, Maximet &maximet);
 	virtual ~SendData();
-    void SetMaximetDiagnostics(String &report, unsigned int avglong, unsigned int outfreq, String &userinf);
     bool PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics);
     bool PerformHttpPost();
     bool isRestart() { return mbRestart; };
@@ -22,6 +22,8 @@ private:
     DataQueue &mrDataQueue;
     Cellular &mrCellular;
     Watchdog &mrWatchdog;
+    Maximet &mrMaximet;
+    Maximet::Config &mrMaximetConfig;
 
 private: // esp http client
     #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
@@ -35,12 +37,6 @@ private: // esp http client
     bool mbSendDiagnostics = false;
     bool mbOtaAppValidated = false;
     bool mbRestart = false;
-
-private:
-    unsigned int muiMaximetOutfreqSeconds = 0;
-    unsigned int muiMaximetAvgLong = 0;
-    String msMaximetUserinfo;
-    String msMaximetReport;
 
 private:
     double mdCurrentLocationLatitude = 0;

@@ -108,14 +108,26 @@ bool Serial::ReadIntoBuffer(unsigned int timeoutms) {
         return false;
     }
     muiBufferLen = len;
-    //ESP_LOG_BUFFER_HEXDUMP(tag, mpBuffer, len, ESP_LOG_INFO);
+    ESP_LOG_BUFFER_HEXDUMP(tag, mpBuffer, len, ESP_LOG_DEBUG);
     return true;
 }
 
+bool Serial::ReadMultiLine(String& lines, unsigned int timeoutms) {
+    lines = "";
+    String line;
+    while(ReadLine(line, timeoutms)) {
+        if (!line.length()) {
+            return true;
+        }
+        lines += line;
+    }
+    return false;
+}
 
 bool Serial::ReadLine(String& line, unsigned int timeoutms) {
     line = "";
-
+    bool cr = false;
+    bool crlf = true;
     int maxLineLength = muiBufferSize;
     while(maxLineLength) {
         if (muiBufferPos == muiBufferLen) {
@@ -127,11 +139,17 @@ bool Serial::ReadLine(String& line, unsigned int timeoutms) {
         }
         if (muiBufferPos < muiBufferLen) {
             unsigned char c = mpBuffer[muiBufferPos++];
-            if (c == 0x0D || c ==0x0A) {  // skip trailing line feeds \r\n
-                if (line.length())
-                    return true;
-            } else {
-                line += (char)c;
+            switch (c)
+            {
+                case 0x0D:
+                    cr = true;
+                    break;
+                case 0x0A:
+                    crlf = cr;
+                    return line;
+                default:
+                    cr = crlf = false;
+                    line += (char)c;
             }
         } 
         maxLineLength--;
