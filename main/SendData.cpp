@@ -209,7 +209,11 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += mrCellular.msNetworkmode;
         mPostData += "\",\"signalquality\": ";
         mPostData += mrCellular.miSignalQuality;
-        mPostData += "}";
+        mPostData += ", \"prefnetwork\": ";
+        mPostData += mrConfig.miCellularNetwork;
+        mPostData += ", \"prefoperator\": \"";
+        mPostData += mrConfig.msCellularOperator;
+        mPostData += "\"}";
         if (mrConfig.mbNmeaDisplay) {
             mPostData += ",\"display\": \"NMEA2000\"";
         }

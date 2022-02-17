@@ -402,69 +402,72 @@ void Maximet::MaximetTask()
                     else
                     {
                         // GMX501
-                        // SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,CHECK
-                        // MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,HPA,HPA,%,G/M3,C,WM2,DEG,DEG,-,-,-,-
+                        // USERINF,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,CHECK
+                        // -,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,HPA,HPA,%,G/M3,C,WM2,DEG,DEG,-,-,-,-
                         switch (col)
                         {
                         case 1:
-                            data.cspeed = data.speed = column.toFloat();
+                            // no need to store with data
                             break;
                         case 2:
-                            data.cgspeed = maximetGSpeed = column.toFloat();
+                            data.cspeed = data.speed = column.toFloat();
                             break;
                         case 3:
-                            data.avgcspeed = maximetAvgSpeed = column.toFloat();
+                            data.cgspeed = maximetGSpeed = column.toFloat();
                             break;
                         case 4:
-                            data.dir = column.toInt();
+                            data.avgcspeed = maximetAvgSpeed = column.toFloat();
                             break;
                         case 5:
+                            data.dir = column.toInt();
+                            break;
+                        case 6:
                             maximetGDir = column.toInt();
                             data.cgdir = nans();
                             break;
-                        case 6:
+                        case 7:
                             maximetAvgDir = column.toInt();
                             break;
-                        case 7:
+                        case 8:
                             data.cdir = StringToShortOrNaN(column);
                             break;
-                        case 8:
+                        case 9:
                             data.avgcdir = StringToShortOrNaN(column);
                             break;
-                        case 9:
+                        case 10:
                             data.compassh = column.toInt();
                             break;
-                        case 10:
+                        case 11:
                             data.pasl = column.toFloat();
                             break;
-                        case 11:
+                        case 12:
                             data.pstn = column.toFloat();
                             break;
-                        case 12:
+                        case 13:
                             data.rh = column.toFloat();
                             break;
-                        case 13:
+                        case 14:
                             data.ah = column.toFloat();
                             break;
-                        case 14:
+                        case 15:
                             data.temp = column.toFloat();
                             break;
-                        case 15:
+                        case 16:
                             data.solarrad = muiSolarradiation = column.toInt();
                             break;
-                        case 16:
+                        case 17:
                             data.xtilt = column.toInt();
                             break;
-                        case 17:
+                        case 18:
                             data.ytilt = column.toInt();
                             break;
-                        case 18:
+                        case 19:
                             data.zorient = column.toInt();
                             break;
-                        case 19:
+                        case 20:
                             column.toCharArray(data.status, data.statuslen);
                             break;
-                        case 20:
+                        case 21:
                             column.toCharArray(data.windstat, data.statuslen);
                             break;
                         }
@@ -738,7 +741,7 @@ void Maximet::MaximetConfig()
     ReadLong();
 
     // ESP_LOGI(tag, "Check config %d, %d", msReport.length(), msUserinfo.length());
-    if (mMaximetConfig.sReport.length() && mMaximetConfig.sUserinfo.length())
+    if (mMaximetConfig.sReport.length() && mMaximetConfig.sUserinfo.length() && mMaximetConfig.sSensor.length())
     {
         const char *sReport = REPORT_GMX501;
         if (mMaximetConfig.sUserinfo.equals("GMX200GPS"))
@@ -762,7 +765,8 @@ void Maximet::MaximetConfig()
             sReport = REPORT_GMX501;
             mMaximetModel = GMX501;
             WriteUserinf("GMX501");
-
+            WriteReport(REPORT_GMX501);
+            WriteCompassdecl(4.3);
             WriteOutfreq(true);
         }
 
