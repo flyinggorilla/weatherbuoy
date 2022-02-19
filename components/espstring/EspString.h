@@ -106,6 +106,12 @@ public:
     // a terminating 0 is written at buffer[length]
     unsigned char setlength(unsigned int length);
 
+
+    // writes a terminating 0 at the beginning and resets the length to 0; 
+    // does NOT free the memory, so to avoid another malloc(); 
+    // use reset() if you intend to free the memory
+    void clear() { setlength(0); };
+
     // returns the allocated capacity writable to the c_str() accessible internal buffer
     // capacity + 1 == internal buffer size. , so that there is always room for the terminating 0
     unsigned int capacity(void);

@@ -147,8 +147,8 @@ void Maximet::MaximetTask()
 
     VelocityVector shortAvgCSpeedVector;
 
-    //esp_log_level_set(tag, ESP_LOG_DEBUG);
-    //esp_log_level_set("Serial", ESP_LOG_DEBUG);
+    // esp_log_level_set(tag, ESP_LOG_DEBUG);
+    // esp_log_level_set("Serial", ESP_LOG_DEBUG);
     MaximetConfig();
 
     ESP_LOGI(tag, "Maximet task started and ready to receive data.");
@@ -189,7 +189,7 @@ void Maximet::MaximetTask()
 
         int cposDataStart = 0;
         int cposDataEnd = 0;
-        Model model = GMX501;
+        Model model = Model::GMX501;
 
         float maximetGSpeed;
         float maximetAvgSpeed;
@@ -225,17 +225,17 @@ void Maximet::MaximetTask()
 
                     if (col == 1)
                     {
-                        if (column.equals("GMX200GPS"))
+                        if (column.equals(GetModelName(Model::GMX200GPS)))
                         {
-                            model = GMX200GPS;
+                            model = Model::GMX200GPS;
                         }
-                        else if (column.equals("GMX501GPS"))
+                        else if (column.equals(GetModelName(Model::GMX501GPS)))
                         {
-                            model = GMX501GPS;
+                            model = Model::GMX501GPS;
                         }
                     }
 
-                    if (model == GMX200GPS)
+                    if (model == Model::GMX200GPS)
                     {
                         // GMX200GPS,+48.339284:+014.309088:+0021.20,000.22,035,000.20,000.00,000.00,000.13,000.00,000.00,038,000,000,249,000,000,287,-02,-01,1,0004,0100,0104,2022-01-22T14:11:06.8,68
                         // USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,CSPEED,CGSPEED,AVGCSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,CGDIR,AVGCDIR,COMPASSH,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,GPSSTATUS,TIME,CHECK
@@ -317,7 +317,7 @@ void Maximet::MaximetTask()
                             break;
                         }
                     }
-                    else if (model == GMX501GPS)
+                    else if (model == Model::GMX501GPS)
                     {
                         // GMX501GPS,002.15,000.81,000.23,140,160,118,290,265,148,1045.0,0987.1,067,05.02,+006.3,0006,+00,+00,+1,0004,0000,+48.336892:+014.306931:+0344.40,0106,2022-01-29T14:23:17.8,45
                         // USERINF,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,GPSLOCATION,GPSSTATUS,TIME,CHECK
@@ -623,31 +623,81 @@ void Maximet::MaximetTask()
     return;
 }
 
+void Maximet::GetReportString(String &report, Model model, bool check)
+{
+    report.clear();
+
+    const Field *fields = nullptr;
+    int fieldCount = 0;
+    switch (model)
+    {
+    case Model::GMX200GPS:
+        fields = FIELDS_GMX200GPS;
+        fieldCount = sizeof(FIELDS_GMX200GPS) / sizeof(Field);
+        break;
+    case Model::GMX501GPS:
+        fields = FIELDS_GMX501GPS;
+        fieldCount = sizeof(FIELDS_GMX501GPS) / sizeof(Field);
+        break;
+    case Model::GMX501:
+        fields = FIELDS_GMX501;
+        fieldCount = sizeof(FIELDS_GMX501) / sizeof(Field);
+        break;
+    // case Model::GMX501RAIN:
+    //     fields = FIELDS_GMX501RAIN;
+    //     fieldCount = sizeof(FIELDS_GMX501RAIN);
+    //     break;
+    default:
+        break;
+    }
+
+    if (!fields)
+        return;
+
+    for (int i = 0; i < fieldCount; i++)
+    {
+        if (i)
+        {
+            report += ",";
+        }
+        Field f = fields[i];
+        if (f == Field::CHECK)
+            return;
+
+        report += f;
+    }
+};
+
 void Maximet::SimulatorStart(Model maximetModel)
 {
-    mMaximetModel = maximetModel;
-    if (mMaximetModel == GMX200GPS)
-    {
-        // GMX200GPS,+48.339284:+014.309088:+0021.20,000.22,035,000.20,000.00,000.00,000.13,000.00,000.00,038,000,000,249,000,000,287,-02,-01,0004,0100,0104,2022-01-22T14:11:06.8,68
-        // USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,CSPEED,CGSPEED,AVGCSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,CGDIR,AVGCDIR,COMPASSH,XTILT,YTILT,STATUS,WINDSTAT,GPSSTATUS,TIME,CHECK
-        // -,-,MS,DEG,MS,MS,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-,-,-
+    // GMX200GPS,+48.339284:+014.309088:+0021.20,000.22,035,000.20,000.00,000.00,000.13,000.00,000.00,038,000,000,249,000,000,287,-02,-01,0004,0100,0104,2022-01-22T14:11:06.8,68
+    // USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,CSPEED,CGSPEED,AVGCSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,CGDIR,AVGCDIR,COMPASSH,XTILT,YTILT,STATUS,WINDSTAT,GPSSTATUS,TIME,CHECK
+    // -,-,MS,DEG,MS,MS,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-,-,-
 
-        SendLine("MAXIMET GMX200GPS-ESP32 Simulator V2.0");
-        SendLine("STARTUP: OK");
-        SendLine("USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,CSPEED,CGSPEED,AVGCSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,CGDIR,AVGCDIR,COMPASSH,XTILT,YTILT,STATUS,WINDSTAT,GPSSTATUS,TIME,CHECK");
-        SendLine("-,-,MS,DEG,MS,MS,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-,-,-");
-        SendLine("");
-        SendLine("<END OF STARTUP MESSAGE>");
-    }
-    else
-    {
-        SendLine("MAXIMET GMX501-ESP32 Simulator V2.0");
-        SendLine("STARTUP: OK");
-        SendLine("SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,STATUS,WINDSTAT,CHECK");
-        SendLine("MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,HPA,HPA,%,G/M3,C,WM2,DEG,DEG,-,-,-");
-        SendLine("");
-        SendLine("<END OF STARTUP MESSAGE>");
-    }
+    mMaximetModel = maximetModel;
+
+    String line;
+
+    line.printf("MAXIMET %s-ESP32 Simulator V2.0", GetModelName(mMaximetModel));
+    SendLine(line);
+
+    SendLine("STARTUP: OK");
+
+    GetReportString(line, mMaximetModel, true);
+    SendLine(line);
+    // SendLine("-,-,MS,DEG,MS,MS,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-,-,-");
+    // SendLine("");
+    SendLine("<END OF STARTUP MESSAGE>");
+    /*    }
+        else
+        {
+            SendLine("MAXIMET GMX501-ESP32 Simulator V2.0");
+            SendLine("STARTUP: OK");
+            SendLine("SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,STATUS,WINDSTAT,CHECK");
+            SendLine("MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,HPA,HPA,%,G/M3,C,WM2,DEG,DEG,-,-,-");
+            SendLine("");
+            SendLine("<END OF STARTUP MESSAGE>");
+        } */
 }
 
 unsigned char CalculateChecksum(String &msg)
@@ -670,7 +720,7 @@ void Maximet::SimulatorDataPoint(float temperature, double longitude, double lat
     isoTime[0] = 0;
     strftime(isoTime, sizeof(isoTime) - 1, "%FT%T.0", pUtcTime);
 
-    if (mMaximetModel == GMX200GPS)
+    if (mMaximetModel == Model::GMX200GPS)
     {
 
         // GMX200GPS,+48.339284:+014.309088:+0021.20,000.22,035,000.20,000.00,000.00,000.13,000.00,000.00,038,000,000,249,000,000,287,-02,-01,0004,0100,0104,2022-01-22T14:11:06.8,68
@@ -722,11 +772,11 @@ void Maximet::MaximetConfig()
 
     // read and optionally update Maximet configuration
     EnterCommandLine();
-    // LAT = +47.944191                                                                                                                                      
+    // LAT = +47.944191
     // LONG = +013.584622
-    //WriteLat(47.944191);
-    //WriteLong(013.584622);
-    //WriteCompassdecl(4.0);
+    // WriteLat(47.944191);
+    // WriteLong(013.584622);
+    // WriteCompassdecl(4.0);
     ReadUserinf();
     ReadReport();
     ReadOutfreq();
@@ -747,24 +797,24 @@ void Maximet::MaximetConfig()
         if (mMaximetConfig.sUserinfo.equals("GMX200GPS"))
         {
             sReport = REPORT_GMX200GPS;
-            mMaximetModel = GMX200GPS;
+            mMaximetModel = Model::GMX200GPS;
         }
         else if (mMaximetConfig.sUserinfo.equals("GMX501GPS"))
         {
             sReport = REPORT_GMX501GPS;
-            mMaximetModel = GMX501GPS;
+            mMaximetModel = Model::GMX501GPS;
         }
         else if (mMaximetConfig.sUserinfo.equals("GMX501"))
         {
             sReport = REPORT_GMX501;
-            mMaximetModel = GMX501;
+            mMaximetModel = Model::GMX501;
         }
         else
         {
             ESP_LOGW(tag, "Deprecated USERINFO=%s detected. Setting USERINFO to GMX501.", mMaximetConfig.sUserinfo.c_str());
             sReport = REPORT_GMX501;
-            mMaximetModel = GMX501;
-            WriteUserinf("GMX501");
+            mMaximetModel = Model::GMX501;
+            WriteUserinf(GetModelName(mMaximetModel));
             WriteReport(REPORT_GMX501);
             WriteCompassdecl(4.3);
             WriteOutfreq(true);
@@ -837,15 +887,16 @@ bool Maximet::ReadConfig(String &value, const char *sConfig)
             value = line.substring(cmd.length());
             // ESP_LOGI(tag, "ReadConfig ReadLine Value: %s", value.c_str());
             return true;
-        } else if (line.startsWith("ILLEGAL ") || line.startsWith("INCORRECT ") ) {
+        }
+        else if (line.startsWith("ILLEGAL ") || line.startsWith("INCORRECT "))
+        {
             ESP_LOGW(tag, "%s: %s", sConfig, line.c_str());
         }
-
     }
     return false;
 }
 
-bool Maximet::ReadConfigInt(int &val, const char* cmd)
+bool Maximet::ReadConfigInt(int &val, const char *cmd)
 {
     String response;
     if (ReadConfig(response, cmd))
@@ -857,7 +908,7 @@ bool Maximet::ReadConfigInt(int &val, const char* cmd)
     return false;
 };
 
-bool Maximet::ReadConfigString(String &val, const char* cmd)
+bool Maximet::ReadConfigString(String &val, const char *cmd)
 {
     String response;
     if (ReadConfig(response, cmd))
@@ -870,8 +921,8 @@ bool Maximet::ReadConfigString(String &val, const char* cmd)
     return false;
 };
 
-
-bool Maximet::ReadConfigFloat(float &val, const char* cmd){
+bool Maximet::ReadConfigFloat(float &val, const char *cmd)
+{
     String response;
     if (ReadConfig(response, cmd))
     {
@@ -880,7 +931,6 @@ bool Maximet::ReadConfigFloat(float &val, const char* cmd){
         return true;
     }
     return false;
-
 };
 
 bool Maximet::ReadUserinf()
@@ -908,24 +958,28 @@ bool Maximet::ReadSWVer()
     return ReadConfigString(mMaximetConfig.sSWVer, "SWVER");
 };
 
-
-bool Maximet::ReadHastn(){
+bool Maximet::ReadHastn()
+{
     return ReadConfigFloat(mMaximetConfig.fHastn, "HASTN");
 }
 
-bool Maximet::ReadHasl(){
+bool Maximet::ReadHasl()
+{
     return ReadConfigFloat(mMaximetConfig.fHasl, "HASL");
 }
 
-bool Maximet::ReadCompassdecl(){
+bool Maximet::ReadCompassdecl()
+{
     return ReadConfigFloat(mMaximetConfig.fCompassdecl, "COMPASSDECL");
 }
 
-bool Maximet::ReadLat(){
+bool Maximet::ReadLat()
+{
     return ReadConfigFloat(mMaximetConfig.fLat, "LAT");
 }
 
-bool Maximet::ReadLong(){
+bool Maximet::ReadLong()
+{
     return ReadConfigFloat(mMaximetConfig.fLong, "LONG");
 }
 
@@ -956,7 +1010,6 @@ bool Maximet::ReadOutfreq()
     }
     return false;
 };
-
 
 bool Maximet::WriteConfig(const char *sConfig, const String &value)
 {
@@ -1002,32 +1055,108 @@ void Maximet::WriteUserinf(const char *userinf)
 }
 
 // compass declination
-void Maximet::WriteCompassdecl(float compassdecl){
+void Maximet::WriteCompassdecl(float compassdecl)
+{
     WriteConfig("COMPASSDECL", String(compassdecl, 1));
     ReadCompassdecl();
 };
 
 // height above sea level
-void Maximet::WriteHasl(float hasl){
+void Maximet::WriteHasl(float hasl)
+{
     WriteConfig("HASL", String(hasl, 2));
     ReadHasl();
 };
 
 // height above/of station
-void Maximet::WriteHastn(float hastn){
+void Maximet::WriteHastn(float hastn)
+{
     WriteConfig("HASTN", String(hastn, 2));
     ReadHastn();
 };
 
 // latitude
-void Maximet::WriteLat(float lat){
+void Maximet::WriteLat(float lat)
+{
     WriteConfig("LAT", String(lat, 6));
     ReadLat();
 };
 
 // longitude
-void Maximet::WriteLong(float lon){
+void Maximet::WriteLong(float lon)
+{
     WriteConfig("LONG", String(lon, 6));
     ReadLong();
 };
 
+static constexpr const char *FieldNames[] = {
+    "USERINF", "TIME", "STATUS", "WINDSTAT",
+    "SPEED", "GSPEED", "AVGSPEED", "CSPEED", "CGSPEED", "AVGCSPEED",
+    "DIR", "GDIR", "AVGDIR", "CDIR", "CGDIR", "AVGCDIR",
+    "TEMP", "SOLARRAD", "PASL", "PSTN", "RH", "AH",
+    "COMPASSH", "XTILT", "YTILT", "ZORIENT",
+    "GPSLOCATION", "GPSSTATUS", "GPSSPEED", "GPSHEADING",
+    "CHECK"};
+
+static const Maximet::Field FIELDS_GMX501GPS[] = {Maximet::Field::USERINF, Maximet::Field:: SPEED, Maximet::Field::GSPEED, Maximet::Field::AVGSPEED, Maximet::Field::DIR, Maximet::Field::GDIR, Maximet::Field::AVGDIR, Maximet::Field::CDIR, Maximet::Field::AVGCDIR,
+                                                  Maximet::Field::COMPASSH, Maximet::Field::PASL, Maximet::Field::PSTN, Maximet::Field::RH, Maximet::Field::AH, Maximet::Field::TEMP, Maximet::Field::SOLARRAD, Maximet::Field::XTILT, Maximet::Field::YTILT, Maximet::Field::ZORIENT,
+                                                  Maximet::Field::STATUS, Maximet::Field::WINDSTAT, Maximet::Field::GPSLOCATION, Maximet::Field::GPSSTATUS, Maximet::Field::TIME, Maximet::Field::CHECK}; // Field list MUST end with CHECK
+
+static const Maximet::Field FIELDS_GMX200GPS[] = {Maximet::Field::USERINF, Maximet::Field::GPSLOCATION, Maximet::Field::GPSSPEED, Maximet::Field::GPSHEADING, Maximet::Field::CSPEED, Maximet::Field::CGSPEED, Maximet::Field::AVGCSPEED,
+                                                  Maximet::Field::SPEED, Maximet::Field::GSPEED, Maximet::Field::AVGSPEED, Maximet::Field::DIR, Maximet::Field::GDIR, Maximet::Field::AVGDIR, Maximet::Field::CDIR, Maximet::Field::CGDIR, Maximet::Field::AVGCDIR, Maximet::Field::COMPASSH,
+                                                  Maximet::Field::XTILT, Maximet::Field::YTILT, Maximet::Field::ZORIENT, Maximet::Field::STATUS, Maximet::Field::WINDSTAT, Maximet::Field::GPSSTATUS, Maximet::Field::TIME, Maximet::Field::CHECK}; // Field list MUST end with CHECK
+
+static const Maximet::Field FIELDS_GMX501[] = {Maximet::Field::USERINF, Maximet::Field::SPEED, Maximet::Field::GSPEED, Maximet::Field::AVGSPEED, Maximet::Field::DIR, Maximet::Field::GDIR, Maximet::Field::AVGDIR, Maximet::Field::CDIR, Maximet::Field::AVGCDIR,
+                                               Maximet::Field::COMPASSH, Maximet::Field::PASL, Maximet::Field::PSTN, Maximet::Field::RH, Maximet::Field::AH, Maximet::Field::TEMP, Maximet::Field::SOLARRAD, Maximet::Field::XTILT, Maximet::Field::YTILT, Maximet::Field::ZORIENT,
+                                               Maximet::Field::STATUS, Maximet::Field::WINDSTAT, Maximet::Field::CHECK}; // Field list MUST end with CHECK
+
+#include <array>
+
+typedef FieldArray std::array<Maximet::Field>;
+
+
+
+/*static Field GetFields(Model model)
+{
+    switch (model)
+    {
+    case Model::GMX200GPS:
+        return FIELDS_GMX200GPS;
+    case Model::GMX501:
+        return FIELDS_GMX501;
+    }
+}; */
+
+static const char *Maximet::GetModelName(Model model) noexcept
+{
+    switch (model)
+    {
+    case Model::NONE:
+        return "NONE";
+    case Model::GMX200GPS:
+        return "GMX200GPS";
+    case Model::GMX501:
+        return "GMX501";
+    case Model::GMX501GPS:
+        return "GMX501GPS";
+    case Model::GMX501RAIN:
+        return "GMX501RAIN";
+    default:
+        return "INVALID";
+    }
+};
+
+static Model GetModel(String &modelName)
+{
+    if (modelName.equals(GetModelName(Model::NONE)))
+        return Model::NONE;
+    if (modelName.equals(GetModelName(Model::GMX200GPS)))
+        return Model::GMX200GPS;
+    if (modelName.equals(GetModelName(Model::GMX501)))
+        return Model::GMX501;
+    if (modelName.equals(GetModelName(Model::GMX501GPS)))
+        return Model::GMX501GPS;
+    if (modelName.equals(GetModelName(Model::GMX501RAIN)))
+        return Model::GMX501RAIN;
+    return Model::INVALID;
+}

@@ -400,7 +400,7 @@ void Esp32WeatherBuoy::RunSimulator(TemperatureSensors &tempSensors, DataQueue &
 {
     maximet.SimulatorStart(model);
 
-    unsigned int maximetDataIntervalSeconds = model == Maximet::GMX501 ? 60 : 1;
+    unsigned int maximetDataIntervalSeconds = model == Maximet::Model::GMX501 ? 60 : 1;
     unsigned int httpPostDataIntervalSeconds = 30;
     unsigned int lastSendTimestamp = 0;
 

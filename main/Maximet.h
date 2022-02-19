@@ -13,50 +13,59 @@
 class Maximet
 {
 public:
-    enum Model
+    enum class Model
     {
         NONE = 0,
         GMX200GPS = 2001,
         GMX501 = 5010,
         GMX501GPS = 5011,
-        GMX501RAIN = 5012
+        GMX501RAIN = 5012,
+        INVALID = -1
     };
 
-    enum Fields
+
+    enum class Field
     {
-        USERINF, TIME, STATUS, WINDSTAT, 
-        SPEED, GSPEED, AVGSPEED, CSPEED, CGSPEED, AVGCSPEED,
-        DIR, GDIR, AVGDIR, CDIR, CGDIR, AVGCDIR,
-        TEMP, SOLARRAD, PASL, PSTN, RH, AH, 
-        COMPASSH, XTILT, YTILT, ZORIENT,
-        GPSLOCATION, GPSSTATUS, GPSSPEED, GPSHEADING, 
-        CHECK
+        USERINF,
+        TIME,
+        STATUS,
+        WINDSTAT,
+        SPEED,
+        GSPEED,
+        AVGSPEED,
+        CSPEED,
+        CGSPEED,
+        AVGCSPEED,
+        DIR,
+        GDIR,
+        AVGDIR,
+        CDIR,
+        CGDIR,
+        AVGCDIR,
+        TEMP,
+        SOLARRAD,
+        PASL,
+        PSTN,
+        RH,
+        AH,
+        COMPASSH,
+        XTILT,
+        YTILT,
+        ZORIENT,
+        GPSLOCATION,
+        GPSSTATUS,
+        GPSSPEED,
+        GPSHEADING,
+        CHECK // check MUST be last
     };
 
-    static constexpr const char* FieldNames[] = {
-        "USERINF", "TIME", "STATUS", "WINDSTAT", 
-        "SPEED", "GSPEED", "AVGSPEED", "CSPEED", "CGSPEED", "AVGCSPEED",
-        "DIR", "GDIR", "AVGDIR", "CDIR", "CGDIR", "AVGCDIR",
-        "TEMP", "SOLARRAD", "PASL", "PSTN", "RH", "AH", 
-        "COMPASSH", "XTILT", "YTILT", "ZORIENT",
-        "GPSLOCATION", "GPSSTATUS", "GPSSPEED", "GPSHEADING", 
-        "CHECK"
-    };
-
-    static const char* GetFieldName(Fields field) { return FieldNames[field]; };
-
-
-    static constexpr Fields FIELDS_GMX501GPS[] = {USERINF, SPEED, GSPEED, AVGSPEED, DIR, GDIR, AVGDIR, CDIR, AVGCDIR,
-                                                  COMPASSH, PASL, PSTN, RH, AH, TEMP, SOLARRAD, XTILT, YTILT, ZORIENT,
-                                                  STATUS, WINDSTAT, GPSLOCATION, GPSSTATUS, TIME, CHECK};
-
-    static constexpr Fields FIELDS_GMX200GPS[] = {USERINF, GPSLOCATION, GPSSPEED, GPSHEADING, CSPEED, CGSPEED, AVGCSPEED,
-                                                  SPEED, GSPEED, AVGSPEED, DIR, GDIR, AVGDIR, CDIR, CGDIR, AVGCDIR, COMPASSH,
-                                                  XTILT, YTILT, ZORIENT, STATUS, WINDSTAT, GPSSTATUS, TIME, CHECK};
-
-    static constexpr Fields FIELDS_GMX501[] = {USERINF, SPEED, GSPEED, AVGSPEED, DIR, GDIR, AVGDIR, CDIR, AVGCDIR,
-                                               COMPASSH, PASL, PSTN, RH, AH, TEMP, SOLARRAD, XTILT, YTILT, ZORIENT,
-                                               STATUS, WINDSTAT, CHECK};
+    static const char *FieldNames[];
+    static const Field FIELDS_GMX501GPS[];
+    static const Field FIELDS_GMX200GPS[];
+    static const Field FIELDS_GMX501[];
+    static const Field GetFields(Model model);
+    static const char *GetModelName(Model model);
+    static Model GetModel(String &modelName);
 
     class Config
     {
@@ -93,6 +102,13 @@ public:
     void SimulatorDataPoint(float temperature, double longitude, double latitude);
 
     Config &GetConfig() { return mMaximetConfig; };
+
+    static const char *GetFieldName(Field field) { return FieldNames[field]; };
+
+    // generates comma separated fields list; 
+    // set check=true if list should end with "CHECK"
+    // note: when configuring maximet, the report string must omit the CHECK field
+    void GetReportString(String &report, Model model, bool check);
 
 private:
     // main loop run by the task
