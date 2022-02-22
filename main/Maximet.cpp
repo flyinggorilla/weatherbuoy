@@ -25,6 +25,9 @@ static const char REPORT_GMX200GPS[] = "USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,
 static const char REPORT_GMX501GPS[] = "USERINF,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,GPSLOCATION,GPSSTATUS,TIME,CHECK";
 static const char REPORT_GMX501[] = "USERINF,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,CHECK";
 
+// Note: REPORT_GMX501RAIN REFLECTS STATUS-QUO AND NOT PREFERRED NEW CONFIG
+static const char REPORT_GMX501RAIN[] = "NODE,DIR,SPEED,CDIR,AVGDIR,AVGSPEED,GDIR,GSPEED,AVGCDIR,WINDSTAT,PRESS,PASL,PSTN,RH,TEMP,DEWPOINT,AH,PRECIPT,PRECIPI,PRECIPS,COMPASSH,SOLARRAD,SOLARHOURS,WCHILL,HEATIDX,AIRDENS,WBTEMP,SUNR,SNOON,SUNS,SUNP,TWIC,TWIN,TWIA,XTILT,YTILT,ZORIENT,USERINF,TIME,VOLT,STATUS,CHECK";
+
 void fMaximetTask(void *pvParameter)
 {
     ((Maximet *)pvParameter)->MaximetTask();
@@ -623,49 +626,29 @@ void Maximet::MaximetTask()
     return;
 }
 
-void Maximet::GetReportString(String &report, Model model, bool check)
+const char *Maximet::GetReportString(Model model)
 {
-    report.clear();
-
-    const Field *fields = nullptr;
-    int fieldCount = 0;
     switch (model)
     {
-    case Model::GMX200GPS:
-        fields = FIELDS_GMX200GPS;
-        fieldCount = sizeof(FIELDS_GMX200GPS) / sizeof(Field);
-        break;
-    case Model::GMX501GPS:
-        fields = FIELDS_GMX501GPS;
-        fieldCount = sizeof(FIELDS_GMX501GPS) / sizeof(Field);
-        break;
     case Model::GMX501:
-        fields = FIELDS_GMX501;
-        fieldCount = sizeof(FIELDS_GMX501) / sizeof(Field);
-        break;
-    // case Model::GMX501RAIN:
-    //     fields = FIELDS_GMX501RAIN;
-    //     fieldCount = sizeof(FIELDS_GMX501RAIN);
-    //     break;
+        return REPORT_GMX501;
+    case Model::GMX200GPS:
+        return REPORT_GMX200GPS;
+    case Model::GMX501GPS:
+        return REPORT_GMX501GPS;
+    case Model::GMX501RAIN:
+        return REPORT_GMX501RAIN;
+    case Model::NONE:
+        return "NONE";
     default:
-        break;
-    }
+        return "";
+    };
+}
 
-    if (!fields)
-        return;
-
-    for (int i = 0; i < fieldCount; i++)
-    {
-        if (i)
-        {
-            report += ",";
-        }
-        Field f = fields[i];
-        if (f == Field::CHECK)
-            return;
-
-        report += f;
-    }
+void Maximet::GetReportString(String &report, Model model)
+{
+    report.clear();
+    report = GetReportString(model);
 };
 
 void Maximet::SimulatorStart(Model maximetModel)
@@ -683,7 +666,7 @@ void Maximet::SimulatorStart(Model maximetModel)
 
     SendLine("STARTUP: OK");
 
-    GetReportString(line, mMaximetModel, true);
+    GetReportString(line, mMaximetModel);
     SendLine(line);
     // SendLine("-,-,MS,DEG,MS,MS,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-,-,-");
     // SendLine("");
@@ -1098,7 +1081,8 @@ static constexpr const char *FieldNames[] = {
     "GPSLOCATION", "GPSSTATUS", "GPSSPEED", "GPSHEADING",
     "CHECK"};
 
-static const Maximet::Field FIELDS_GMX501GPS[] = {Maximet::Field::USERINF, Maximet::Field:: SPEED, Maximet::Field::GSPEED, Maximet::Field::AVGSPEED, Maximet::Field::DIR, Maximet::Field::GDIR, Maximet::Field::AVGDIR, Maximet::Field::CDIR, Maximet::Field::AVGCDIR,
+/*
+static const Maximet::Field FIELDS_GMX501GPS[] = {Maximet::Field::USERINF, Maximet::Field::SPEED, Maximet::Field::GSPEED, Maximet::Field::AVGSPEED, Maximet::Field::DIR, Maximet::Field::GDIR, Maximet::Field::AVGDIR, Maximet::Field::CDIR, Maximet::Field::AVGCDIR,
                                                   Maximet::Field::COMPASSH, Maximet::Field::PASL, Maximet::Field::PSTN, Maximet::Field::RH, Maximet::Field::AH, Maximet::Field::TEMP, Maximet::Field::SOLARRAD, Maximet::Field::XTILT, Maximet::Field::YTILT, Maximet::Field::ZORIENT,
                                                   Maximet::Field::STATUS, Maximet::Field::WINDSTAT, Maximet::Field::GPSLOCATION, Maximet::Field::GPSSTATUS, Maximet::Field::TIME, Maximet::Field::CHECK}; // Field list MUST end with CHECK
 
@@ -1109,23 +1093,7 @@ static const Maximet::Field FIELDS_GMX200GPS[] = {Maximet::Field::USERINF, Maxim
 static const Maximet::Field FIELDS_GMX501[] = {Maximet::Field::USERINF, Maximet::Field::SPEED, Maximet::Field::GSPEED, Maximet::Field::AVGSPEED, Maximet::Field::DIR, Maximet::Field::GDIR, Maximet::Field::AVGDIR, Maximet::Field::CDIR, Maximet::Field::AVGCDIR,
                                                Maximet::Field::COMPASSH, Maximet::Field::PASL, Maximet::Field::PSTN, Maximet::Field::RH, Maximet::Field::AH, Maximet::Field::TEMP, Maximet::Field::SOLARRAD, Maximet::Field::XTILT, Maximet::Field::YTILT, Maximet::Field::ZORIENT,
                                                Maximet::Field::STATUS, Maximet::Field::WINDSTAT, Maximet::Field::CHECK}; // Field list MUST end with CHECK
-
-#include <array>
-
-typedef FieldArray std::array<Maximet::Field>;
-
-
-
-/*static Field GetFields(Model model)
-{
-    switch (model)
-    {
-    case Model::GMX200GPS:
-        return FIELDS_GMX200GPS;
-    case Model::GMX501:
-        return FIELDS_GMX501;
-    }
-}; */
+*/
 
 const char *Maximet::GetModelName(Model model)
 {

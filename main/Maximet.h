@@ -13,7 +13,7 @@
 class Maximet
 {
 public:
-    enum class Model
+    enum Model
     {
         NONE = 0,
         GMX200GPS = 2001,
@@ -24,7 +24,7 @@ public:
     };
 
 
-    enum class Field
+    /*enum class Field
     {
         USERINF,
         TIME,
@@ -57,13 +57,15 @@ public:
         GPSSPEED,
         GPSHEADING,
         CHECK // check MUST be last
-    };
+    };*/
 
-    static const char *FieldNames[];
-    static const Field FIELDS_GMX501GPS[];
-    static const Field FIELDS_GMX200GPS[];
-    static const Field FIELDS_GMX501[];
-    static const Field GetFields(Model model);
+    //static const char *FieldNames[];
+    //static const Field FIELDS_GMX501GPS[];
+    //static const Field FIELDS_GMX200GPS[];
+    //static const Field FIELDS_GMX501[];
+    //static const Field GetFields(Model model);
+    //static const char *GetModelName(Model model);
+    //static Model GetModel(String &modelName);
     static const char *GetModelName(Model model);
     static Model GetModel(String &modelName);
 
@@ -103,12 +105,11 @@ public:
 
     Config &GetConfig() { return mMaximetConfig; };
 
-    static const char *GetFieldName(Field field) { return FieldNames[(int)field]; };
+    //static const char *GetFieldName(Field field) { return FieldNames[(int)field]; };
 
-    // generates comma separated fields list; 
-    // set check=true if list should end with "CHECK"
-    // note: when configuring maximet, the report string must omit the CHECK field
-    void GetReportString(String &report, Model model, bool check);
+    // provides comma separated fields list of targeted configuration 
+    void GetReportString(String &report, Model model);
+    const char* GetReportString(Model model);
 
 private:
     // main loop run by the task
@@ -148,12 +149,15 @@ private:
     // height above sea level
     void WriteHasl(float hasl);
 
-    // height above/of station
+    // set height above/of station
     void WriteHastn(float hastn);
 
-    // set latitude if not GPS
+    // set stationary latitude
+    // automatically provided if GPS is available
     void WriteLat(float lat);
-    // set longitude if not GPS
+
+    // set stationary longitude
+    // automatically provided if GPS is available
     void WriteLong(float lon);
 
     // configure Maximet long average interval -
@@ -164,8 +168,12 @@ private:
     // high = true: 1 output per second
     // high = false: 1 output per minute
     void WriteOutfreq(bool high);
-    // set columns maximet should send e.g. "USERINF,SPEED,GSPEED,AVGSPEED,DIR" --- this will send "REPORT USERINF SPEED .... " (no comma!) to maximet
+
+    // set fields maximet should send e.g. "USERINF,SPEED,GSPEED,AVGSPEED,DIR" 
+    // sends "REPORT USERINF SPEED .... " (no comma!) to maximet
+    // automatically removes the last field ",CHECK" if present
     void WriteReport(const char *report);
+    
     // set
     void WriteUserinf(const char *userinf);
 
