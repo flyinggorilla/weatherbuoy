@@ -1127,7 +1127,7 @@ typedef FieldArray std::array<Maximet::Field>;
     }
 }; */
 
-static const char *Maximet::GetModelName(Model model) noexcept
+const char *Maximet::GetModelName(Model model)
 {
     switch (model)
     {
@@ -1146,7 +1146,7 @@ static const char *Maximet::GetModelName(Model model) noexcept
     }
 };
 
-static Model GetModel(String &modelName)
+Maximet::Model Maximet::GetModel(String &modelName)
 {
     if (modelName.equals(GetModelName(Model::NONE)))
         return Model::NONE;

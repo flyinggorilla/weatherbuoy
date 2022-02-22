@@ -103,7 +103,7 @@ public:
 
     Config &GetConfig() { return mMaximetConfig; };
 
-    static const char *GetFieldName(Field field) { return FieldNames[field]; };
+    static const char *GetFieldName(Field field) { return FieldNames[(int)field]; };
 
     // generates comma separated fields list; 
     // set check=true if list should end with "CHECK"
