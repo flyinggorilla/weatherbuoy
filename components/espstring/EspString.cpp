@@ -754,6 +754,15 @@ int String::indexOf(const String &s2, unsigned int fromIndex) const
     return found - buffer;
 }
 
+
+bool String::contains(const char* match) {
+    return indexOf(match) >= 0;
+};
+
+bool String::contains(const String &match) {
+    return indexOf(match) >= 0;
+};
+
 int String::lastIndexOf(char theChar) const
 {
     return lastIndexOf(theChar, len - 1);

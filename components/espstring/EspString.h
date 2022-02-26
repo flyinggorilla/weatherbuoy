@@ -309,6 +309,10 @@ public:
     int indexOf(char ch, unsigned int fromIndex) const;
     int indexOf(const String &str) const;
     int indexOf(const String &str, unsigned int fromIndex) const;
+
+    bool contains(const char* match);
+    bool contains(const String &match);
+
     int lastIndexOf(char ch) const;
     int lastIndexOf(char ch, unsigned int fromIndex) const;
     int lastIndexOf(const String &str) const;

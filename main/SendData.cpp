@@ -521,29 +521,68 @@ bool SendData::PerformHttpPost()
                 updateConfig = true;
             };
 
-
-    /*        float hasl;
-            bool updateHasl;
-            float hast;
-            float 
+            // Maximet configurations
             value = ReadMessageValue("set-hasl:");
             if (value.length())
             {
-                mrConfig.msAlarmSms = value;
+                mrMaximet.Stop();
+                mrMaximet.WriteHasl(value.toFloat());
                 updateConfig = true;
             };
 
+            value = ReadMessageValue("set-hastn:");
+            if (value.length())
+            {
+                mrMaximet.Stop();
+                mrMaximet.WriteHastn(value.toFloat());
+                updateConfig = true;
+            };
             
-            messageAddConfigParam("set-", "hasl", simpleStringRegex);
-            messageAddConfigParam("set-", "hast", simpleStringRegex);
-            messageAddConfigParam("set-", "position", gpsRegex);
-            messageAddConfigParamFloat("set-", "compassdecl");
-            messageAddConfigParamInt("set-", "userinf");
-            messageAddConfigParamInt("set-", "outfreq");
+            value = ReadMessageValue("set-position:");
+            if (value.indexOf(':') > 0)
+            {
+                mrMaximet.Stop();
+                int latPos = value.indexOf(':', 0);
+                double lat = value.substring(0, latPos).toFloat();
+                double lon = value.substring(latPos + 1).toFloat();
+                if (!isnan(lat) && !isnan(lon)) {
+                    mrMaximet.WriteLat(lat);
+                    mrMaximet.WriteLong(lon);
+                    updateConfig = true;
+                }
+            }
 
-*/
+            value = ReadMessageValue("set-compassdecl:");
+            if (value.length())
+            {
+                mrMaximet.Stop();
+                mrMaximet.WriteCompassdecl(value.toFloat());
+                updateConfig = true;
+            };
 
+            value = ReadMessageValue("set-outfreq:");
+            if (value.length())
+            {
+                mrMaximet.Stop();
+                mrMaximet.WriteOutfreq(value.toInt() == 1);
+                updateConfig = true;
+            };
 
+            value = ReadMessageValue("set-userinf:");
+            if (value.length())
+            {
+                mrMaximet.Stop();
+                mrMaximet.WriteUserinf(value.c_str());
+                updateConfig = true;
+            };
+
+            value = ReadMessageValue("set-avglong:");
+            if (value.length())
+            {
+                mrMaximet.Stop();
+                mrMaximet.WriteAvgLong(value.toInt());
+                updateConfig = true;
+            };
 
             mbRestart = false;
             if (command.equals("restart") || command.equals("config") || command.equals("udpate"))

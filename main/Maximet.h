@@ -24,54 +24,14 @@ public:
     };
 
 
-    /*enum class Field
-    {
-        USERINF,
-        TIME,
-        STATUS,
-        WINDSTAT,
-        SPEED,
-        GSPEED,
-        AVGSPEED,
-        CSPEED,
-        CGSPEED,
-        AVGCSPEED,
-        DIR,
-        GDIR,
-        AVGDIR,
-        CDIR,
-        CGDIR,
-        AVGCDIR,
-        TEMP,
-        SOLARRAD,
-        PASL,
-        PSTN,
-        RH,
-        AH,
-        COMPASSH,
-        XTILT,
-        YTILT,
-        ZORIENT,
-        GPSLOCATION,
-        GPSSTATUS,
-        GPSSPEED,
-        GPSHEADING,
-        CHECK // check MUST be last
-    };*/
-
-    //static const char *FieldNames[];
-    //static const Field FIELDS_GMX501GPS[];
-    //static const Field FIELDS_GMX200GPS[];
-    //static const Field FIELDS_GMX501[];
-    //static const Field GetFields(Model model);
-    //static const char *GetModelName(Model model);
-    //static Model GetModel(String &modelName);
+    static const char *GetModelReport(Model model);
     static const char *GetModelName(Model model);
     static Model GetModel(String &modelName);
 
     class Config
     {
     public:
+        Model model;
         String sReport;
         String sUserinfo;
         String sSensor;
@@ -93,8 +53,8 @@ public:
     // start the task
     void Start(int gpioRX, int gpioTX, bool alternateUart = false);
 
-    // stop the task (e.g. before OTA update)
-    void Stop() { mbRun = false; };
+    // stop the task (e.g. before OTA update, or before writing Maximet configuration)
+    void Stop();
 
     // weatherbuoy electronics can be used to simulator a Gill Maximet Weatherstation via its RS232 serial interface. good for testing other weatherbuoys
     void SimulatorStart(Model maximetModel);
@@ -111,37 +71,12 @@ public:
     void GetReportString(String &report, Model model);
     const char* GetReportString(Model model);
 
-private:
-    // main loop run by the task
-    void MaximetTask();
-    friend void fMaximetTask(void *pvParameter);
-    void MaximetConfig();
+public:    
+    // maximet configuration writes; 
+    // Write* methods automatically invoke Maximet commandline mode
 
-    void SendLine(const char *text);
-    void SendLine(String &line);
-
-    // enters Maximet commmandline mode with *\r\n and allows to send config;
-    // calls "exit" automatically at the end to continue data sending
-    bool EnterCommandLine();
-    void ExitCommandLine();
-    bool ReadConfig(String &value, const char *sConfig);
-    bool WriteConfig(const char *sConfig, const String &value);
-    bool ReadConfigFloat(float &val, const char *cmd);
-    bool ReadConfigString(String &val, const char *cmd);
-    bool ReadConfigInt(int &val, const char *cmd);
-
-    bool ReadUserinf();
-    bool ReadSensor();
-    bool ReadReport();
-    bool ReadOutfreq();
-    bool ReadAvgLong();
-    bool ReadSerial();
-    bool ReadSWVer();
-    bool ReadHasl();
-    bool ReadHastn();
-    bool ReadLat();
-    bool ReadLong();
-    bool ReadCompassdecl();
+    // checks whether Maximet task is ready to write
+    bool IsReadyToWrite();
 
     // compass declination
     void WriteCompassdecl(float compassdecl);
@@ -174,8 +109,49 @@ private:
     // automatically removes the last field ",CHECK" if present
     void WriteReport(const char *report);
     
-    // set
+    // set user info string,  e.g. GMX501GPS
     void WriteUserinf(const char *userinf);
+
+    // call after finished with Write* commands
+    // exits configuration mode
+    void WriteFinish();
+
+
+private:
+    // main loop run by the task
+    void MaximetTask();
+    friend void fMaximetTask(void *pvParameter);
+    void MaximetConfig();
+
+    void SendLine(const char *text);
+    void SendLine(String &line);
+
+    // enters Maximet commmandline mode with *\r\n and allows to send config;
+    // calls "exit" automatically at the end to continue data sending
+    bool EnterCommandLine();
+    void ExitCommandLine();
+    bool ReadConfig(String &value, const char *sConfig);
+    bool WriteConfig(const char *sConfig, const String &value);
+    bool ReadConfigFloat(float &val, const char *cmd);
+    bool ReadConfigString(String &val, const char *cmd);
+    bool ReadConfigInt(int &val, const char *cmd);
+
+    // read configured user info alias USERINF: contains maximet model. e.g. "GMX501" when properly configured for weatherbuoy
+    bool ReadUserinf();
+
+    // read list of available sensors 
+    bool ReadSensor();
+    bool ReadReport();
+    bool ReadOutfreq();
+    bool ReadAvgLong();
+    bool ReadSerial();
+    bool ReadSWVer();
+    bool ReadHasl();
+    bool ReadHastn();
+    bool ReadLat();
+    bool ReadLong();
+    bool ReadCompassdecl();
+
 
     Model mMaximetModel;
     Serial *mpSerial;
@@ -187,6 +163,7 @@ private:
     Config mMaximetConfig;
 
     bool mbRun = true;
+    bool mbStopped = true;
     bool mbCommandline = false;
 
     // cached data
