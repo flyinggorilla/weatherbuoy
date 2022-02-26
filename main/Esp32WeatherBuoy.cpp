@@ -350,7 +350,7 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
         }
 
         // read maximet data queue and create a HTTP POST message
-        sendData.PrepareHttpPost(voltage, current, boardtemp, watertemp, bDiagnostics);
+        sendData.PrepareHttpPost(voltage, current, boardtemp, watertemp, bDiagnostics, mOnlineMode);
 
         // try sending, max 3 times
         if (mOnlineMode != MODE_OFFLINE)
@@ -452,7 +452,7 @@ void Esp32WeatherBuoy::RunSimulator(TemperatureSensors &tempSensors, DataQueue &
         if (uptimeSeconds - lastSendTimestamp >= httpPostDataIntervalSeconds)
         {
             lastSendTimestamp = uptimeSeconds;
-            sendData.PrepareHttpPost(5000, 70, boardtemp, watertemp, true);
+            sendData.PrepareHttpPost(5000, 70, boardtemp, watertemp, true, mOnlineMode);
             sendData.PerformHttpPost();
         }
     }
@@ -543,7 +543,7 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
         }
 
         // read maximet data queue and create a HTTP POST message
-        sendData.PrepareHttpPost(voltage, current, boardtemp, watertemp, bDiagnostics);
+        sendData.PrepareHttpPost(voltage, current, boardtemp, watertemp, bDiagnostics, mOnlineMode);
 
         // try sending, max 3 times
         if (mOnlineMode != MODE_OFFLINE)

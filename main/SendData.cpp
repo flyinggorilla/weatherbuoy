@@ -57,7 +57,7 @@ void SendData::Cleanup()
     mhEspHttpClient = nullptr;
 }
 
-bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics)
+bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics, OnlineMode onlineMode)
 {
     bSendDiagnostics = bSendDiagnostics || mbSendDiagnostics;
 
@@ -193,27 +193,29 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += mrConfig.miIntervalLowbattery;
         mPostData += ", \"intervaldiag\": ";
         mPostData += mrConfig.miIntervalDiagnostics;
-        mPostData += ",\"cellular\": {\"datasent\":";
-        mPostData += (unsigned long)(mrCellular.getDataSent() / 1024); // convert to kB
-        mPostData += ",\"datareceived\":";
-        mPostData += (unsigned long)(mrCellular.getDataReceived() / 1024); // convert to kB
-        mPostData += ",\"network\": \"";
-        mPostData += mrConfig.msCellularOperator;
-        mPostData += "\",\"operator\": \"";
-        mPostData += mrCellular.msOperator;
-        mPostData += "\",\"subscriber\": \"";
-        mPostData += mrCellular.msSubscriber;
-        mPostData += "\",\"hardware\": \"";
-        mPostData += mrCellular.msHardware;
-        mPostData += "\",\"networkmode\": \"";
-        mPostData += mrCellular.msNetworkmode;
-        mPostData += "\",\"signalquality\": ";
-        mPostData += mrCellular.miSignalQuality;
-        mPostData += ", \"prefnetwork\": ";
-        mPostData += mrConfig.miCellularNetwork;
-        mPostData += ", \"prefoperator\": \"";
-        mPostData += mrConfig.msCellularOperator;
-        mPostData += "\"}";
+        if (onlineMode == MODE_CELLULAR) {
+            mPostData += ",\"cellular\": {\"datasent\":";
+            mPostData += (unsigned long)(mrCellular.getDataSent() / 1024); // convert to kB
+            mPostData += ",\"datareceived\":";
+            mPostData += (unsigned long)(mrCellular.getDataReceived() / 1024); // convert to kB
+            mPostData += ",\"network\": \"";
+            mPostData += mrConfig.msCellularOperator;
+            mPostData += "\",\"operator\": \"";
+            mPostData += mrCellular.msOperator;
+            mPostData += "\",\"subscriber\": \"";
+            mPostData += mrCellular.msSubscriber;
+            mPostData += "\",\"hardware\": \"";
+            mPostData += mrCellular.msHardware;
+            mPostData += "\",\"networkmode\": \"";
+            mPostData += mrCellular.msNetworkmode;
+            mPostData += "\",\"signalquality\": ";
+            mPostData += mrCellular.miSignalQuality;
+            mPostData += ", \"prefnetwork\": ";
+            mPostData += mrConfig.miCellularNetwork;
+            mPostData += ", \"prefoperator\": \"";
+            mPostData += mrConfig.msCellularOperator;
+            mPostData += "\"}";
+        }
         if (mrConfig.mbNmeaDisplay) {
             mPostData += ",\"display\": \"NMEA2000\"";
         }
@@ -364,6 +366,7 @@ bool SendData::PerformHttpPost()
         if (command.length())
         {
             bool updateConfig = false;
+            bool updateMaximet = false;
             String value;
 
             value = ReadMessageValue("set-apssid:");
@@ -517,6 +520,30 @@ bool SendData::PerformHttpPost()
                 mrConfig.miIntervalLowbattery = value.toInt();
                 updateConfig = true;
             };
+
+
+    /*        float hasl;
+            bool updateHasl;
+            float hast;
+            float 
+            value = ReadMessageValue("set-hasl:");
+            if (value.length())
+            {
+                mrConfig.msAlarmSms = value;
+                updateConfig = true;
+            };
+
+            
+            messageAddConfigParam("set-", "hasl", simpleStringRegex);
+            messageAddConfigParam("set-", "hast", simpleStringRegex);
+            messageAddConfigParam("set-", "position", gpsRegex);
+            messageAddConfigParamFloat("set-", "compassdecl");
+            messageAddConfigParamInt("set-", "userinf");
+            messageAddConfigParamInt("set-", "outfreq");
+
+*/
+
+
 
             mbRestart = false;
             if (command.equals("restart") || command.equals("config") || command.equals("udpate"))
