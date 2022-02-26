@@ -69,6 +69,7 @@ Serial::~Serial() {
     free(mpBuffer);
 }
 
+// try forever until 1 byte arrives
 bool Serial::ReadIntoBuffer() {
     muiBufferPos = 0;
     muiBufferLen = 0;
@@ -83,22 +84,72 @@ bool Serial::ReadIntoBuffer() {
     return true;
 }
 
-bool Serial::ReadLine(String& line) {
-    line = "";
+// timeout 0 = try forever by default
+bool Serial::ReadIntoBuffer(unsigned int timeoutms) {
+    muiBufferPos = 0;
+    muiBufferLen = 0;
+    size_t maxBytesToRead = 0;
+    if (ESP_OK != uart_get_buffered_data_len(muiUartNo, &maxBytesToRead)) {
+        return false;
+    }
 
+    //ESP_LOGI(tag, "Data in Buffer %d bytes", (unsigned int)maxBytesToRead);
+
+    // if nothing is in buffer, then wait for timeout, otherwise read only whats in buffer
+    if (!maxBytesToRead) {
+        maxBytesToRead = 1;
+    } else if (maxBytesToRead > muiBufferSize) {
+        maxBytesToRead = muiBufferSize;
+    }
+
+    int len = uart_read_bytes(muiUartNo, mpBuffer, maxBytesToRead, timeoutms / portTICK_RATE_MS);
+    if (len < 0) {
+        ESP_LOGE(tag, "Error reading from serial interface #%d", muiUartNo);
+        return false;
+    }
+    muiBufferLen = len;
+    ESP_LOG_BUFFER_HEXDUMP(tag, mpBuffer, len, ESP_LOG_DEBUG);
+    return true;
+}
+
+bool Serial::ReadMultiLine(String& lines, unsigned int timeoutms) {
+    lines = "";
+    String line;
+    while(ReadLine(line, timeoutms)) {
+        if (!line.length()) {
+            return true;
+        }
+        lines += line;
+    }
+    return false;
+}
+
+bool Serial::ReadLine(String& line, unsigned int timeoutms) {
+    line = "";
+    bool cr = false;
+    bool crlf = true;
     int maxLineLength = muiBufferSize;
     while(maxLineLength) {
         if (muiBufferPos == muiBufferLen) {
-            if (!ReadIntoBuffer())
+            if (!ReadIntoBuffer(timeoutms))
                 return false;
+            if(!muiBufferLen) {
+                return false;                
+            }
         }
         if (muiBufferPos < muiBufferLen) {
             unsigned char c = mpBuffer[muiBufferPos++];
-            if (c == 0x0D || c ==0x0A) {  // skip trailing line feeds \r\n
-                if (line.length())
-                    return true;
-            } else {
-                line += (char)c;
+            switch (c)
+            {
+                case 0x0D:
+                    cr = true;
+                    break;
+                case 0x0A:
+                    crlf = cr;
+                    return line;
+                default:
+                    cr = crlf = false;
+                    line += (char)c;
             }
         } 
         maxLineLength--;
@@ -107,6 +158,15 @@ bool Serial::ReadLine(String& line) {
     return false;
 }
 
+bool Serial::Write(const String &buffer) {
+    if (uart_write_bytes(muiUartNo, buffer.c_str(), buffer.length()) >= 0) {
+        ESP_LOGD(tag, "Sent to UART: \"%s\"", buffer.c_str());
+        //ESP_LOG_BUFFER_HEXDUMP(tag, buffer.c_str(), buffer.length(), ESP_LOG_INFO);
+        return true;
+    }
+    ESP_LOGE(tag, "Error writing to UART %d: \"%s\"", muiUartNo, buffer.c_str());
+    return false;
+}
 
 
 

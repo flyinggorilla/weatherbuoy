@@ -76,9 +76,8 @@ coredump.dat
 
 *.out.log
 maximetsimulator/secureboot.py
-*.cmd
 testjson.json
-
+firmwareupdate.cmd
 
 # logs
 logs

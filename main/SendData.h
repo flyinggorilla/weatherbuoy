@@ -7,20 +7,23 @@
 #include "Config.h"
 #include "Cellular.h"
 #include "Watchdog.h"
-#include "ReadMaximet.h"
+#include "DataQueue.h"
+#include "Maximet.h"
 
 class SendData {
 public:
-	SendData(Config &config, ReadMaximet &readMaximet, Cellular &cellular, Watchdog &watchdog);
+	SendData(Config &config, DataQueue &dataQueue, Cellular &cellular, Watchdog &watchdog, Maximet &maximet);
 	virtual ~SendData();
     bool PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics);
     bool PerformHttpPost();
     bool isRestart() { return mbRestart; };
 private:
     Config &mrConfig;
-    ReadMaximet &mrReadMaximet;
+    DataQueue &mrDataQueue;
     Cellular &mrCellular;
     Watchdog &mrWatchdog;
+    Maximet &mrMaximet;
+    Maximet::Config &mrMaximetConfig;
 
 private: // esp http client
     #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
@@ -34,6 +37,10 @@ private: // esp http client
     bool mbSendDiagnostics = false;
     bool mbOtaAppValidated = false;
     bool mbRestart = false;
+
+private:
+    double mdCurrentLocationLatitude = 0;
+    double mdCurrentLocationLongitude = 0;
 };
 
 

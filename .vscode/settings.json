@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "new": "cpp",
+        "cmath": "cpp"
+    },
+    "idf.adapterTargetName": "esp32",
+    "idf.portWin": "COM5",
+    "git.ignoredRepositories": [
+        "c:\\users\\bernd\\esp\\esp-idf"
+    ]
+}

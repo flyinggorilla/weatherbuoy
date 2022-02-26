@@ -16,6 +16,12 @@ menu "Weatherbuoy"
         string "Default WiFi AP Password."
         default ""
 
+    config WEATHERBUOY_NTPSERVER
+        string "Default NTP Server."
+        default "pool.ntp.org"
+        help
+            NTP server hostname. e.g. at.pool.ntp.org.
+    
     config WEATHERBUOY_TARGET_URL
         string "Default target URL to send data and retrieve configuration."
 
@@ -35,7 +41,7 @@ menu "Weatherbuoy"
         default "A1"
 
     config WEATHERBUOY_CELLULAR_NETWORK
-        int "Preferred network mode. Default = 2 (automatic)"
+        int "Preferred network mode. Default = 51 (GSM+LTE)"
         help  
               2 - Automatic
               9 - CDMA Only
@@ -53,6 +59,33 @@ menu "Weatherbuoy"
               39 – GSM+WCDMA+LTE Only
               51 – GSM+LTE Only
               54 – WCDMA+LTE Only
-        default 2
+        default 51
+
+    config WEATHERBUOY_MAXIMET_SIMULATOR
+        int "Simulate Maximet via Serial. Default = 0 (off)"
+        help  
+                0 - Off
+                2001 - Maximet GMX200 with GPS
+                5010 - Maximet GMX501
+                5011 - Maximet GMX501 with GPS
+        default 0
+
+    config WEATHERBUOY_SENDDATA_INTERVAL_DAY
+        int "Interval in seconds to send data at daytime. default = 60 seconds."
+        default 60   
+
+    config WEATHERBUOY_SENDDATA_INTERVAL_NIGHT
+        int "Interval in seconds to send data at daytime. default = 300 seconds."
+        default 300   
+
+    config WEATHERBUOY_SENDDATA_INTERVAL_DIAGNOSTICS
+        int "Interval in seconds to send data at daytime. default = 900 seconds."
+        default 900   
+
+    config WEATHERBUOY_SENDDATA_INTERVAL_LOWBATTERY
+        int "Interval in seconds to send data at daytime. default = 3600 seconds."
+        default 3600   
             
+       
+
 endmenu

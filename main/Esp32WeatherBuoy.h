@@ -4,6 +4,13 @@
 #include "Config.h"
 #include "Wifi.h"
 #include "Cellular.h"
+#include "DataQueue.h"
+#include "Maximet.h"
+#include "Max471Meter.h"
+#include "SendData.h"
+#include "NmeaDisplay.h"
+#include "TemperatureSensors.h"
+#include "Alarm.h"
 
 #define FIRMWARE_VERSION __DATE__ " " __TIME__
 
@@ -13,6 +20,7 @@ public:
 	virtual ~Esp32WeatherBuoy();
 
 	void Start();
+	//void StartMaximetSimulator(MaximetModel model);
 	enum OnlineMode {
 		MODE_OFFLINE,
 		MODE_WIFISTA,
@@ -21,12 +29,20 @@ public:
 	};
 
 	void Restart(int seconds);
-	Config& GetConfig() { return config; }
+	Config& GetConfig() { return mConfig; }
+
+	void HandleAlarm(Alarm *pAlarm);
+	void RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet, Alarm *pAlarm);
+	void RunDisplay(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet);
+	void RunSimulator(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet, Maximet::Model model);
 
 private:
-	Config config;
-	Wifi wifi;
-	Cellular cellular;
+	Config mConfig;
+	Wifi mWifi;
+	Cellular mCellular;
+	OnlineMode mOnlineMode;
+	bool mbCellular;
+	NmeaDisplay *mpDisplay = nullptr;
 };
 
 
