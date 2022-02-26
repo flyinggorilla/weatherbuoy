@@ -18,7 +18,7 @@
 | Part | Description | Links | Cost (ex. delivery) |
 |-|-|-|-|
 | Waterproof housing | Fibox PCM200/100T, 255x180x100 Polycarbonat | [Fibox 6016927](https://www.fibox.de//catalog/64/product/183/6016927_GER1.html), [conrad](https://www.conrad.at/de/p/fibox-pcm-200-100-t-6016927-universal-gehaeuse-255-x-180-x-100-polycarbonat-lichtgrau-ral-7035-1-st-521203.html) | EUR 46 |
-| Weather station | Gill MaxiMet: ultrasonic windspeed/direction, compass, solar radiation | [GILL MaxiMet GMX501](http://gillinstruments.com/data/datasheets/1957-009%20Maximet-gmx501%20Iss%207.pdf) | EUR 3000 |
+| Weather station | Gill MaxiMet: ultrasonic windspeed/direction, compass, solar radiation | [GILL MaxiMet GMX501](http://gillinstruments.com/data/datasheets/1957-009%20Maximet-gmx501%20Iss%207.pdf) Note: GMX200 costs half, just lacks solar| EUR 1500-3000 |
 | Microcontroller |  Lilygo ESP32 | [LILYGO® TTGO T-PCIE ESP32-WROVER-B](http://www.lilygo.cn/prod_view.aspx?TypeId=50044&Id=1313&FId=t3:50044:3) | EUR 10 |
 | 4G/LTE Modem  | SimCom 7600 | [PCIE-SIM7600E Module](http://www.lilygo.cn/prod_view.aspx?TypeId=50044&Id=1313&FId=t3:50044:3)  |  EUR 30 |
 | Solar panel | 12V, 20W, monocrystalline, water proof IP65 | [Offgridtec](https://www.offgridtec.com/en/offgridtec-20w-mono-solarpanel-12v.html)| EUR 27 |
@@ -48,23 +48,42 @@ files are in the folder [/cad](cad)
 [System: Fusion 360 live model](https://a360.co/3yyAmHY)
 [PCB: Fusion 360 live model](https://a360.co/3zrHFRN)
 
+how to order a PCB:
+* choose a PCB manufacturer. recommendation: https://www.eurocircuits.com/ 
+* upload __weatherbuoy pcb.brd__ to e.g. eurocircuits to order your PCB
+
 ## firmware
 * built with ESP-IDF Version 4.3 or later
 * adds software components for
-  * Cellular handling for SimCom Modem
+  * Cellular handling for SimCom 7600E Modem
   * Max417 current/voltage measurement
   * Comfortable/safer Strings
   * reading/parsing Gill Maximet data from serial interface
+* new as of February 2022:
+  * remotely configuring Gill Maximet wind/weather stations
+  * NMEA2000 data output for a real-time Display e.g. Garmin GNX130
+  * SMS and Buzzer alerting based on GPS geofence, tilt sensor, and Maximet unplugging
+  * Use exactly same electronics also to simulate a maximet station for testing purposes
+  * upgraded to ESP-IDF 4.4
+  * improved serial/UART handling to maximet and modem for performance and robustness
+
+## Lilygo TTGP T-PCIE SIM7600E PIN usage
+* UART0: RX: GPIO3, TX: GPIO1 (USB, logging, debugging)
+* UART1: RX: GPI13, TX: GPIO14 (Maximet RS232)
+* UART2: RX: GPIO16, TX: GPIO17 (SimCom Modem)
+* ADC: GPIO39 (Max471, Voltage)
+* ADC: GPIO34 (Max471, Current)
+* TWAI: RX: GPIO22, TX: GPIO21 (I2C ports for driving NMEA2000 display)
+* OUT: GPIO19 (Buzzer, up to max 70mA)
+
 
 ## troubleshooting
 
 ### cannot flash via serial/USB anymore
 * remove serial connection to Maximet (or turn off/reset Maximet/Simulator device)
   https://esp32.com/viewtopic.php?t=1205
+
 ### observing weird crashes, especially after changing git branches
 * completely delete the build folder and perform a 100% clean build
  https://esp32.com/viewtopic.php?t=1205
 
-UART0: RX: GPIO3, TX: GPIO1
-UART1: RX: GPIO9, TX: GPIO10
-UART2: RX: GPIO16, TX: GPIO17
