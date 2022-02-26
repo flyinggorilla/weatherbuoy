@@ -125,15 +125,6 @@ void Maximet::MaximetTask()
     unsigned int intervalMs = 0;
     int skipped = 0; */
 
-    enum MaximetStates
-    {
-        STARTUP,
-        COLUMNS,
-        UNITS,
-        ENDSTARTUP,
-        SENDINGDATA
-    };
-
     enum ParsingStates
     {
         START,
@@ -145,7 +136,6 @@ void Maximet::MaximetTask()
 
     Data data;
     String column;
-    MaximetStates maximetState = SENDINGDATA;
     int lastUptime = 0;
 
     VelocityVector shortAvgCSpeedVector;
@@ -164,28 +154,6 @@ void Maximet::MaximetTask()
         }
         ESP_LOGD(tag, "THE LINE: %s", line.c_str());
 
-        if (line.startsWith("STARTUP: OK"))
-        {
-            maximetState = STARTUP;
-        }
-        switch (maximetState)
-        {
-        case SENDINGDATA:
-            break;
-        case STARTUP:
-            maximetState = COLUMNS;
-            continue;
-        case COLUMNS:
-            maximetState = UNITS;
-            continue;
-        case UNITS:
-            maximetState = ENDSTARTUP;
-            continue;
-        case ENDSTARTUP:
-            maximetState = SENDINGDATA;
-            continue;
-        }
-
         int cpos = 0;
         int len = line.length();
         int col = 0;
@@ -193,7 +161,7 @@ void Maximet::MaximetTask()
 
         int cposDataStart = 0;
         int cposDataEnd = 0;
-        Model model = Model::GMX501;
+        Model model = Model::NONE;
 
         float maximetGSpeed;
         float maximetAvgSpeed;
@@ -229,13 +197,11 @@ void Maximet::MaximetTask()
 
                     if (col == 1)
                     {
-                        if (column.equals(GetModelName(Model::GMX200GPS)))
+                        model = GetModel(column);
+                        if (!model) 
                         {
-                            model = Model::GMX200GPS;
-                        }
-                        else if (column.equals(GetModelName(Model::GMX501GPS)))
-                        {
-                            model = Model::GMX501GPS;
+                            parsingState = GARBLED;
+                            continue;
                         }
                     }
 
@@ -403,7 +369,7 @@ void Maximet::MaximetTask()
                             break;
                         }
                     }
-                    else
+                    else if (model == Model::GMX501)
                     {
                         // GMX501
                         // USERINF,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,CHECK
@@ -839,19 +805,19 @@ void Maximet::MaximetConfig()
         }
         else
         {
-            mMaximetConfig.model = bGps ? Model::GMX200GPS : Model::INVALID;
+            mMaximetConfig.model = bGps ? Model::GMX200GPS : Model::NONE;
         }
     }
     else
     {
         ESP_LOGE(tag, "Incompatible Maximet: no Wind, Tilt or Compass sensor!");
-        mMaximetConfig.model = Model::INVALID;
+        mMaximetConfig.model = Model::NONE;
     }
 
     ESP_LOGI(tag, "Detected Maximet model (SENSORS): %s", GetModelName(mMaximetConfig.model));
 
     // ESP_LOGI(tag, "Check config %d, %d", msReport.length(), msUserinfo.length());
-    if (mMaximetConfig.sReport.length() && mMaximetConfig.model != Model::INVALID && mMaximetConfig.model != Model::NONE)
+    if (mMaximetConfig.sReport.length() && mMaximetConfig.model)
     {
 
         if (!mMaximetConfig.sReport.equals(GetModelReport(mMaximetConfig.model)))
@@ -861,9 +827,9 @@ void Maximet::MaximetConfig()
             WriteReport(GetModelReport(mMaximetConfig.model));
             WriteCompassdecl(4.3);
             WriteOutfreq(true);
-            WriteHasl(469); 
+            WriteHasl(469);
             WriteHastn(3);
-            WriteLat(47.875249176262976); // mid of attersee
+            WriteLat(47.875249176262976);  // mid of attersee
             WriteLong(13.548413577850653); // mid of attersee
         }
 
@@ -873,9 +839,7 @@ void Maximet::MaximetConfig()
             WriteUserinf(GetModelName(mMaximetConfig.model));
         };
 
-
         mMaximetModel = mMaximetConfig.model;
-
     }
     ExitCommandLine();
 }
@@ -1188,33 +1152,28 @@ const char *Maximet::GetModelReport(Model model)
         return REPORT_GMX200GPS;
     default:
         return REPORT_GMX501;
-   }
+    }
 }
-
 
 const char *Maximet::GetModelName(Model model)
 {
     switch (model)
     {
-    case Model::NONE:
-                return "NONE";
-            case Model::GMX200GPS:
-                return "GMX200GPS";
-            case Model::GMX501:
-                return "GMX501";
-            case Model::GMX501GPS:
-                return "GMX501GPS";
-            case Model::GMX501RAIN:
-                return "GMX501RAIN";
-            default:
-                return "INVALID";
-            }
+    case Model::GMX200GPS:
+        return "GMX200GPS";
+    case Model::GMX501:
+        return "GMX501";
+    case Model::GMX501GPS:
+        return "GMX501GPS";
+    case Model::GMX501RAIN:
+        return "GMX501RAIN";
+    default:
+        return "NONE";
+    }
 };
 
 Maximet::Model Maximet::GetModel(String &modelName)
 {
-    if (modelName.equals(GetModelName(Model::NONE)))
-        return Model::NONE;
     if (modelName.equals(GetModelName(Model::GMX200GPS)))
         return Model::GMX200GPS;
     if (modelName.equals(GetModelName(Model::GMX501)))
@@ -1223,5 +1182,5 @@ Maximet::Model Maximet::GetModel(String &modelName)
         return Model::GMX501GPS;
     if (modelName.equals(GetModelName(Model::GMX501RAIN)))
         return Model::GMX501RAIN;
-    return Model::INVALID;
+    return Model::NONE;
 }

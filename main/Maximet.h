@@ -20,7 +20,6 @@ public:
         GMX501 = 5010,
         GMX501GPS = 5011,
         GMX501RAIN = 5012,
-        INVALID = -1
     };
 
 
