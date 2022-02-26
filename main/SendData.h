@@ -10,11 +10,18 @@
 #include "DataQueue.h"
 #include "Maximet.h"
 
+enum OnlineMode {
+    MODE_OFFLINE,
+    MODE_WIFISTA,
+    MODE_WIFIAP,
+    MODE_CELLULAR
+};
+
 class SendData {
 public:
 	SendData(Config &config, DataQueue &dataQueue, Cellular &cellular, Watchdog &watchdog, Maximet &maximet);
 	virtual ~SendData();
-    bool PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics);
+    bool PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics, OnlineMode onlineMode);
     bool PerformHttpPost();
     bool isRestart() { return mbRestart; };
 private:

@@ -21,12 +21,6 @@ public:
 
 	void Start();
 	//void StartMaximetSimulator(MaximetModel model);
-	enum OnlineMode {
-		MODE_OFFLINE,
-		MODE_WIFISTA,
-		MODE_WIFIAP,
-		MODE_CELLULAR
-	};
 
 	void Restart(int seconds);
 	Config& GetConfig() { return mConfig; }
