@@ -54,7 +54,7 @@ void Max471Meter::Max471MeterTask() {
         }
         muiCurrentCount++;
         taskEXIT_CRITICAL(&mCriticalSection);
-        ESP_LOGD(tag, "Current %d mA", measurement);
+        ESP_LOGV(tag, "Current %d mA", measurement);
     }
 }
 
@@ -149,10 +149,10 @@ unsigned int ADC::AdaptiveMeasure(unsigned int samples) {
     if (sensitiveMode) {
         adc1_config_channel_atten(mChannel, ADC_ATTEN_DB_11); // restore always high attenuation after sensitive mode
         voltage = esp_adc_cal_raw_to_voltage(adc_reading, mpAdcCharsSensitive);
-        ESP_LOGD(tag, "Sensitive mode - Raw: %d\tVoltage: %dmV", adc_reading, voltage);
+        ESP_LOGV(tag, "Sensitive mode - Raw: %d\tVoltage: %dmV", adc_reading, voltage);
     } else {
         voltage = esp_adc_cal_raw_to_voltage(adc_reading, mpAdcCharsNormal);
-        ESP_LOGD(tag, "Normal mode - Raw: %d\tVoltage: %dmV", adc_reading, voltage);
+        ESP_LOGV(tag, "Normal mode - Raw: %d\tVoltage: %dmV", adc_reading, voltage);
     }
 
     return voltage;

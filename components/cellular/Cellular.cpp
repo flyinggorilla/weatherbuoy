@@ -233,11 +233,32 @@ bool Cellular::PowerOn(void)
         if (gpio_get_level(CELLULAR_GPIO_STATUS))
         {
             ESP_LOGI(tag, "Modem turned on.");
-            return true;
+            break;
         }
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         ESP_LOGD(tag, "still booting modem.... %d", maxModemUartReadyTime);
     }
+
+
+    // Only enter AT Command through serial port after SIM7500&SIM7600 Series is powered on and
+    // Unsolicited Result Code "RDY" is received from serial port. If auto-bauding is enabled, the Unsolicited
+    // Result Codes "RDY" and so on are not indicated when you start up the ME, and the "AT" prefix, or "at" prefix must be set at the beginning 
+
+    int maxModemReadyTime = 30; // seconds
+    String line;
+    while (maxModemReadyTime--)
+    {
+        ModemReadLine(line);
+        if (line.contains("RDY")) {
+            ESP_LOGI(tag, "Modem ready.");
+            ResetInputBuffers();
+            return true;
+        }
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        ESP_LOGD(tag, "still waiting for modem to get ready.... %d", maxModemReadyTime);
+    }
+
+
 
 #endif
 
@@ -278,6 +299,7 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
         ESP_LOGE(tag, "Severe problem, no connection to Modem");
     };
 
+
 #ifdef CONFIG_LILYGO_TTGO_TPCIE_SIM7600
     if (!Command("ATE0", "OK", nullptr, "Echo off"))
     { // CONFIG_LILYGO_TTGO_TPCIE_SIM7600
@@ -317,6 +339,8 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
     }
 #elif CONFIG_LILYGO_TTGO_TPCIE_SIM7600
     Command("AT+IPR=?", "OK", &response, "What serial speeds are supported?");
+    ESP_LOGD(tag, "Baud Rates: %s", response.c_str()); 
+
     command = "AT+IPR=";
     command += CELLULAR_ACCELERATED_BAUD_RATE;
     if (Command(command.c_str(), "OK", &response, "Set accelerated baud rate. Default = 115200."))
@@ -329,9 +353,9 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
         {
             ESP_LOGE(tag, "Error switching to %d baud", CELLULAR_ACCELERATED_BAUD_RATE);
         }
+        vTaskDelay(1000 / portTICK_PERIOD_MS); // one second delay seems to be mandatory after changing the baud rate; otherwise next AT command hangs
     }
 
-    ESP_LOGD(tag, "Baud Rates: %s", response.c_str());
 #endif
 
 #ifdef CONFIG_LILYGO_TTGO_TCALL14_SIM800
@@ -349,7 +373,26 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
 
 #ifdef CONFIG_LILYGO_TTGO_TPCIE_SIM7600
 
-    //##########**************** THATS THE DEAL!!
+    // only query the list of operators in debug mode or when preferred operator is NOT set
+    if (!msPreferredOperator.length() || LOG_LOCAL_LEVEL >= ESP_LOG_DEBUG) { 
+        int listOperatorsTries = 30;
+        while (listOperatorsTries--)
+        {
+            vTaskDelay(1000 / portTICK_PERIOD_MS); 
+            if (Command("AT+COPS=?", "OK", &response, "List operators"))
+            { 
+                ESP_LOGI(tag, "Operators: %s", response.c_str());
+                break;
+            }
+            if (listOperatorsTries) {
+                ESP_LOGI(tag, "still waiting for list of operators.... %d", listOperatorsTries);
+            } else {
+                ESP_LOGE(tag, "could not retrieve list of operators");
+            }
+        }
+    }    
+
+    // Setting the preferred Operator is super important. e.g. for Yesss.at use "A1" as operator.
     command = "AT+COPS=0,0,\"";
     command += msPreferredOperator;
     command += "\"";

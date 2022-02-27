@@ -76,6 +76,13 @@ how to order a PCB:
 * TWAI: RX: GPIO22, TX: GPIO21 (I2C ports for driving NMEA2000 display)
 * OUT: GPIO19 (Buzzer, up to max 70mA)
 
+## SIM7600E modem firmware
+* LE11B03SIM7600M21-A v1.12 B03 cannot be switched to LTE (works only as GSM modem) 
+* LE11B04SIM7600M21-A v1.12 B04 works fine also in LTE mode
+* LE20B04SIM7600M21-A v2.0  B04 works find also in LTE mode
+
+  Lilygo Firmware upgrade instructions https://github.com/Xinyuan-LilyGO/LilyGo-T-PCIE/blob/master/doc/sim7600SA_update_firmware.md
+
 
 ## troubleshooting
 

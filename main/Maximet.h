@@ -120,7 +120,7 @@ private:
     // main loop run by the task
     void MaximetTask();
     friend void fMaximetTask(void *pvParameter);
-    void MaximetConfig();
+    bool MaximetConfig();
 
     void SendLine(const char *text);
     void SendLine(String &line);

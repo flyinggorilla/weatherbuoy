@@ -518,30 +518,6 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
         float boardtemp = tempSensors.GetBoardTemp();
         float watertemp = tempSensors.GetWaterTemp();
 
-        if (mOnlineMode == MODE_CELLULAR)
-        {
-            /*ESP_LOGI(tag, "switching to full power mode next...");
-            if (!cellular.SwitchToFullPowerMode())
-            {
-                ESP_LOGW(tag, "Retrying switching to full power mode ...");
-                if (!cellular.SwitchToFullPowerMode())
-                {
-                    ESP_LOGE(tag, "Switching to full power mode failed");
-                }
-            }*/
-
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-            ESP_LOGI(tag, "switching to PPP mode next...");
-            if (!mCellular.SwitchToPppMode())
-            {
-                ESP_LOGW(tag, "Retrying switching to PPP mode next...");
-                if (!mCellular.SwitchToPppMode())
-                {
-                    ESP_LOGE(tag, "Failed to switch to PPP mode.");
-                }
-            };
-        }
-
         // read maximet data queue and create a HTTP POST message
         sendData.PrepareHttpPost(voltage, current, boardtemp, watertemp, bDiagnostics, mOnlineMode);
 
@@ -551,10 +527,18 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
             int tries = 3;
             while (tries--)
             {
-                if (sendData.PerformHttpPost())
+                vTaskDelay(1000 / portTICK_PERIOD_MS);
+                ESP_LOGI(tag, "switching to PPP mode next...");
+                if (mCellular.SwitchToPppMode())
                 {
-                    break;
-                }
+                    if (sendData.PerformHttpPost())
+                    {
+                        break;
+                    }
+                } else {
+                    mCellular.SwitchToCommandMode();
+                };
+
                 if (tries)
                 {
                     ESP_LOGW(tag, "Retrying HTTP Post...");
@@ -562,13 +546,6 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
                 }
             }
         }
-
-        /*
-        if (mOnlineMode == MODE_CELLULAR)
-        {
-            ESP_LOGI(tag, "switching to low power mode...");
-            cellular.SwitchToLowPowerMode();
-        } */
 
         secondsToSleep = mConfig.miIntervalDay;
     }

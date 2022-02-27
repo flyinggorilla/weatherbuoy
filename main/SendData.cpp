@@ -239,30 +239,33 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
             mPostData += mrConfig.miSimulator / 10;
             mPostData += mrConfig.miSimulator % 10 ? "GPS\"" : "\"";
         }
-        mPostData += ", \"maximet\": {";
-        mPostData += "\"avglong\": ";
-        mPostData += mrMaximetConfig.iAvgLong;
-        mPostData += ",\"outfreq\": ";
-        mPostData += mrMaximetConfig.iOutputIntervalSec;
-        mPostData += ",\"userinf\": \"";
-        mPostData += mrMaximetConfig.sUserinfo;
-        mPostData += "\",\"report\": \"";
-        mPostData += mrMaximetConfig.sReport;
-        mPostData += "\",\"sensor\": \"";
-        mPostData += mrMaximetConfig.sSensor;
-        mPostData += "\",\"serial\": \"";
-        mPostData += mrMaximetConfig.sSerial;
-        mPostData += "\",\"hasl\": ";
-        mPostData += mrMaximetConfig.fHasl;
-        mPostData += ",\"hastn\": ";
-        mPostData += mrMaximetConfig.fHastn;
-        mPostData += ",\"compassdecl\": ";
-        mPostData += mrMaximetConfig.fCompassdecl;
-        mPostData += ",\"lat\": ";
-        mPostData += String(mrMaximetConfig.fLat, 6);
-        mPostData += ",\"lon\": ";
-        mPostData += String(mrMaximetConfig.fLong, 6);
-        mPostData += "}}";
+        if (mrMaximetConfig.model) {
+            mPostData += ", \"maximet\": {";
+            mPostData += "\"avglong\": ";
+            mPostData += mrMaximetConfig.iAvgLong;
+            mPostData += ",\"outfreq\": ";
+            mPostData += mrMaximetConfig.iOutputIntervalSec;
+            mPostData += ",\"userinf\": \"";
+            mPostData += mrMaximetConfig.sUserinfo;
+            mPostData += "\",\"report\": \"";
+            mPostData += mrMaximetConfig.sReport;
+            mPostData += "\",\"sensor\": \"";
+            mPostData += mrMaximetConfig.sSensor;
+            mPostData += "\",\"serial\": \"";
+            mPostData += mrMaximetConfig.sSerial;
+            mPostData += "\",\"hasl\": ";
+            mPostData += mrMaximetConfig.fHasl;
+            mPostData += ",\"hastn\": ";
+            mPostData += mrMaximetConfig.fHastn;
+            mPostData += ",\"compassdecl\": ";
+            mPostData += mrMaximetConfig.fCompassdecl;
+            mPostData += ",\"lat\": ";
+            mPostData += String(mrMaximetConfig.fLat, 6);
+            mPostData += ",\"lon\": ";
+            mPostData += String(mrMaximetConfig.fLong, 6);
+            mPostData += "}";
+        }
+        mPostData += "}";
         mbSendDiagnostics = false;
     }
     mPostData += "}";

@@ -142,7 +142,13 @@ void Maximet::MaximetTask()
 
     // esp_log_level_set(tag, ESP_LOG_DEBUG);
     // esp_log_level_set("Serial", ESP_LOG_DEBUG);
-    MaximetConfig();
+    if (!MaximetConfig()) 
+    {
+        ESP_LOGE(tag, "Failed to detect an attached and properly configured Maximet Weather station");
+        mbRun = false;
+        mbStopped = true;
+        return;
+    }
 
     ESP_LOGI(tag, "Maximet task started and ready to receive data.");
     mbStopped = false;
@@ -747,12 +753,16 @@ void Maximet::Stop()
     }
 };
 
-void Maximet::MaximetConfig()
+bool Maximet::MaximetConfig()
 {
-    // vTaskDelay(1000 / portTICK_PERIOD_MS);
+    mMaximetConfig.model = Model::NONE;
 
     // read and optionally update Maximet configuration
-    EnterCommandLine();
+    if (!EnterCommandLine()) 
+    {
+        ESP_LOGE(tag, "No Maximet detected!");
+        return false;
+    }
     // LAT = +47.944191
     // LONG = +013.584622
     // WriteLat(47.944191);
@@ -771,7 +781,6 @@ void Maximet::MaximetConfig()
     ReadLat();
     ReadLong();
 
-    mMaximetConfig.model = Model::NONE;
     if (mMaximetConfig.sSensor.contains("WIND") && mMaximetConfig.sSensor.contains("TILT") && mMaximetConfig.sSensor.contains("COMPASS"))
     {
         bool bSolar = false;
@@ -842,6 +851,7 @@ void Maximet::MaximetConfig()
         mMaximetModel = mMaximetConfig.model;
     }
     ExitCommandLine();
+    return true;
 }
 
 static const unsigned int COMMANDLINE_TIMEOUT_MS = 5000;
