@@ -18,7 +18,6 @@ static const TickType_t UART_TIMEOUT = 180 * 1000 / portTICK_PERIOD_MS;
 #error UART function must be configured into IRAM, otherwise OTA will fail.
 #endif
 
-
 // ------------------------------------------
 // change device in Menuconfig->Cellular
 // ------------------------------------------
@@ -45,8 +44,8 @@ static const TickType_t UART_TIMEOUT = 180 * 1000 / portTICK_PERIOD_MS;
 #define CELLULAR_GPIO_DTR GPIO_NUM_32 // Data Terminal Ready - used for sleep function
 #define CELLULAR_GPIO_RI GPIO_NUM_33  // RING - used to wake
 #define CELLULAR_GPIO_STATUS GPIO_NUM_36
-#define CELLULAR_DEFAULT_BAUD_RATE 115200
-#define CELLULAR_ACCELERATED_BAUD_RATE 115200 * 4
+#define CELLULAR_DEFAULT_BAUD_RATE 115200 * 1
+#define CELLULAR_ACCELERATED_BAUD_RATE 115200 * 8
 #define CELLULAR_UART_EVENT_QUEUE_SIZE 4
 #define CELLULAR_UART_RX_RECEIVE_BUFFER_SIZE 1024 * 4
 #define CELLULAR_UART_SEND_BUFFER_SIZE 1024 * 2
@@ -56,28 +55,24 @@ static const TickType_t UART_TIMEOUT = 180 * 1000 / portTICK_PERIOD_MS;
 #include <locale>
 #include <codecvt>
 
-std::string wstringToUtf8(const std::wstring& str)
+std::string wstringToUtf8(const std::wstring &str)
 
 {
 
-	std::wstring_convert<std::codecvt_utf8<wchar_t> > strCnv;
+    std::wstring_convert<std::codecvt_utf8<wchar_t>> strCnv;
 
-	return strCnv.to_bytes(str);
-
+    return strCnv.to_bytes(str);
 }
 
-
-std::wstring utf8ToWstring(const std::string& str)
+std::wstring utf8ToWstring(const std::string &str)
 
 {
 
-	std::wstring_convert< std::codecvt_utf8<wchar_t> > strCnv;
+    std::wstring_convert<std::codecvt_utf8<wchar_t>> strCnv;
 
-	return strCnv.from_bytes(str);
-
+    return strCnv.from_bytes(str);
 }
 #endif
-
 
 /* TODO to keep up with buffer performance issues? intterrupt handler and copy buffer myself?
 
@@ -101,6 +96,11 @@ Cellular::Cellular()
 
 bool Cellular::InitModem()
 {
+    #if LOG_LOCAL_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG || LOG_DEFAULT_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG
+        esp_log_level_set(tag, ESP_LOG_DEBUG);
+        esp_log_level_set("Serial", ESP_LOG_DEBUG);
+    #endif
+
     uart_config_t uart_config = {
         .baud_rate = CELLULAR_DEFAULT_BAUD_RATE, // default baud rate, use AT+IPR command to set higher speeds 460800 is max of CONFIG_LILYGO_TTGO_TCALL14_SIM800
         .data_bits = UART_DATA_8_BITS,
@@ -239,17 +239,17 @@ bool Cellular::PowerOn(void)
         ESP_LOGD(tag, "still booting modem.... %d", maxModemUartReadyTime);
     }
 
-
     // Only enter AT Command through serial port after SIM7500&SIM7600 Series is powered on and
     // Unsolicited Result Code "RDY" is received from serial port. If auto-bauding is enabled, the Unsolicited
-    // Result Codes "RDY" and so on are not indicated when you start up the ME, and the "AT" prefix, or "at" prefix must be set at the beginning 
+    // Result Codes "RDY" and so on are not indicated when you start up the ME, and the "AT" prefix, or "at" prefix must be set at the beginning
 
     int maxModemReadyTime = 30; // seconds
     String line;
     while (maxModemReadyTime--)
     {
         ModemReadLine(line);
-        if (line.contains("RDY")) {
+        if (line.contains("RDY"))
+        {
             ESP_LOGI(tag, "Modem ready.");
             ResetInputBuffers();
             return true;
@@ -257,8 +257,6 @@ bool Cellular::PowerOn(void)
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         ESP_LOGD(tag, "still waiting for modem to get ready.... %d", maxModemReadyTime);
     }
-
-
 
 #endif
 
@@ -276,8 +274,6 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
 
     String response;
     String command;
-
-    esp_log_level_set(tag, ESP_LOG_DEBUG);
 
     ESP_LOGD(tag, "Starting receiver task....");
     xTaskCreate(&fReceiverTask, "ModemReceiver", 8192, this, ESP_TASKD_EVENT_PRIO, NULL);
@@ -298,7 +294,6 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
     {
         ESP_LOGE(tag, "Severe problem, no connection to Modem");
     };
-
 
 #ifdef CONFIG_LILYGO_TTGO_TPCIE_SIM7600
     if (!Command("ATE0", "OK", nullptr, "Echo off"))
@@ -338,8 +333,10 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
         }
     }
 #elif CONFIG_LILYGO_TTGO_TPCIE_SIM7600
+#if LOG_LOCAL_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG || LOG_DEFAULT_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG
     Command("AT+IPR=?", "OK", &response, "What serial speeds are supported?");
-    ESP_LOGD(tag, "Baud Rates: %s", response.c_str()); 
+    ESP_LOGD(tag, "Baud Rates: %s", response.c_str());
+#endif
 
     command = "AT+IPR=";
     command += CELLULAR_ACCELERATED_BAUD_RATE;
@@ -374,23 +371,27 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
 #ifdef CONFIG_LILYGO_TTGO_TPCIE_SIM7600
 
     // only query the list of operators in debug mode or when preferred operator is NOT set
-    if (!msPreferredOperator.length() || LOG_LOCAL_LEVEL >= ESP_LOG_DEBUG) { 
+    if (!msPreferredOperator.length() || LOG_LOCAL_LEVEL >= ESP_LOG_DEBUG)
+    {
         int listOperatorsTries = 30;
         while (listOperatorsTries--)
         {
-            vTaskDelay(1000 / portTICK_PERIOD_MS); 
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
             if (Command("AT+COPS=?", "OK", &response, "List operators"))
-            { 
+            {
                 ESP_LOGI(tag, "Operators: %s", response.c_str());
                 break;
             }
-            if (listOperatorsTries) {
+            if (listOperatorsTries)
+            {
                 ESP_LOGI(tag, "still waiting for list of operators.... %d", listOperatorsTries);
-            } else {
+            }
+            else
+            {
                 ESP_LOGE(tag, "could not retrieve list of operators");
             }
         }
-    }    
+    }
 
     // Setting the preferred Operator is super important. e.g. for Yesss.at use "A1" as operator.
     command = "AT+COPS=0,0,\"";
@@ -438,7 +439,7 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
 
     msNetworkmode = "";
     if (Command("AT+CNSMOD?", "OK", &response, "Current network system mode"))
-    {   // +CNSMOD: 0,4
+    { // +CNSMOD: 0,4
         // 0 – no service
         // 1 – GSM
         // 2 – GPRS
@@ -547,7 +548,7 @@ bool Cellular::SendSMS(String &rsTo, String &rsMsg)
     ret = Command("AT+CMGS=?", "OK", &response, "Query SMS sending capability SMS.");
     ESP_LOGI(tag, "query SMS sending %s. response %s", ret ? "succeeded" : "failed", response.c_str());
 
-    #ifdef UCS2SMS   
+#ifdef UCS2SMS
     ret = Command("AT+CSCS=?", "OK", &response, "Query SMS character sets.");
     ESP_LOGI(tag, "query SMS character sets %s. response %s", ret ? "succeeded" : "failed", response.c_str());
     String characterSets;
@@ -565,7 +566,7 @@ bool Cellular::SendSMS(String &rsTo, String &rsMsg)
     }
     ret = Command("AT+CSCS=\"UCS2\"", "OK", &response, "Query SMS character set.");
     ESP_LOGI(tag, "query SMS character sets %s. response %s", ret ? "succeeded" : "failed", response.c_str());
-    #endif
+#endif
 
     String command;
     static const char CTRLZ = 0x1A;
@@ -577,14 +578,14 @@ bool Cellular::SendSMS(String &rsTo, String &rsMsg)
         ESP_LOGE(tag, "ERROR preparing SMS to: %s, response: %s", rsMsg.c_str(), response.c_str());
         return false;
     }
-    #ifdef UCS2SMS   
+#ifdef UCS2SMS
     String hexUcs2Msg;
-    //convert UTF-8 to UCS-2
+    // convert UTF-8 to UCS-2
     std::wstring ucs2Msg = utf8ToWstring("testmsg😁");
-    // convert bytes to hex 
+    // convert bytes to hex
     // limit to 70 UCS-2 chars
     command = hexUcs2Msg;
-    #endif
+#endif
     String smsMsg = rsMsg;
     smsMsg.replace("\r\n", "\r");
     command = smsMsg;
@@ -697,9 +698,9 @@ bool Cellular::ReadIntoBuffer()
         if (len)
         {
             mullReceivedTotal += len;
-            ESP_LOGD(tag, "UART %s received: %d", mbCommandMode ? "RESPONSE"  : "DATA", len);
-            ESP_LOG_BUFFER_HEXDUMP(tag, mpBuffer, len, ESP_LOG_DEBUG);
-        } 
+            ESP_LOGD(tag, "UART %s received: %d", mbCommandMode ? "RESPONSE" : "DATA", len);
+            ESP_LOG_BUFFER_HEXDUMP(tag, mpBuffer, len, ESP_LOG_VERBOSE);
+        }
         return true;
     }
     // Event of HW FIFO overflow detected
@@ -711,7 +712,7 @@ bool Cellular::ReadIntoBuffer()
         ESP_LOGE(tag, "uart hw fifo overflow");
         // xQueueReset(mhUartEventQueueHandle);
         return false;
-        //break;
+        // break;
     // Event of UART ring buffer full
     case UART_BUFFER_FULL:
         // If buffer full happened, you should consider increasing your buffer size
@@ -721,9 +722,9 @@ bool Cellular::ReadIntoBuffer()
         return false;
     // Event of UART RX break detected
     case UART_BREAK:
-        ESP_LOGI(tag, "uart break."); 
-        //ResetInputBuffers();
-        //return false;
+        ESP_LOGI(tag, "uart break.");
+        // ResetInputBuffers();
+        // return false;
         break;
     case UART_PARITY_ERR:
         ESP_LOGE(tag, "uart parity error");
@@ -744,25 +745,25 @@ bool Cellular::ReadIntoBuffer()
 
 bool Cellular::SwitchToLowPowerMode()
 {
-    //ESP_LOGW(tag, "trying to wait for 3 seconds before switching to command mode:  mbCommandMode=%s", mbCommandMode ? "true" : "false");
-    //vTaskDelay(3000 / portTICK_PERIOD_MS);
+    // ESP_LOGW(tag, "trying to wait for 3 seconds before switching to command mode:  mbCommandMode=%s", mbCommandMode ? "true" : "false");
+    // vTaskDelay(3000 / portTICK_PERIOD_MS);
     SwitchToCommandMode();
 
     String response;
 
-/* NETIF_DISCONNECT DID IT ALREADY????
+    /* NETIF_DISCONNECT DID IT ALREADY????
 
 
-    if (Command("ATH", "+PPPD: DISCONNECTED", &response, "Disconnect data call."))
-    {
-        ESP_LOGI(tag, "Disconnected data call.");
-    }
-    else
-    {
-        ESP_LOGE(tag, "Disconnecting data call failed.");
-    }
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
-*/
+        if (Command("ATH", "+PPPD: DISCONNECTED", &response, "Disconnect data call."))
+        {
+            ESP_LOGI(tag, "Disconnected data call.");
+        }
+        else
+        {
+            ESP_LOGE(tag, "Disconnecting data call failed.");
+        }
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    */
 
     if (Command("AT+CFUN=0", "OK", &response, "Set modem to minimum functionality."))
     { // mode 4 would shut down RF entirely to "flight-mode"; mode 0 still keeps SMS receiption intact
@@ -833,9 +834,18 @@ bool Cellular::SwitchToFullPowerMode()
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 
+    QuerySignalStatus();
+
+    ESP_LOGI(tag, "Switching to full power mode completed.");
+    return true;
+}
+
+void Cellular::QuerySignalStatus()
+{
+    String response;
     msNetworkmode = "";
     if (Command("AT+CNSMOD?", "OK", &response, "Current network system mode"))
-    {   // +CNSMOD: 0,4
+    { // +CNSMOD: 0,4
         // 0 – no service
         // 1 – GSM
         // 2 – GPRS
@@ -885,29 +895,38 @@ bool Cellular::SwitchToFullPowerMode()
     {
         miSignalQuality = -1;
     }
-
-    ESP_LOGI(tag, "Switching to full power mode completed.");
-    return true;
 }
 
 bool Cellular::SwitchToCommandMode()
 {
+    // Waiting for UART event.
+    esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
+    ESP_LOGI(tag, "netif action stopped.");
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    esp_netif_action_disconnected(mpEspNetif, 0, 0, nullptr);
+    ESP_LOGI(tag, "netif action disconnected.");
+    vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+    mbCommandMode = true;
+
+
+    ESP_LOGD(tag, "resetting input buffers.");
+    ResetInputBuffers();
+
+    ESP_LOGD(tag, "sending break event.");
     uart_event_t uartSwitchToPppEvent = {
         .type = UART_BREAK,
         .size = 0,
         .timeout_flag = true};
 
-    // Waiting for UART event.
-    esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
-    ESP_LOGI(tag, "netif action stopped.");
-    vTaskDelay(1000 / portTICK_PERIOD_MS); 
-    esp_netif_action_disconnected(mpEspNetif, 0, 0, nullptr);
-    ESP_LOGI(tag, "netif action disconnected.");
-    vTaskDelay(1000 / portTICK_PERIOD_MS); 
+    if (pdTRUE == xQueueSend(mhUartEventQueueHandle, (void *)&uartSwitchToPppEvent, 0))
+    {
+        ESP_LOGD(tag, "sent break event.");
+    } else  {
+        ESP_LOGE(tag, "SwitchToCommandMode() could not send send break event.");
+    }
 
-    mbCommandMode = true;
-
-    // esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
+    // esp_netif_action_stop(mpEspNetif, 0, 0, nullptr); --- this calls already +++
     //  esp_netif_action_disconnected
 
     // The +++ character sequence causes the TA to cancel the data flow over the
@@ -919,13 +938,13 @@ bool Cellular::SwitchToCommandMode()
     // "+++" characters entered with no characters in between (1 second)
     // No characters entered for T1 timer (1 second)
     // Switch to Command mode, otherwise go to step 1.
-    
+
     // ESP_LOGI(tag, "Switching to command mode with +++");
     // String write("+++\r\n");
     // vTaskDelay(1000 / portTICK_PERIOD_MS); // spec: 1s delay for the modem to recognize the escape sequence
     // int iWriteLen = ModemWriteData(write.c_str(), write.length());
     // vTaskDelay(1200 / portTICK_PERIOD_MS); // spec: 1s
-   
+
     ESP_LOGI(tag, "SwitchToCommandMode() finished.");
     return true;
 }
@@ -936,11 +955,15 @@ bool Cellular::SwitchToPppMode()
 
     if (!mbCommandMode)
     {
-        ESP_LOGW(tag, "SwitchToPppMode() already in PPP mode");
-        return true;
+        if (esp_netif_is_netif_up(mpEspNetif))
+        {
+            ESP_LOGW(tag, "SwitchToPppMode() already in PPP mode");
+            return true;
+        };
+        ESP_LOGW(tag, "SwitchToPppMode() Network Down - restarting PPP mode");
     }
 
-    ESP_LOGI(tag, "SwitchToPppMode()");
+    //ESP_LOGI(tag, "SwitchToPppMode()");
     //*   String command = "AT+CGDCONT=1,\"IP\",\"";
 
 #ifdef CONFIG_LILYGO_TTGO_TCALL14_SIM800
@@ -1010,8 +1033,6 @@ bool Cellular::SwitchToPppMode()
     return false;
 }
 
-
-
 bool Cellular::ModemReadLine(String &line)
 {
     line = "";
@@ -1030,28 +1051,29 @@ bool Cellular::ModemReadLine(String &line)
         {
             unsigned char c = mpBuffer[muiBufferPos++];
 
-            switch (c) 
+            switch (c)
             {
-                case 0x0D: 
-                    cr = true;
-                    break;
-                case 0x0A:
-                    crlf = cr;
-                    if (line.length())
-                    {
-                        ESP_LOGD(tag, "ModemReadLine(): %s", line.c_str());
-                        return true;
-                    }
-                    break;
-                case '>': // modem waits for input!
-                    if(!line.length() && crlf) {
-                        line += (char)c;
-                        return true;
-                    }
-                    // intentionally fall through!
-                default:                                    
+            case 0x0D:
+                cr = true;
+                break;
+            case 0x0A:
+                crlf = cr;
+                if (line.length())
+                {
+                    ESP_LOGD(tag, "ModemReadLine(): %s", line.c_str());
+                    return true;
+                }
+                break;
+            case '>': // modem waits for input!
+                if (!line.length() && crlf)
+                {
                     line += (char)c;
-                    cr = crlf = false;
+                    return true;
+                }
+                // intentionally fall through!
+            default:
+                line += (char)c;
+                cr = crlf = false;
             }
         }
         maxLineLength--;
@@ -1104,16 +1126,17 @@ bool Cellular::ModemReadResponse(String &sResponse, const char *expectedLastLine
     sResponse = "";
     while (maxLines--)
     {
-        //int attempts = 0;
-        //while(!ModemReadLine(sLine)) {
-        //    attempts++;
-        //    ESP_LOGW(tag, "ModemReadLine retry #%d", attempts);
-        //    if (attempts > 5) {
-        //        return false;
-        //    }
-        //}
+        // int attempts = 0;
+        // while(!ModemReadLine(sLine)) {
+        //     attempts++;
+        //     ESP_LOGW(tag, "ModemReadLine retry #%d", attempts);
+        //     if (attempts > 5) {
+        //         return false;
+        //     }
+        // }
 
-        if(!ModemReadLine(sLine)) {
+        if (!ModemReadLine(sLine))
+        {
             ESP_LOGE(tag, "ModemReadLine timed out");
             return false;
         }
@@ -1300,9 +1323,12 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
 
         if (id > NETIF_PPP_ERRORNONE && id < NETIF_PP_PHASE_OFFSET)
         {
-            if (id == NETIF_PPP_ERRORUSER) {
+            if (id == NETIF_PPP_ERRORUSER)
+            {
                 ESP_LOGI(tag, "Netif PPP user interrupted.");
-            } else {
+            }
+            else
+            {
                 ESP_LOGE(tag, "Netif PPP Status Error: %s", status);
             }
         }

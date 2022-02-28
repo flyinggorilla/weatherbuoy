@@ -768,18 +768,18 @@ bool Maximet::MaximetConfig()
     // WriteLat(47.944191);
     // WriteLong(013.584622);
     // WriteCompassdecl(4.0);
-    ReadUserinf();
+    ReadSerial(); // SERIAL: 22040004
+    ReadSWVer();  // SWVER: 2669 V2.00.22
+    ReadSensor(); // SENSOR: WIND,PRESS,TEMP,RH,DEWPOINT,VOLT,COMPASS,GPS,SOLAR,TILT
     ReadReport();
+    ReadUserinf();
+
     ReadOutfreq();
     ReadAvgLong();
-    ReadHasl();
-    ReadHastn();
     ReadCompassdecl();
-    ReadSensor();
-    ReadSerial();
-    ReadSWVer();
     ReadLat();
     ReadLong();
+
 
     if (mMaximetConfig.sSensor.contains("WIND") && mMaximetConfig.sSensor.contains("TILT") && mMaximetConfig.sSensor.contains("COMPASS"))
     {
@@ -799,6 +799,12 @@ bool Maximet::MaximetConfig()
         if (mMaximetConfig.sSensor.contains("PRECIP"))
         {
             bRain = true;
+        }
+
+        if (mMaximetConfig.sSensor.contains("PRESS"))
+        {
+            ReadHasl(); // not available for GMX200
+            ReadHastn(); // not available for GMX200
         }
 
         if (bSolar)
@@ -824,6 +830,9 @@ bool Maximet::MaximetConfig()
     }
 
     ESP_LOGI(tag, "Detected Maximet model (SENSORS): %s", GetModelName(mMaximetConfig.model));
+
+
+
 
     // ESP_LOGI(tag, "Check config %d, %d", msReport.length(), msUserinfo.length());
     if (mMaximetConfig.sReport.length() && mMaximetConfig.model)

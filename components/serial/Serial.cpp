@@ -1,3 +1,5 @@
+//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+
 #include "Serial.h"
 #include "EspString.h"
 #include "driver/uart.h"
@@ -108,7 +110,7 @@ bool Serial::ReadIntoBuffer(unsigned int timeoutms) {
         return false;
     }
     muiBufferLen = len;
-    ESP_LOG_BUFFER_HEXDUMP(tag, mpBuffer, len, ESP_LOG_DEBUG);
+    ESP_LOG_BUFFER_HEXDUMP(tag, mpBuffer, len, ESP_LOG_VERBOSE);
     return true;
 }
 

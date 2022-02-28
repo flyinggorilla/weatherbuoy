@@ -31,6 +31,7 @@ public:
     bool SwitchToPppMode(); // can be moved to private
     bool SwitchToLowPowerMode();
     bool SwitchToFullPowerMode();
+    void QuerySignalStatus();
 
     unsigned long long getDataSent() { return mullSentTotal; };
     unsigned long long getDataReceived() { return mullReceivedTotal; };

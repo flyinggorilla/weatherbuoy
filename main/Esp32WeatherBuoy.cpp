@@ -1,3 +1,4 @@
+//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include "sdkconfig.h"
 #include "esp_system.h"
 #include "esp_log.h"
@@ -510,6 +511,15 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
         if (!isMaximetData && !bDiagnostics)
         {
             continue;
+        }
+
+        if (bDiagnostics) 
+        {
+            // to retrieve updated network info we need to exit PPP mode
+            mCellular.SwitchToCommandMode();
+            
+            // update network info 
+            mCellular.QuerySignalStatus();
         }
 
         tempSensors.Read(); // note, this causes approx 700ms delay
