@@ -872,13 +872,21 @@ bool Maximet::EnterCommandLine()
         return true;
     }
 
-    String cmd("*\r\necho off\r\n");
-    String line;
-    mpSerial->Write(cmd);
 
-    while (mpSerial->ReadLine(line, COMMANDLINE_TIMEOUT_MS))
+    String cmd("\r\n*\r\necho off\r\n");
+    String line;
+    int attempts = 10;
+    mpSerial->Flush();
+    while (attempts--)
     {
-        ESP_LOGI(tag, "ReadConfig ReadLine: %s", line.c_str());
+        mpSerial->Write(cmd);
+        if (mpSerial->ReadLine(line, COMMANDLINE_TIMEOUT_MS))
+        {
+            ESP_LOGI(tag, "Switch Maximet to commandline...  ReadLine: %s", line.c_str());
+        } 
+        else {
+            ESP_LOGW(tag, "Timeout switching Maximet to commandline... ");
+        }
         if (line.startsWith("SETUP MODE"))
         {
             ESP_LOGI(tag, "Commandline mode entered.");
@@ -889,7 +897,12 @@ bool Maximet::EnterCommandLine()
             ESP_LOGI(tag, "Already in commandline mode.");
             return mbCommandline = true;
         }
-        mpSerial->Write(cmd);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        ESP_LOGI(tag, "Remaining attempts switching Maximet to commandline: %i", attempts);
+    }
+
+    if (!attempts) {
+        ESP_LOGE(tag, "Could not switch Maximet to commandline");
     }
 
     return mbCommandline = false;

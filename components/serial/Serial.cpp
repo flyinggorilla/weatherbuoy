@@ -71,6 +71,15 @@ Serial::~Serial() {
     free(mpBuffer);
 }
 
+bool Serial::Flush() {
+    muiBufferPos = 0;
+    muiBufferLen = 0;
+    if (ESP_OK != uart_flush_input(muiUartNo)) {
+        return false;
+    }
+    return true;
+}
+
 // try forever until 1 byte arrives
 bool Serial::ReadIntoBuffer() {
     muiBufferPos = 0;

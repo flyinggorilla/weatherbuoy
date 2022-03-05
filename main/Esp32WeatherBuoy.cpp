@@ -1,4 +1,4 @@
-//#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
+//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "sdkconfig.h"
 #include "esp_system.h"
 #include "esp_log.h"
@@ -68,8 +68,8 @@ static const char tag[] = "WeatherBuoy";
 #define CONFIG_ALARM_BUZZER_PIN GPIO_NUM_19
 
 // Restart ESP32 if there is not data being successfully sent within this period.
-#define CONFIG_WATCHDOG_SECONDS 60 * 125             // 125min - if two hourly sends fail, thats the latest to restart
-#define CONFIG_SOLARRADIATIONMIN_DAYTIME 2           // >2W/m2 solar radiation to declare DAYTIME
+#define CONFIG_WATCHDOG_SECONDS 60 * 125   // 125min - if two hourly sends fail, thats the latest to restart
+#define CONFIG_SOLARRADIATIONMIN_DAYTIME 2 // >2W/m2 solar radiation to declare DAYTIME
 
 Esp32WeatherBuoy::Esp32WeatherBuoy()
 {
@@ -99,6 +99,13 @@ void TestVelocityVector();
 
 void Esp32WeatherBuoy::Start()
 {
+
+#if LOG_LOCAL_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG || CONFIG_LOG_DEFAULT_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG
+    esp_log_level_set("Cellular", ESP_LOG_DEBUG);
+    esp_log_level_set("Wifi", ESP_LOG_DEBUG);
+    esp_log_level_set("Maximet", ESP_LOG_INFO);
+    esp_log_level_set("Serial", ESP_LOG_DEBUG);
+#endif
 
     ESP_LOGI(tag, "Atterwind WeatherBuoy starting!");
     if (!mConfig.Load())
@@ -147,7 +154,10 @@ void Esp32WeatherBuoy::Start()
     int maximetRxPin = CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN;
     int maximetTxPin = CONFIG_WEATHERBUOY_READMAXIMET_TX_PIN;
     Maximet maximet(dataQueue);
-    maximet.Start(maximetRxPin, maximetTxPin);
+    if (!mConfig.miSimulator)
+    {
+        maximet.Start(maximetRxPin, maximetTxPin);
+    }
 
     // detect available Simcom 7600E Modem, such as on Lillygo PCI board
     if (mCellular.InitModem())
@@ -255,8 +265,10 @@ void Esp32WeatherBuoy::HandleAlarm(Alarm *pAlarm)
         }
         String to = mConfig.msAlarmSms.substring(startPos, endPos);
         ESP_LOGI(tag, "Sending SMS: to: %s msg: %s", to.c_str(), msg.c_str());
-        if(mCellular.SendSMS(to, msg))
+        if (mCellular.SendSMS(to, msg))
+        {
             sent++;
+        }
 
         startPos = endPos + 1;
     }
@@ -280,7 +292,7 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
     while (true)
     {
         HandleAlarm(pAlarm); // check for alarm before and after waiting for the queue to minimize latency
-        tempSensors.Read(); // note, this causes approx 700ms delay
+        tempSensors.Read();  // note, this causes approx 700ms delay
         vTaskDelay(1 * 1000 / portTICK_PERIOD_MS);
         bool isMaximetData = dataQueue.WaitForData(60);
         HandleAlarm(pAlarm); // check for alarm
@@ -454,7 +466,21 @@ void Esp32WeatherBuoy::RunSimulator(TemperatureSensors &tempSensors, DataQueue &
         {
             lastSendTimestamp = uptimeSeconds;
             sendData.PrepareHttpPost(5000, 70, boardtemp, watertemp, true, mOnlineMode);
-            sendData.PerformHttpPost();
+
+            int sendViaWifiTries = 10;
+            while (sendViaWifiTries--)
+            {
+                if (mWifi.IsConnected() && sendData.PerformHttpPost())
+                {
+                    break;
+                }
+                else
+                {
+                    vTaskDelay(1000 / portTICK_PERIOD_MS);
+                    mWifi.Reconnect();
+                    ESP_LOGW(tag, "Retrying sending via wifi. Remaining attempts: %i", sendViaWifiTries);
+                }
+            }
         }
     }
 }
@@ -513,12 +539,12 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
             continue;
         }
 
-        if (bDiagnostics) 
+        if (bDiagnostics)
         {
             // to retrieve updated network info we need to exit PPP mode
             mCellular.SwitchToCommandMode();
-            
-            // update network info 
+
+            // update network info
             mCellular.QuerySignalStatus();
         }
 
@@ -545,13 +571,16 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
                     {
                         break;
                     }
-                } else {
+                }
+                else
+                {
                     mCellular.SwitchToCommandMode();
                 };
 
                 if (tries)
                 {
                     ESP_LOGW(tag, "Retrying HTTP Post...");
+                    mCellular.SwitchToCommandMode();       // switch to command mode first, to restart PPP mode
                     vTaskDelay(1000 / portTICK_PERIOD_MS); // wait one second
                 }
             }

@@ -1,4 +1,4 @@
-//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "sdkconfig.h"
 #include "Wifi.h"
 #include "EspString.h"
@@ -165,6 +165,34 @@ void Wifi::Connect()
 	}
 
 	ESP_ERROR_CHECK(esp_wifi_start());
+}
+
+bool Wifi::Reconnect() 
+{
+	ESP_LOGI(tag, "Reconnecting");
+	mbConnected = false;
+	esp_err_t connect = esp_wifi_connect();
+	if (ESP_OK == connect)
+	{
+		ESP_LOGI(tag, "Initiated reconnection. Waiting for IP address....");
+	} else {
+		ESP_LOGE(tag, "esp_wifi_connect() %s", esp_err_to_name(connect));
+		return false;
+	}
+	int reconnectSeconds = 60;
+	while (!mbConnected && reconnectSeconds--) 
+	{
+		ESP_LOGI(tag, "Waiting for reconnection %i", reconnectSeconds);
+		vTaskDelay(1000 / portTICK_PERIOD_MS);
+	}
+	if (mbConnected) 
+	{
+		ESP_LOGI(tag, "Reconnection finally successful!");
+		return true;
+	}
+
+	ESP_LOGE(tag, "Got tired. Could not reconnect to wifi.");
+	return false;
 }
 
 void Wifi::StartAP()

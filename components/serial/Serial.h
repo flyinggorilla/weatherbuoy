@@ -14,19 +14,25 @@ public:
     
     // read until CRLF
     bool ReadLine(String& line, unsigned int timeoutms = 250);
+    
     // read until data and CRLF
     bool ReadMultiLine(String& line, unsigned int timeoutms = 250);
+    
+    // attach serial
     bool Attach();
-    bool Release();
-    //bool ReadLine();
-    //String& data() { return mData; }; 
 
+    // release serial
+    bool Release();
+    
+    // Clear input buffers
+    bool Flush(); 
+
+    // write text or binary data to serial
     bool Write(const String& buffer);
 
 private:
     bool ReadIntoBuffer(unsigned int timeoutms); // timeout 0 = try forever by default
     bool ReadIntoBuffer(); // timeout 0 = try forever by default
-    //void FlushBuffer();
     unsigned char *mpBuffer;
     unsigned int muiBufferSize;
     unsigned int muiBufferPos;

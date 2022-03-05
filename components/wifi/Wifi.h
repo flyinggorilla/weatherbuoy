@@ -23,6 +23,7 @@ public:
 	void StartTimeSync(String &rsNtpServer);
 
 	bool IsConnected() { return mbConnected; };
+	bool Reconnect();
 	void addDNSServer(String &ip);
 	struct in_addr getHostByName(String &hostName);
 	void setIPInfo(String &ip, String &gw, String &netmask);

@@ -104,8 +104,8 @@ void NmeaDisplay::DisplayTask()
         }
 
 
-        static const double defaultLatitude = 47.940703;
-        static const double defaultLongitude = 13.595386;
+        //static const double defaultLatitude = 47.940703;
+        //static const double defaultLongitude = 13.595386;
         static const double defaultAltitude = 469;
         static const double hdop = 1; // horizontal dilution in meters
         double altitude = defaultAltitude;

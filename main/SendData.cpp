@@ -369,7 +369,6 @@ bool SendData::PerformHttpPost()
         if (command.length())
         {
             bool updateConfig = false;
-            bool updateMaximet = false;
             String value;
 
             value = ReadMessageValue("set-apssid:");

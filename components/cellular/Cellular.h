@@ -8,6 +8,11 @@
 #include "esp_netif.h"
 
 
+static const TickType_t UART_INPUT_TIMEOUT_CMDSHORT = 10 * 1000 / portTICK_PERIOD_MS;
+static const TickType_t UART_INPUT_TIMEOUT_CMDLONG = 120 * 1000 / portTICK_PERIOD_MS;
+static const TickType_t UART_INPUT_TIMEOUT_PPP = 30 * 1000 / portTICK_PERIOD_MS;
+
+
 class Cellular;
 
 
@@ -26,7 +31,7 @@ public:
     void ReadSMS();
     bool SendSMS(String &rsTo, String &rsMsg);
 
-    bool Command(const char *sCommand,const char *sSuccess, String *sResponse = nullptr, const char *sInfo = nullptr, unsigned short maxLines = 100);
+    bool Command(const char *sCommand,const char *sSuccess, String *sResponse = nullptr, const char *sInfo = nullptr, unsigned short maxLines = 100, TickType_t timeout = UART_INPUT_TIMEOUT_CMDSHORT);
     bool SwitchToCommandMode(); // todo, move to private
     bool SwitchToPppMode(); // can be moved to private
     bool SwitchToLowPowerMode();
@@ -58,8 +63,8 @@ private:
     void ReceiverTask();
     friend void fReceiverTask(void *pvParameter);
 
-    bool ModemReadLine(String& line);
-    bool ModemReadResponse(String &sResponse, const char *expectedLastLineResponse, unsigned short maxLines);
+    bool ModemReadLine(String& line, TickType_t timeout);
+    bool ModemReadResponse(String &sResponse, const char *expectedLastLineResponse, unsigned short maxLines, TickType_t timeout);
 
     bool ModemWriteLine(const char *sWrite);
     bool ModemWrite(String &command);
@@ -68,7 +73,7 @@ private:
     int ModemWriteData(const char* data, int len);
     friend esp_err_t esp_cellular_transmit(void *h, void *buffer, size_t len);
 
-    bool ReadIntoBuffer();
+    bool ReadIntoBuffer(TickType_t timeout);
     void ResetInputBuffers();
     unsigned char *mpBuffer;
     unsigned int muiBufferSize;
