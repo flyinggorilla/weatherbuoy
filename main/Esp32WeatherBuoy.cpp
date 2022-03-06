@@ -137,7 +137,8 @@ void Esp32WeatherBuoy::Start()
     tempSensors.Init(CONFIG_TEMPERATURESENSOR_GPIO_ONEWIRE);
 
     ESP_LOGI(tag, "Hostname: %s", mConfig.msHostname.c_str());
-    ESP_LOGI(tag, "Target URL: %s", mConfig.msTargetUrl.c_str());
+    //ESP_LOGI(tag, "Target URL: %s", mConfig.msTargetUrl.c_str());
+    ESP_LOGI(tag, "Target URL: %s", CONFIG_WEATHERBUOY_TARGET_URL);
     ESP_LOGI(tag, "App Version: %s", esp_ota_get_app_description()->version);
 
     Max471Meter max471Meter(CONFIG_MAX471METER_GPIO_VOLTAGE, CONFIG_MAX471METER_GPIO_CURRENT);

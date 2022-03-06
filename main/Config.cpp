@@ -16,7 +16,7 @@ Config::Config()
 	msAPSsid = CONFIG_WEATHERBUOY_HOSTNAME;
 	msAPPass = CONFIG_WEATHERBUOY_WIFI_AP_PASS;
 	msHostname = CONFIG_WEATHERBUOY_HOSTNAME;
-	msTargetUrl = CONFIG_WEATHERBUOY_TARGET_URL;
+	//msTargetUrl = CONFIG_WEATHERBUOY_TARGET_URL; // remove, it is too dangerous to misconfigure and not being able to auto-rollback via OTA
 	msSTASsid = CONFIG_WEATHERBUOY_WIFI_STA_SSID;
 	msSTAPass = CONFIG_WEATHERBUOY_WIFI_STA_PASS;
 	msCellularApn = CONFIG_WEATHERBUOY_CELLULAR_APN;
@@ -57,7 +57,7 @@ bool Config::Load()
 	ReadString(h, "STASsid", msSTASsid);
 	ReadString(h, "STAPass", msSTAPass);
 	ReadString(h, "Hostname", msHostname);
-	ReadString(h, "TargetUrl", msTargetUrl);
+	//ReadString(h, "TargetUrl", msTargetUrl);
 	ReadString(h, "CellularApn", msCellularApn);
 	ReadString(h, "CellularUser", msCellularUser);
 	ReadString(h, "CellularPass", msCellularPass);
@@ -104,8 +104,8 @@ bool Config::Save()
 		ret = false;
 	if (!WriteString(h, "Hostname", msHostname))
 		ret = false;
-	if (!WriteString(h, "TargetUrl", msTargetUrl))
-		ret = false;
+	// if (!WriteString(h, "TargetUrl", msTargetUrl))
+	//	ret = false;
 	if (!WriteString(h, "CellularApn", msCellularPass))
 		ret = false;
 	if (!WriteString(h, "CellularUser", msCellularUser))

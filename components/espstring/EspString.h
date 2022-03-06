@@ -346,6 +346,11 @@ public:
     long toInt(void) const;
     float toFloat(void) const;
 
+    bool toFloat(float &value);
+    bool toDouble(double &value);
+    bool toInt(int &value);
+    bool toLong(long &value);
+
     unsigned char concat(const char *cstr, unsigned int length);
 
 protected:

@@ -337,7 +337,7 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
     }
 #elif CONFIG_LILYGO_TTGO_TPCIE_SIM7600
 #if LOG_LOCAL_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG || LOG_DEFAULT_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG
-    Command("AT+IPR=?", "OK", &response, "What serial speeds are supported?");
+    Command("AT+IPR=?", "OK", &response, "What serial speeds are supported?", UART_INPUT_TIMEOUT_CMDLONG);
     ESP_LOGD(tag, "Baud Rates: %s", response.c_str());
 #endif
 
@@ -1228,6 +1228,13 @@ bool Cellular::ModemReadResponse(String &sResponse, const char *expectedLastLine
 
 bool Cellular::Command(const char *sCommand, const char *sSuccess, String *spResponse, const char *sInfo, unsigned short maxLines, TickType_t timeout)
 {
+    
+    // V.250 specification:
+    // The DTE shall not begin issuing a subsequent command line until at least one-tenth of a second has 
+    // elapsed after receipt of the entire result code issued by the DCE in response to the preceding 
+    // command line. 
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+
     ESP_LOGD(tag, "Command(%s) %s", sCommand, sInfo);
     String response;
     if (!spResponse)

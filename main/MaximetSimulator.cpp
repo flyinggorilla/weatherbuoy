@@ -316,6 +316,10 @@ void MaximetSimulator::SendDataPoint()
     strcpy(data.status, "0000");
     strcpy(data.windstat, "0000");
 
+    data.xtilt = 33;
+    data.ytilt = -33;
+    data.zorient = 1;
+
     float gspeed = 3.9;
     float avgspeed = 2.4;
     int avgdir = 44;

@@ -26,8 +26,8 @@ class TemperatureSensors {
         OneWireBus   *mpOwb = nullptr;
         owb_rmt_driver_info mRmtDriverInfo;
 
-        float mfWaterTemp;
-        float mfBoardTemp;
+        float mfWaterTemp = 0;
+        float mfBoardTemp = 0;
 
 };
 

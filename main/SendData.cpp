@@ -98,18 +98,21 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += maximetData.avgcdir;
         mPostData += ",\"compassh\":";
         mPostData += maximetData.compassh;
-        mPostData += ",\"pasl\":";
-        mPostData += maximetData.pasl;
-        mPostData += ",\"pstn\":";
-        mPostData += maximetData.pstn;
-        mPostData += ",\"rh\":";
-        mPostData += maximetData.rh;
-        mPostData += ",\"ah\":";
-        mPostData += maximetData.ah;
-        mPostData += ",\"temp\":";
-        mPostData += maximetData.temp;
-        mPostData += ",\"solarrad\":";
-        mPostData += maximetData.solarrad;
+        if (mrMaximetConfig.model == Maximet::Model::GMX501 || mrMaximetConfig.model == Maximet::Model::GMX501GPS)
+        {
+            mPostData += ",\"pasl\":";
+            mPostData += maximetData.pasl;
+            mPostData += ",\"pstn\":";
+            mPostData += maximetData.pstn;
+            mPostData += ",\"rh\":";
+            mPostData += maximetData.rh;
+            mPostData += ",\"ah\":";
+            mPostData += maximetData.ah;
+            mPostData += ",\"temp\":";
+            mPostData += maximetData.temp;
+            mPostData += ",\"solarrad\":";
+            mPostData += maximetData.solarrad;
+        }
         mPostData += ",\"xtilt\":";
         mPostData += maximetData.xtilt;
         mPostData += ",\"ytilt\":";
@@ -176,7 +179,7 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += "\", \"esp-idf-version\": \"";
         mPostData += esp_ota_get_app_description()->idf_ver;
         mPostData += "\",\"targeturl\": \"";
-        mPostData += mrConfig.msTargetUrl;
+        mPostData += CONFIG_WEATHERBUOY_TARGET_URL; //mrConfig.msTargetUrl;
         mPostData += "\",\"apssid\": \"";
         mPostData += mrConfig.msAPSsid;
         mPostData += "\",\"appass\": \"";
@@ -283,13 +286,14 @@ bool SendData::PerformHttpPost()
     // Initialize URL and HTTP client
     if (!mhEspHttpClient)
     {
-        if (!mrConfig.msTargetUrl.startsWith("http"))
+        /*if (!mrConfig.msTargetUrl.startsWith("http"))
         {
-            ESP_LOGE(tag, "No proper target URL in form of'http(s)://server/' defined: url='%s'", mrConfig.msTargetUrl.c_str());
+            //ESP_LOGE(tag, "No proper target URL in form of'http(s)://server/' defined: url='%s'", mrConfig.msTargetUrl.c_str());
+            ESP_LOGE(tag, "No proper target URL in form of'http(s)://server/' defined: url='%s'", CONFIG_WEATHERBUOY_TARGET_URL);
             return false;
-        }
+        }*/
         memset(&mEspHttpClientConfig, 0, sizeof(esp_http_client_config_t));
-        mEspHttpClientConfig.url = mrConfig.msTargetUrl.c_str();
+        mEspHttpClientConfig.url = CONFIG_WEATHERBUOY_TARGET_URL; // mrConfig.msTargetUrl.c_str();
         mEspHttpClientConfig.method = HTTP_METHOD_POST;
         mhEspHttpClient = esp_http_client_init(&mEspHttpClientConfig);
     }
@@ -406,12 +410,12 @@ bool SendData::PerformHttpPost()
                 updateConfig = true;
             };
 
-            value = ReadMessageValue("set-targeturl:");
-            if (value.length())
-            {
-                mrConfig.msTargetUrl = value;
-                updateConfig = true;
-            };
+            //value = ReadMessageValue("set-targeturl:");
+            //if (value.length())
+            //{
+            //    mrConfig.msTargetUrl = value;
+            //    updateConfig = true;
+            //};
 
             value = ReadMessageValue("set-apssid:");
             if (value.length())
@@ -612,13 +616,14 @@ bool SendData::PerformHttpPost()
                 //mrMaximet.Stop();
 
                 const String &pem = ReadMessagePemValue("set-cert-pem:");
+                String targetUrl(CONFIG_WEATHERBUOY_TARGET_URL);
                 mEspHttpClientConfig.method = HTTP_METHOD_GET;
-                if (!mrConfig.msTargetUrl.endsWith("/"))
+                if (!targetUrl.endsWith("/"))
                 {
-                    mrConfig.msTargetUrl += "/";
+                    targetUrl += "/";
                 }
-                mrConfig.msTargetUrl += "firmware.bin";
-                mEspHttpClientConfig.url = mrConfig.msTargetUrl.c_str();
+                targetUrl += "firmware.bin";
+                mEspHttpClientConfig.url = targetUrl.c_str();
                 mEspHttpClientConfig.skip_cert_common_name_check = false; // dont touch!!
                 if (pem.length())
                 {

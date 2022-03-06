@@ -46,7 +46,7 @@ public:
 	String msSTASsid;
 	String msSTAPass;
 	String msHostname;
-	String msTargetUrl;
+	// String msTargetUrl; // remove, too risky to lock out of system without OTA rollback mechanism
 	String msCellularApn;
 	String msCellularUser;
 	String msCellularPass;

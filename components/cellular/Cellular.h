@@ -8,8 +8,8 @@
 #include "esp_netif.h"
 
 
-static const TickType_t UART_INPUT_TIMEOUT_CMDSHORT = 10 * 1000 / portTICK_PERIOD_MS;
-static const TickType_t UART_INPUT_TIMEOUT_CMDLONG = 120 * 1000 / portTICK_PERIOD_MS;
+static const TickType_t UART_INPUT_TIMEOUT_CMDSHORT = 30 * 1000 / portTICK_PERIOD_MS;
+static const TickType_t UART_INPUT_TIMEOUT_CMDLONG = 120 * 1000 / portTICK_PERIOD_MS; // 120s is defined in spec as max response time for such long running queries
 static const TickType_t UART_INPUT_TIMEOUT_PPP = 30 * 1000 / portTICK_PERIOD_MS;
 
 
