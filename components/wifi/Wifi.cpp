@@ -21,6 +21,7 @@ Wifi::Wifi()
 {
 	muConnectedClients = 0;
 	mbConnected = false;
+	mbGotIp = false;
 }
 
 void wifiEventHandler(void* ctx, esp_event_base_t base, int32_t id, void* event_data)
@@ -170,6 +171,19 @@ void Wifi::Connect()
 bool Wifi::Reconnect() 
 {
 	ESP_LOGI(tag, "Reconnecting");
+	/*if (ESP_OK == esp_wifi_start()) 
+	{
+		ESP_LOGI(tag, "Re-Started Wifi: esp_wifi_start()");
+	} else {
+		ESP_LOGE(tag, "esp_wifi_start() failed");
+	} */
+	/*if (ESP_OK == esp_wifi_disconnect()) 
+	{
+		ESP_LOGI(tag, "Disconnecting Wifi to prepare a Restart: esp_wifi_disconnect()");
+	} else {
+		ESP_LOGE(tag, "esp_wifi_disconnect() failed");
+	} 
+	vTaskDelay(1000 / portTICK_PERIOD_MS); */
 	mbConnected = false;
 	esp_err_t connect = esp_wifi_connect();
 	if (ESP_OK == connect)
@@ -177,6 +191,8 @@ bool Wifi::Reconnect()
 		ESP_LOGI(tag, "Initiated reconnection. Waiting for IP address....");
 	} else {
 		ESP_LOGE(tag, "esp_wifi_connect() %s", esp_err_to_name(connect));
+		//ESP_LOGI(tag, "esp_wifi_start()");
+		//ESP_ERROR_CHECK(esp_wifi_start());
 		return false;
 	}
 	int reconnectSeconds = 60;
@@ -281,30 +297,24 @@ void Wifi::OnEvent(esp_event_base_t base, int32_t id, void* event_data)
 		case WIFI_EVENT_AP_STACONNECTED:
 			muConnectedClients++;
 			ESP_LOGD(tag, "--- WIFI_EVENT_AP_STACONNECTED - %d clients", muConnectedClients);
-			//if (mpStateDisplay)
-			//	mpStateDisplay->SetConnected(true, this);
 			break;
 		case WIFI_EVENT_AP_STADISCONNECTED:
 			if (muConnectedClients)
 				muConnectedClients--;
 			ESP_LOGD(tag, "--- WIFI_EVENT_AP_STADISCONNECTED - %d clients", muConnectedClients);
-			//if (!muConnectedClients && mpStateDisplay)
-			//	mpStateDisplay->SetConnected(false, this);
 			break;
 		case WIFI_EVENT_STA_CONNECTED:
 			ESP_LOGD(tag, "--- WIFI_EVENT_STA_CONNECTED");
+			mbConnected = mbGotIp;
 			break;
 		case WIFI_EVENT_STA_DISCONNECTED:
 			ESP_LOGD(tag, "--- WIFI_EVENT_STA_DISCONNECTED");
 			mbConnected = false;
-			//if (mpStateDisplay)
-			//	mpStateDisplay->SetConnected(false, this);
-			esp_wifi_connect();
+			//esp_wifi_connect();
 			break;
 		case WIFI_EVENT_STA_START: {
 			ESP_LOGD(tag, "--- WIFI_EVENT_STA_START");
-			//ESP_LOGD(tag, "SETTING HOSTNAME: %s", msHostname.c_str() == NULL ? "NULL" : msHostname.c_str());
-			//ESP_ERROR_CHECK(tcpip_adapter_set_hostname(TCPIP_ADAPTER_IF_STA, msHostname.c_str()));
+			mbGotIp = false;
 			const char* csActualHostname = nullptr;
 			ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_get_hostname(netif, &csActualHostname));
 			ESP_LOGI(tag, "hostname: \"%s\"", csActualHostname == nullptr ? "<error, no hostname set!>" : csActualHostname);
@@ -323,6 +333,7 @@ void Wifi::OnEvent(esp_event_base_t base, int32_t id, void* event_data)
 		}
 		case WIFI_EVENT_STA_STOP:
 			ESP_LOGD(tag, "--- WIFI_EVENT_STA_STOP");
+			mbConnected = false;
 			break;
 		default:
 			break;
@@ -331,18 +342,45 @@ void Wifi::OnEvent(esp_event_base_t base, int32_t id, void* event_data)
 		switch(id) {
 		case IP_EVENT_STA_GOT_IP:
 			ESP_LOGD(tag, "--- IP_EVENT_STA_GOT_IP");
+			mbGotIp = true;
 			mbConnected = true;
-			//if (mpStateDisplay)
-			//	mpStateDisplay->SetConnected(true, this);
-			
 			//EXAMPLE CODE
         	//ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         	//ESP_LOGI(TAG, "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
 
-			tcpip_adapter_ip_info_t ip;
-			tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip);
+			//tcpip_adapter_ip_info_t ip;
+			//tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip);
+			break;
+    	case IP_EVENT_STA_LOST_IP: // station lost IP and the IP is reset to 0
+			ESP_LOGD(tag, "--- IP_EVENT_STA_LOST_IP");
+			// mbConnected = false;
+			mbGotIp = false;
+			// ???? Generally the application don’t need to care about this event, 
+			// it is just a debug event to let the application know that the IPV4 address is lost.
+			break;
+		case IP_EVENT_AP_STAIPASSIGNED: // soft-AP assign an IP to a connected station 
+			ESP_LOGD(tag, "--- IP_EVENT_AP_STAIPASSIGNED");
+			break;
+		case IP_EVENT_GOT_IP6: 
+			ESP_LOGD(tag, "--- IP_EVENT_GOT_IP6");
+			mbConnected = true;
+			//tcpip_adapter_ip_info_t ip;
+			//tcpip_adapter_get_ip_info(TCPIP_ADAPTER_IF_STA, &ip);
+			break;
+		case IP_EVENT_ETH_GOT_IP:
+			ESP_LOGD(tag, "--- IP_EVENT_ETH_GOT_IP");
+			break;
+		case IP_EVENT_ETH_LOST_IP:
+			ESP_LOGD(tag, "--- IP_EVENT_ETH_LOST_IP");
+			break;
+		case IP_EVENT_PPP_GOT_IP:
+			ESP_LOGD(tag, "--- IP_EVENT_PPP_GOT_IP");
+			break;
+		case IP_EVENT_PPP_LOST_IP:
+			ESP_LOGD(tag, "--- IP_EVENT_PPP_LOST_IP");
 			break;
 		default:
+			ESP_LOGW(tag, "UNKNOWN IP EVENT: %i", id);
 			break;
 		}
     }

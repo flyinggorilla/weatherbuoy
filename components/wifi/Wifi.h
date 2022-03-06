@@ -51,6 +51,7 @@ private:
 
 	__uint8_t muConnectedClients;
 	bool mbConnected;
+	bool mbGotIp;
 
 	int dnsCount = 0;
 	char *dnsServer = nullptr;

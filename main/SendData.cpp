@@ -425,22 +425,22 @@ bool SendData::PerformHttpPost()
             {
                 if (value.equalsIgnoreCase("off") || value.equalsIgnoreCase("false"))
                 {
-                    mrConfig.miSimulator = WEATHERBUOY_SIMULATOR_OFF;
+                    mrConfig.miSimulator = Maximet::Model::NONE; //   WEATHERBUOY_SIMULATOR_OFF;
                     updateConfig = true;
                 }
                 else if (value.equalsIgnoreCase("gmx501gps"))
                 {
-                    mrConfig.miSimulator = WEATHERBUOY_SIMULATOR_MAXIMET_GMX501GPS;
+                    mrConfig.miSimulator = Maximet::Model::GMX501GPS; // WEATHERBUOY_SIMULATOR_MAXIMET_GMX501GPS;
                     updateConfig = true;
                 }
                 else if (value.equalsIgnoreCase("gmx501"))
                 {
-                    mrConfig.miSimulator = WEATHERBUOY_SIMULATOR_MAXIMET_GMX501;
+                    mrConfig.miSimulator = Maximet::Model::GMX501; // WEATHERBUOY_SIMULATOR_MAXIMET_GMX501;
                     updateConfig = true;
                 }
                 else if (value.equalsIgnoreCase("gmx200gps"))
                 {
-                    mrConfig.miSimulator = WEATHERBUOY_SIMULATOR_MAXIMET_GMX200GPS;
+                    mrConfig.miSimulator = Maximet::Model::GMX200GPS; // WEATHERBUOY_SIMULATOR_MAXIMET_GMX200GPS;
                     updateConfig = true;
                 }
             }

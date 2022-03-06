@@ -331,6 +331,15 @@ public:
     void remove(unsigned int index, unsigned int count); */
     void toLowerCase(void);
     void toUpperCase(void);
+
+    // trims whitespaces as of isspace() 
+    // For the "C" locale, white-space characters are any of:
+    // ' '	(0x20)	space (SPC)
+    // '\t'	(0x09)	horizontal tab (TAB)
+    // '\n'	(0x0a)	newline (LF)
+    // '\v'	(0x0b)	vertical tab (VT)
+    // '\f'	(0x0c)	feed (FF)
+    // '\r'	(0x0d)	carriage return (CR)
     void trim(void);
 
     // parsing/conversion

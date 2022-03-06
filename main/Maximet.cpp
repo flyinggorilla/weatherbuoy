@@ -1,3 +1,4 @@
+//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -20,13 +21,6 @@
 static const char tag[] = "Maximet";
 #define SERIAL_BUFFER_SIZE (2048)
 #define SERIAL_BAUD_RATE (19200)
-
-static const char REPORT_GMX200GPS[] = "USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,CSPEED,CGSPEED,AVGCSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,CGDIR,AVGCDIR,COMPASSH,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,GPSSTATUS,TIME,CHECK";
-static const char REPORT_GMX501GPS[] = "USERINF,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,GPSLOCATION,GPSSTATUS,TIME,CHECK";
-static const char REPORT_GMX501[] = "USERINF,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,CHECK";
-
-// Note: REPORT_GMX501RAIN REFLECTS STATUS-QUO AND NOT PREFERRED NEW CONFIG
-static const char REPORT_GMX501RAIN[] = "NODE,DIR,SPEED,CDIR,AVGDIR,AVGSPEED,GDIR,GSPEED,AVGCDIR,WINDSTAT,PRESS,PASL,PSTN,RH,TEMP,DEWPOINT,AH,PRECIPT,PRECIPI,PRECIPS,COMPASSH,SOLARRAD,SOLARHOURS,WCHILL,HEATIDX,AIRDENS,WBTEMP,SUNR,SNOON,SUNS,SUNP,TWIC,TWIN,TWIA,XTILT,YTILT,ZORIENT,USERINF,TIME,VOLT,STATUS,CHECK";
 
 void fMaximetTask(void *pvParameter)
 {
@@ -604,13 +598,13 @@ const char *Maximet::GetReportString(Model model)
     switch (model)
     {
     case Model::GMX501:
-        return REPORT_GMX501;
+        return MAXIMET_REPORT_GMX501;
     case Model::GMX200GPS:
-        return REPORT_GMX200GPS;
+        return MAXIMET_REPORT_GMX200GPS;
     case Model::GMX501GPS:
-        return REPORT_GMX501GPS;
+        return MAXIMET_REPORT_GMX501GPS;
     case Model::GMX501RAIN:
-        return REPORT_GMX501RAIN;
+        return MAXIMET_REPORT_GMX501RAIN;
     case Model::NONE:
         return "NONE";
     default:
@@ -623,81 +617,6 @@ void Maximet::GetReportString(String &report, Model model)
     report.clear();
     report = GetReportString(model);
 };
-
-void Maximet::SimulatorStart(Model maximetModel)
-{
-    // GMX200GPS,+48.339284:+014.309088:+0021.20,000.22,035,000.20,000.00,000.00,000.13,000.00,000.00,038,000,000,249,000,000,287,-02,-01,0004,0100,0104,2022-01-22T14:11:06.8,68
-    // USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,CSPEED,CGSPEED,AVGCSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,CGDIR,AVGCDIR,COMPASSH,XTILT,YTILT,STATUS,WINDSTAT,GPSSTATUS,TIME,CHECK
-    // -,-,MS,DEG,MS,MS,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-,-,-
-
-    mMaximetModel = maximetModel;
-
-    String line;
-
-    line.printf("MAXIMET %s-ESP32 Simulator V2.0", GetModelName(mMaximetModel));
-    SendLine(line);
-
-    SendLine("STARTUP: OK");
-
-    GetReportString(line, mMaximetModel);
-    SendLine(line);
-    // SendLine("-,-,MS,DEG,MS,MS,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-,-,-");
-    // SendLine("");
-    SendLine("<END OF STARTUP MESSAGE>");
-    /*    }
-        else
-        {
-            SendLine("MAXIMET GMX501-ESP32 Simulator V2.0");
-            SendLine("STARTUP: OK");
-            SendLine("SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,STATUS,WINDSTAT,CHECK");
-            SendLine("MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,HPA,HPA,%,G/M3,C,WM2,DEG,DEG,-,-,-");
-            SendLine("");
-            SendLine("<END OF STARTUP MESSAGE>");
-        } */
-}
-
-unsigned char CalculateChecksum(String &msg)
-{
-    unsigned char cs = 0;
-    for (int i = 0; i < msg.length(); i++)
-    {
-        cs ^= (unsigned char)(msg.charAt(i));
-    }
-    return cs;
-}
-
-void Maximet::SimulatorDataPoint(float temperature, double longitude, double latitude)
-{
-    String data;
-    time_t now;
-    time(&now);
-    tm *pUtcTime = gmtime(&now);
-    char isoTime[25];
-    isoTime[0] = 0;
-    strftime(isoTime, sizeof(isoTime) - 1, "%FT%T.0", pUtcTime);
-
-    if (mMaximetModel == Model::GMX200GPS)
-    {
-
-        // GMX200GPS,+48.339284:+014.309088:+0021.20,000.22,035,000.20,000.00,000.00,000.13,000.00,000.00,038,000,000,249,000,000,287,-02,-01,0004,0100,0104,2022-01-22T14:11:06.8,68
-        // USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,CSPEED,CGSPEED,AVGCSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,CGDIR,AVGCDIR,COMPASSH,XTILT,YTILT,STATUS,WINDSTAT,GPSSTATUS,TIME,CHECK
-        // -,-,MS,DEG,MS,MS,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-,-,-
-
-        // GMX200GPS,+48.339284:+014.309088:+0021.20, 000.22,035,000.20,000.00,000.00,000.13,000.00,000.00,038,000,000,249,000,000,287,-02,-01,0004,0100,0104,2022-01-22T14:11:06.8,68
-        data.printf("GMX200GPS,%+02.6f:%+02.6f:+2.00, 003.0,004,%0.1f,006.00,007.00,008.00,009.00,010.00,011,012,013,014,015,016,017,-018,+019,0020,0021,0022,%s", latitude, longitude, temperature, isoTime);
-    }
-    else
-    {
-        data.printf("000.34,000.86,000.42,082,090,094,270,281,188,1023.1,0969.0,039,07.13,%+0.1f,0065,-01,+01,0000,0000,", temperature);
-    }
-
-    String line;
-    unsigned char checksum = CalculateChecksum(data);
-
-    line.printf("\x02%s\x03%02X", data.c_str(), checksum);
-    // ESP_LOG_BUFFER_HEXDUMP(tag, line.c_str(), line.length(), ESP_LOG_INFO);
-    SendLine(line);
-}
 
 void Maximet::SendLine(const char *text)
 {
@@ -1175,15 +1094,15 @@ const char *Maximet::GetModelReport(Model model)
     switch (model)
     {
     case Model::GMX501:
-        return REPORT_GMX501;
+        return MAXIMET_REPORT_GMX501;
     case Model::GMX501GPS:
-        return REPORT_GMX501GPS;
+        return MAXIMET_REPORT_GMX501GPS;
     case Model::GMX501RAIN:
-        return REPORT_GMX501RAIN;
+        return MAXIMET_REPORT_GMX501RAIN;
     case Model::GMX200GPS:
-        return REPORT_GMX200GPS;
+        return MAXIMET_REPORT_GMX200GPS;
     default:
-        return REPORT_GMX501;
+        return MAXIMET_REPORT_GMX501;
     }
 }
 

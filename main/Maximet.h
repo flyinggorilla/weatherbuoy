@@ -10,6 +10,17 @@
                                                "PASL", "PSTN", "RH", "AH", "TEMP", "SOLARRAD", "XTILT", "YTILT", "ZORIENT", "STATUS", "WINDSTAT",
                                                "GPSLOCATION", "GPSSTATUS", "TIME", "CHECK"}; */
 
+#define SERIAL_BUFFER_SIZE (2048)
+#define SERIAL_BAUD_RATE (19200)
+
+static const char MAXIMET_REPORT_GMX200GPS[] = "USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,CSPEED,CGSPEED,AVGCSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,CGDIR,AVGCDIR,COMPASSH,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,GPSSTATUS,TIME,CHECK";
+static const char MAXIMET_REPORT_GMX501GPS[] = "USERINF,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,GPSLOCATION,GPSSTATUS,TIME,CHECK";
+static const char MAXIMET_REPORT_GMX501[] = "USERINF,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,CHECK";
+
+// Note: MAXIMET_REPORT_GMX501RAIN REFLECTS STATUS-QUO AND NOT PREFERRED NEW CONFIG
+static const char MAXIMET_REPORT_GMX501RAIN[] = "NODE,DIR,SPEED,CDIR,AVGDIR,AVGSPEED,GDIR,GSPEED,AVGCDIR,WINDSTAT,PRESS,PASL,PSTN,RH,TEMP,DEWPOINT,AH,PRECIPT,PRECIPI,PRECIPS,COMPASSH,SOLARRAD,SOLARHOURS,WCHILL,HEATIDX,AIRDENS,WBTEMP,SUNR,SNOON,SUNS,SUNP,TWIC,TWIN,TWIA,XTILT,YTILT,ZORIENT,USERINF,TIME,VOLT,STATUS,CHECK";
+
+
 class Maximet
 {
 public:
@@ -22,10 +33,13 @@ public:
         GMX501RAIN = 5012,
     };
 
-
     static const char *GetModelReport(Model model);
     static const char *GetModelName(Model model);
     static Model GetModel(String &modelName);
+    // provides comma separated fields list of targeted configuration 
+    static void GetReportString(String &report, Model model);
+    static const char* GetReportString(Model model);
+
 
     class Config
     {
@@ -56,19 +70,12 @@ public:
     void Stop();
 
     // weatherbuoy electronics can be used to simulator a Gill Maximet Weatherstation via its RS232 serial interface. good for testing other weatherbuoys
-    void SimulatorStart(Model maximetModel);
+    void StartSimulator(Model maximetModel, int gpioRX, int gpioTX, bool alternateUart = false);
 
     unsigned int SolarRadiation() { return muiSolarradiation; };
 
-    void SimulatorDataPoint(float temperature, double longitude, double latitude);
-
     Config &GetConfig() { return mMaximetConfig; };
 
-    //static const char *GetFieldName(Field field) { return FieldNames[(int)field]; };
-
-    // provides comma separated fields list of targeted configuration 
-    void GetReportString(String &report, Model model);
-    const char* GetReportString(Model model);
 
 public:    
     // maximet configuration writes; 

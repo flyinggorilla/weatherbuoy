@@ -7,6 +7,7 @@
 #include "Config.h"
 #include "SendData.h"
 #include "Maximet.h"
+#include "MaximetSimulator.h"
 #include "Watchdog.h"
 #include "Wifi.h"
 #include "Cellular.h"
@@ -104,6 +105,7 @@ void Esp32WeatherBuoy::Start()
     esp_log_level_set("Cellular", ESP_LOG_DEBUG);
     esp_log_level_set("Wifi", ESP_LOG_DEBUG);
     esp_log_level_set("Maximet", ESP_LOG_INFO);
+    esp_log_level_set("MaximetSimulator", ESP_LOG_DEBUG);
     esp_log_level_set("Serial", ESP_LOG_DEBUG);
 #endif
 
@@ -160,7 +162,8 @@ void Esp32WeatherBuoy::Start()
     }
 
     // detect available Simcom 7600E Modem, such as on Lillygo PCI board
-    if (mCellular.InitModem())
+    ESP_LOGE(tag, "remove simulator check!");
+    if (!mConfig.miSimulator && mCellular.InitModem())
     {
         mCellular.Start(mConfig.msCellularApn, mConfig.msCellularUser, mConfig.msCellularPass, mConfig.msCellularOperator, mConfig.miCellularNetwork);
         mOnlineMode = MODE_CELLULAR;
@@ -170,11 +173,6 @@ void Esp32WeatherBuoy::Start()
     }
     else // try wifi if configured
     {
-        // since no MODEM was found, we assume this is an Adafruit ESP32 Feather board, with different serial pins
-        // comment those two lines if you use a Lillygo PCIE board without Modem
-        maximetRxPin = 16;
-        maximetTxPin = 17;
-
         if (mConfig.msSTASsid.length())
         {
             // config.msSTASsid = "";
@@ -411,55 +409,31 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
 
 void Esp32WeatherBuoy::RunSimulator(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet, Maximet::Model model)
 {
-    maximet.SimulatorStart(model);
+    MaximetSimulator simulator;
+    int maximetRxPin = CONFIG_WEATHERBUOY_READMAXIMET_RX_PIN;
+    int maximetTxPin = CONFIG_WEATHERBUOY_READMAXIMET_TX_PIN;
+    // since no MODEM was found, we assume this is an Adafruit ESP32 Feather board, with different serial pins
+    // comment those two lines if you use a Lillygo PCIE board without Modem
+    maximetRxPin = 16;
+    maximetTxPin = 17;
 
-    unsigned int maximetDataIntervalSeconds = model == Maximet::Model::GMX501 ? 60 : 1;
+    simulator.Start(model, maximetRxPin, maximetTxPin);
+
+    Data data;
+
+    unsigned int maximetDataIntervalSeconds = 60;
     unsigned int httpPostDataIntervalSeconds = 30;
     unsigned int lastSendTimestamp = 0;
 
-    double latitude = 0;
-    double longitude = 0;
-
-    // 0.000001° ~= 11cm distance. --> 5 to 6 digits after comma is required
-    // 0.00001° ~= 1.1m
-    // 0.0001° ~= 11m
-    // 0.001° ~= 110m
-    // 0.01° ~= 1.1km
-    // 0.1° ~= 11km
-
-    // const double minLatitude = 47.81358410627437;
-    // const double maxLatitude = 47.95123189196899;
-    // const double minLongitude = 13.50722014276939;
-    // const double maxLongitude = 13.5951846390785;
-    const double minLatitude = 47.81358410627437;
-    const double maxLatitude = 47.92123189196899;
-    const double minLongitude = 13.54722014276939;
-    const double maxLongitude = 13.5551846390785;
 
     while (true)
     {
         tempSensors.Read(); // note, this causes approx 700ms delay
         vTaskDelay((maximetDataIntervalSeconds * 1000 - 700) / portTICK_PERIOD_MS);
-        // ESP_LOGI(tag, "Sending temperature %.2f", tempSensors.GetBoardTemp());
-        if (latitude < minLatitude || latitude > maxLatitude)
-        {
-            latitude = maxLatitude;
-        }
-        if (longitude < minLongitude || longitude > maxLongitude)
-        {
-            longitude = minLongitude;
-        }
-
-        longitude += 0.000011; // move east
-        latitude -= 0.000101;  // move south (towards equator)
-        // longitude = 0.123456;
-        // latitude = 7.654321;
-        // unsigned int voltage = max471Meter.Voltage();
-        // unsigned int current = max471Meter.Current();
         float boardtemp = tempSensors.GetBoardTemp();
         float watertemp = tempSensors.GetWaterTemp();
 
-        maximet.SimulatorDataPoint(tempSensors.GetBoardTemp(), longitude, latitude);
+        simulator.SetTemperature(watertemp);
 
         unsigned int uptimeSeconds = (unsigned int)(esp_timer_get_time() / 1000000); // seconds since start
         if (uptimeSeconds - lastSendTimestamp >= httpPostDataIntervalSeconds)
