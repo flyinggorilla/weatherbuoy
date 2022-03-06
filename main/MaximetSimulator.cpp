@@ -313,10 +313,13 @@ void MaximetSimulator::SendDataPoint()
     data.gpsspeed = 3;
     data.temp = mfTemp;
     data.speed = 2.1;
+    strcpy(data.status, "0000");
+    strcpy(data.windstat, "0000");
 
     float gspeed = 3.9;
     float avgspeed = 2.4;
     int avgdir = 44;
+    int gdir = 45;
     String gpsStatus("0106");
 
     // 0.000001° ~= 11cm distance. --> 5 to 6 digits after comma is required
@@ -351,33 +354,38 @@ void MaximetSimulator::SendDataPoint()
     // unsigned int voltage = max471Meter.Voltage();
     // unsigned int current = max471Meter.Current();
 
+    static const char fmtFloat[] = ",%06.2f";
+    static const char fmtInt[] = ",%03i";
+
     switch (mMaximetModel)
     {
     case Maximet::Model::GMX200GPS:
     {
-        // GMX200GPS,+48.339284:+014.309088:+0021.20,000.22,035,000.20,000.00,000.00,000.13,000.00,000.00,038,000,000,249,000,000,287,-02,-01,0004,0100,0104,2022-01-22T14:11:06.8,68
+        // GMX200GPS,+48.339284:+014.309088:+0021.20,000.22,035,000.20,000.00,000.00,000.13,000.00,000.00,038,000,000,249,000,000,287,-02,-01,+00,0004,0100,0104,2022-01-22T14:11:06.8,68
         // USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,CSPEED,CGSPEED,AVGCSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,CGDIR,AVGCDIR,COMPASSH,XTILT,YTILT,STATUS,WINDSTAT,GPSSTATUS,TIME,CHECK
         // -,-,MS,DEG,MS,MS,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-,-,-
 
         // GMX200GPS,+48.339284:+014.309088:+0021.20, 000.22,035,000.20,000.00,000.00,000.13,000.00,000.00,038,000,000,249,000,000,287,-02,-01,0004,0100,0104,2022-01-22T14:11:06.8,68
         line += Maximet::GetModelName(mMaximetModel);
         line.printf(",%+010.6f:%+010.6f:+2.00", data.lat, data.lon);
-        line.printf(",%06.2f", data.gpsspeed);
-        line.printf(",%06.2f", data.gpsheading);
-        line.printf(",%06.2f", data.cspeed);
-        line.printf(",%06.2f", data.cgspeed);
-        line.printf(",%06.2f", data.avgcspeed);
-        line.printf(",%06.2f", data.speed);
-        line.printf(",%06.2f", gspeed);
-        line.printf(",%06.2f", avgspeed);
-        line.printf(",%03i", data.dir);
-        line.printf(",%03i", avgdir);
-        line.printf(",%03i", data.cdir);
-        line.printf(",%03i", data.cgdir);
-        line.printf(",%03i", data.avgcdir);
-        line.printf(",%03i", data.compassh);
+        line.printf(fmtFloat, data.gpsspeed);
+        line.printf(fmtFloat, data.gpsheading);
+        line.printf(fmtFloat, data.cspeed);
+        line.printf(fmtFloat, data.cgspeed);
+        line.printf(fmtFloat, data.avgcspeed);
+        line.printf(fmtFloat, data.speed);
+        line.printf(fmtFloat, gspeed);
+        line.printf(fmtFloat, avgspeed);
+        line.printf(fmtInt, data.dir);
+        line.printf(fmtInt, gdir);
+        line.printf(fmtInt, avgdir);
+        line.printf(fmtInt, data.cdir);
+        line.printf(fmtInt, data.cgdir);
+        line.printf(fmtInt, data.avgcdir);
+        line.printf(fmtInt, data.compassh);
         line.printf(",%+03i", data.xtilt);
         line.printf(",%+03i", data.ytilt);
+        line.printf(",%+03i", data.zorient);
         line.printf(",%s", data.status);
         line.printf(",%s", data.windstat);
         line.printf(",%s", gpsStatus.c_str());
