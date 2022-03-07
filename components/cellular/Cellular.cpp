@@ -239,7 +239,6 @@ bool Cellular::PowerOn(void)
         ESP_LOGD(tag, "still booting modem.... %d", maxModemUartReadyTime);
     }
 
-
     // Only enter AT Command through serial port after SIM7500&SIM7600 Series is powered on and
     // Unsolicited Result Code "RDY" is received from serial port. If auto-bauding is enabled, the Unsolicited
     // Result Codes "RDY" and so on are not indicated when you start up the ME, and the "AT" prefix, or "at" prefix must be set at the beginning
@@ -248,8 +247,8 @@ bool Cellular::PowerOn(void)
     String line;
     while (maxModemReadyTime--)
     {
-        if(ModemReadLine(line, UART_INPUT_TIMEOUT_CMDSHORT)) 
-        ESP_LOGD(tag, "ModemReadLine: '%s'", line.c_str());
+        if (ModemReadLine(line, UART_INPUT_TIMEOUT_CMDSHORT))
+            ESP_LOGD(tag, "ModemReadLine: '%s'", line.c_str());
 
         if (line.contains("RDY"))
         {
@@ -381,7 +380,7 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
         {
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             // this command may run longer to find all the operators
-            if (Command("AT+COPS=?", "OK", &response, "List operators", 200, UART_INPUT_TIMEOUT_CMDLONG)) 
+            if (Command("AT+COPS=?", "OK", &response, "List operators", 200, UART_INPUT_TIMEOUT_CMDLONG))
             {
                 ESP_LOGI(tag, "Operators: %s", response.c_str());
                 break;
@@ -913,7 +912,6 @@ bool Cellular::SwitchToCommandMode()
 
     mbCommandMode = true;
 
-
     ESP_LOGD(tag, "resetting input buffers.");
     ResetInputBuffers();
 
@@ -926,7 +924,9 @@ bool Cellular::SwitchToCommandMode()
     if (pdTRUE == xQueueSend(mhUartEventQueueHandle, (void *)&uartSwitchToPppEvent, 0))
     {
         ESP_LOGD(tag, "sent break event.");
-    } else  {
+    }
+    else
+    {
         ESP_LOGE(tag, "SwitchToCommandMode() could not send send break event.");
     }
 
@@ -944,8 +944,10 @@ bool Cellular::SwitchToCommandMode()
 
     String response;
     int attempts = 10;
-    while (attempts--) {
-       if (ModemWriteLine("AT"))
+    while (attempts--)
+    {
+        vTaskDelay(100 / portTICK_PERIOD_MS); // v25.ter specification requires 100ms wait period before reissuing another call
+        if (ModemWriteLine("AT"))
         {
             if (ModemReadResponse(response, "OK", 10, UART_INPUT_TIMEOUT_CMDSHORT))
             {
@@ -953,7 +955,8 @@ bool Cellular::SwitchToCommandMode()
             }
             ESP_LOGI(tag, "Retrying testing command mode due to %s. Remaining attempts %i", response.c_str(), attempts);
 
-            if (attempts < 9) {
+            if (attempts < 9)
+            {
                 // esp_netif_action_stop(mpEspNetif, 0, 0, nullptr); --- this calls already +++
                 //  esp_netif_action_disconnected
 
@@ -972,16 +975,15 @@ bool Cellular::SwitchToCommandMode()
                 vTaskDelay(1000 / portTICK_PERIOD_MS); // spec: 1s delay for the modem to recognize the escape sequence
                 ModemWriteData(write.c_str(), write.length());
                 vTaskDelay(1200 / portTICK_PERIOD_MS); // spec: 1s
-
             }
         }
     }
 
-    if (!attempts) {
+    if (!attempts)
+    {
         ESP_LOGE(tag, "Could not enter commandline mode. %s", response.c_str());
         return false;
     }
-
 
     // esp_netif_action_stop(mpEspNetif, 0, 0, nullptr); --- this calls already +++
     //  esp_netif_action_disconnected
@@ -1020,7 +1022,7 @@ bool Cellular::SwitchToPppMode()
         ESP_LOGW(tag, "SwitchToPppMode() Network Down - restarting PPP mode");
     }
 
-    //ESP_LOGI(tag, "SwitchToPppMode()");
+    // ESP_LOGI(tag, "SwitchToPppMode()");
     //*   String command = "AT+CGDCONT=1,\"IP\",\"";
 
 #ifdef CONFIG_LILYGO_TTGO_TCALL14_SIM800
@@ -1117,7 +1119,7 @@ bool Cellular::ModemReadLine(String &line, TickType_t timeout)
                 crlf = cr;
                 if (line.length())
                 {
-                    //ESP_LOGD(tag, "ModemReadLine: '%s'", line.c_str());
+                    // ESP_LOGD(tag, "ModemReadLine: '%s'", line.c_str());
                     return true;
                 }
                 break;
@@ -1195,18 +1197,25 @@ bool Cellular::ModemReadResponse(String &sResponse, const char *expectedLastLine
         if (ModemReadLine(sLine, timeout))
         {
             ESP_LOGD(tag, "ModemReadLine: '%s'", sLine.c_str());
-        } else {
+        }
+        else
+        {
             ESP_LOGE(tag, "ModemReadLine timed out");
             return false;
         }
 
         sResponse += sLine;
-        //ESP_LOGD(tag, "LINE: '%s', '%s'", sLine.c_str(), sResponse.c_str());
-        //ESP_LOGD(tag, "ModemReadLine: '%s'", sLine.c_str());
+        // ESP_LOGD(tag, "LINE: '%s', '%s'", sLine.c_str(), sResponse.c_str());
+        // ESP_LOGD(tag, "ModemReadLine: '%s'", sLine.c_str());
         if (sLine.startsWith(expectedLastLineResponse))
         {
             // ESP_LOGI(tag, "Success: '%s', '%s'", sLine.c_str(), sResponse.c_str());
             return true;
+        }
+        else if (sLine.startsWith("+PPPD: DISCONNECTED")) // Sent by ESP-IDF PPP Layer, without OK
+        {
+            ESP_LOGI(tag, "PPP Daemon disconnected.");
+            return false;
         }
         else if (sLine.startsWith("ERROR") || sLine.startsWith("NO CARRIER"))
         {
@@ -1228,11 +1237,11 @@ bool Cellular::ModemReadResponse(String &sResponse, const char *expectedLastLine
 
 bool Cellular::Command(const char *sCommand, const char *sSuccess, String *spResponse, const char *sInfo, unsigned short maxLines, TickType_t timeout)
 {
-    
+
     // V.250 specification:
-    // The DTE shall not begin issuing a subsequent command line until at least one-tenth of a second has 
-    // elapsed after receipt of the entire result code issued by the DCE in response to the preceding 
-    // command line. 
+    // The DTE shall not begin issuing a subsequent command line until at least one-tenth of a second has
+    // elapsed after receipt of the entire result code issued by the DCE in response to the preceding
+    // command line.
     vTaskDelay(100 / portTICK_PERIOD_MS);
 
     ESP_LOGD(tag, "Command(%s) %s", sCommand, sInfo);
@@ -1252,7 +1261,7 @@ bool Cellular::Command(const char *sCommand, const char *sSuccess, String *spRes
 
     ESP_LOGE(tag, "Unexpected response: '%s', expected: '%s' for command: %s %s", spResponse->c_str(), sSuccess ? sSuccess : "OK", sInfo ? sInfo : "", sCommand);
 
-    //ESP_LOGE(tag, "%s --> Command(%s)=?%s:\r\n%s", sInfo ? sInfo : "", sCommand, sSuccess, spResponse->c_str());
+    // ESP_LOGE(tag, "%s --> Command(%s)=?%s:\r\n%s", sInfo ? sInfo : "", sCommand, sSuccess, spResponse->c_str());
     return false;
 }
 

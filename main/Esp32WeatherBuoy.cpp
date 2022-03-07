@@ -163,6 +163,7 @@ void Esp32WeatherBuoy::Start()
     }
 
     // detect available Simcom 7600E Modem, such as on Lillygo PCI board
+    ESP_LOGW(tag, "lower modem speed to 460kbaud again?");
     ESP_LOGE(tag, "remove simulator check!");
     if (!mConfig.miSimulator && mCellular.InitModem())
     {

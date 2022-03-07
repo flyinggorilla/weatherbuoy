@@ -4,11 +4,6 @@
 #include <nvs.h>
 #include "EspString.h"
 
-/*#define WEATHERBUOY_SIMULATOR_OFF 0
-#define WEATHERBUOY_SIMULATOR_MAXIMET_GMX200GPS 2001
-#define WEATHERBUOY_SIMULATOR_MAXIMET_GMX501 5010
-#define WEATHERBUOY_SIMULATOR_MAXIMET_GMX501GPS 5011 */
-
 class Config {
 public:
 	Config();
@@ -46,7 +41,6 @@ public:
 	String msSTASsid;
 	String msSTAPass;
 	String msHostname;
-	// String msTargetUrl; // remove, too risky to lock out of system without OTA rollback mechanism
 	String msCellularApn;
 	String msCellularUser;
 	String msCellularPass;
