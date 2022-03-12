@@ -1,4 +1,4 @@
-//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "sdkconfig.h"
 #include "esp_system.h"
 #include "esp_log.h"
@@ -69,7 +69,7 @@ static const char tag[] = "WeatherBuoy";
 #define CONFIG_ALARM_BUZZER_PIN GPIO_NUM_19
 
 // Restart ESP32 if there is not data being successfully sent within this period.
-#define CONFIG_WATCHDOG_SECONDS 60 * 125   // 125min - if two hourly sends fail, thats the latest to restart
+#define CONFIG_WATCHDOG_SECONDS 60 * 65   // 65min - if hourly send including retries fail,then lets restart
 #define CONFIG_SOLARRADIATIONMIN_DAYTIME 2 // >2W/m2 solar radiation to declare DAYTIME
 
 Esp32WeatherBuoy::Esp32WeatherBuoy()
@@ -137,7 +137,7 @@ void Esp32WeatherBuoy::Start()
     tempSensors.Init(CONFIG_TEMPERATURESENSOR_GPIO_ONEWIRE);
 
     ESP_LOGI(tag, "Hostname: %s", mConfig.msHostname.c_str());
-    //ESP_LOGI(tag, "Target URL: %s", mConfig.msTargetUrl.c_str());
+    // ESP_LOGI(tag, "Target URL: %s", mConfig.msTargetUrl.c_str());
     ESP_LOGI(tag, "Target URL: %s", CONFIG_WEATHERBUOY_TARGET_URL);
     ESP_LOGI(tag, "App Version: %s", esp_ota_get_app_description()->version);
 
@@ -340,53 +340,46 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
 
         if (mOnlineMode == MODE_CELLULAR)
         {
-            ESP_LOGI(tag, "switching to full power mode next...");
-            if (!mCellular.SwitchToFullPowerMode())
+            int attempts = 3;
+            bool prepared = false;
+            do
             {
-                ESP_LOGW(tag, "Retrying switching to full power mode ...");
+                ESP_LOGI(tag, "Switching to full power mode next...");
                 if (!mCellular.SwitchToFullPowerMode())
                 {
-                    ESP_LOGE(tag, "Switching to full power mode failed");
+                    ESP_LOGE(tag, "Switching to full power mode failed. Shutting down again. Remaining attempts: %i", attempts);
+                    mCellular.SwitchToLowPowerMode();
+                    continue;
                 }
-            }
 
-            vTaskDelay(1000 / portTICK_PERIOD_MS);
-            ESP_LOGI(tag, "switching to PPP mode next...");
-            if (!mCellular.SwitchToPppMode())
-            {
-                ESP_LOGW(tag, "Retrying switching to PPP mode next...");
+                ESP_LOGI(tag, "Switching to PPP mode next...");
                 if (!mCellular.SwitchToPppMode())
                 {
-                    ESP_LOGE(tag, "Failed to switch to PPP mode.");
+                    ESP_LOGE(tag, "Failed to switch to PPP mode. Shutting down modem. Remaining attempts: %i", attempts);
+                    mCellular.SwitchToLowPowerMode();
+                    continue;
+                };
+
+                if (!prepared)
+                {
+                    // read maximet data queue and create a HTTP POST message
+                    sendData.PrepareHttpPost(voltage, current, boardtemp, watertemp, bDiagnostics, mOnlineMode);
+                    prepared = true;
                 }
-            };
-        }
 
-        // read maximet data queue and create a HTTP POST message
-        sendData.PrepareHttpPost(voltage, current, boardtemp, watertemp, bDiagnostics, mOnlineMode);
-
-        // try sending, max 3 times
-        if (mOnlineMode != MODE_OFFLINE)
-        {
-            int tries = 3;
-            while (tries--)
-            {
                 if (sendData.PerformHttpPost())
                 {
+                    ESP_LOGI(tag, "Posting data succeeded. Switching to low power mode...");
+                    mCellular.SwitchToLowPowerMode();
                     break;
                 }
-                if (tries)
+                else
                 {
-                    ESP_LOGW(tag, "Retrying HTTP Post...");
-                    vTaskDelay(1000 / portTICK_PERIOD_MS); // wait one second
+                    ESP_LOGE(tag, "Failed to perform HTTP Post. Shutting down modem. Remaining attempts: %i", attempts);
+                    mCellular.SwitchToLowPowerMode();
                 }
-            }
-        }
 
-        if (mOnlineMode == MODE_CELLULAR)
-        {
-            ESP_LOGI(tag, "switching to low power mode...");
-            mCellular.SwitchToLowPowerMode();
+            } while (--attempts);
         }
 
         // determine nighttime by low solar radiation
@@ -426,7 +419,6 @@ void Esp32WeatherBuoy::RunSimulator(TemperatureSensors &tempSensors, DataQueue &
     unsigned int maximetDataIntervalSeconds = 60;
     unsigned int httpPostDataIntervalSeconds = 30;
     unsigned int lastSendTimestamp = 0;
-
 
     while (true)
     {
@@ -530,37 +522,33 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
         float boardtemp = tempSensors.GetBoardTemp();
         float watertemp = tempSensors.GetWaterTemp();
 
-        // read maximet data queue and create a HTTP POST message
-        sendData.PrepareHttpPost(voltage, current, boardtemp, watertemp, bDiagnostics, mOnlineMode);
-
-        // try sending, max 3 times
-        if (mOnlineMode != MODE_OFFLINE)
+        int attempts = 3;
+        bool prepared = false;
+        while (attempts--)
         {
-            int tries = 3;
-            while (tries--)
+            ESP_LOGI(tag, "switching to PPP mode next...");
+            if (mCellular.SwitchToPppMode())
             {
-                vTaskDelay(1000 / portTICK_PERIOD_MS);
-                ESP_LOGI(tag, "switching to PPP mode next...");
-                if (mCellular.SwitchToPppMode())
-                {
-                    if (sendData.PerformHttpPost())
-                    {
-                        break;
-                    }
-                }
-                else
-                {
-                    mCellular.SwitchToCommandMode();
-                };
 
-                if (tries)
+                if (!prepared)
                 {
-                    ESP_LOGW(tag, "Retrying HTTP Post...");
-                    mCellular.SwitchToCommandMode();       // switch to command mode first, to restart PPP mode
-                    vTaskDelay(1000 / portTICK_PERIOD_MS); // wait one second
+                    // read maximet data queue and create a HTTP POST message
+                    sendData.PrepareHttpPost(voltage, current, boardtemp, watertemp, bDiagnostics, mOnlineMode);
+                    prepared = true;
+                }
+
+                if (sendData.PerformHttpPost())
+                {
+                    break;
                 }
             }
-        }
+            else
+            {
+                ESP_LOGW(tag, "Restarting modem, then Retrying HTTP Post. Remaining attempts: %i", attempts);
+                mCellular.SwitchToLowPowerMode();
+                vTaskDelay(1000 / portTICK_PERIOD_MS); // wait one second
+            };
+        };
 
         secondsToSleep = mConfig.miIntervalDay;
     }

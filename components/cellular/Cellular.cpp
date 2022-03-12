@@ -1,4 +1,4 @@
-//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "sdkconfig.h"
 #include "Cellular.h"
 #include "EspString.h"
@@ -44,9 +44,9 @@ static const char tag[] = "Cellular";
 #define CELLULAR_GPIO_RI GPIO_NUM_33  // RING - used to wake
 #define CELLULAR_GPIO_STATUS GPIO_NUM_36
 #define CELLULAR_DEFAULT_BAUD_RATE 115200 * 1
-#define CELLULAR_ACCELERATED_BAUD_RATE 115200 * 8
+#define CELLULAR_ACCELERATED_BAUD_RATE 115200 * 8 // '+IPR: (300,600,1200,2400,4800,9600,19200,38400,57600,115200,230400,460800,921600,3000000,3200000,3686400)'
 #define CELLULAR_UART_EVENT_QUEUE_SIZE 4
-#define CELLULAR_UART_RX_RECEIVE_BUFFER_SIZE 1024 * 4
+#define CELLULAR_UART_RX_RECEIVE_BUFFER_SIZE 1024 * 8
 #define CELLULAR_UART_SEND_BUFFER_SIZE 1024 * 2
 #endif
 
@@ -628,7 +628,7 @@ void Cellular::ReceiverTask()
         }
         else
         {
-            ESP_LOGD(tag, "ReceiverTask() ReadIntoBuffer return false");
+            ESP_LOGD(tag, "ReceiverTask(%s) ReadIntoBuffer return false", mbCommandMode ? "CMD" : "DATA");
         }
     }
 }
@@ -684,9 +684,9 @@ bool Cellular::ReadIntoBuffer(TickType_t timeout)
     switch (event.type)
     {
     // Event of UART receving data
-    /*We'd better handler data event fast, there would be much more data events than
-    other types of events. If we take too much time on data event, the queue might
-    be full.*/
+    // We'd better handler data event fast, there would be much more data events than
+    // other types of events. If we take too much time on data event, the queue might
+    // be full.
     case UART_DATA:
     {
         int len = uart_read_bytes(muiUartNo, mpBuffer, muiBufferSize, 0);
@@ -713,9 +713,7 @@ bool Cellular::ReadIntoBuffer(TickType_t timeout)
         // As an example, we directly flush the rx buffer here in order to read more data.
         ResetInputBuffers();
         ESP_LOGE(tag, "uart hw fifo overflow");
-        // xQueueReset(mhUartEventQueueHandle);
         return false;
-        // break;
     // Event of UART ring buffer full
     case UART_BUFFER_FULL:
         // If buffer full happened, you should consider increasing your buffer size
@@ -723,12 +721,10 @@ bool Cellular::ReadIntoBuffer(TickType_t timeout)
         ESP_LOGE(tag, "uart ring buffer full");
         ResetInputBuffers();
         return false;
-    // Event of UART RX break detected
     case UART_BREAK:
+        // stopping data mode
         ESP_LOGI(tag, "uart break.");
-        // ResetInputBuffers();
-        // return false;
-        break;
+        return true;
     case UART_PARITY_ERR:
         ESP_LOGE(tag, "uart parity error");
         ResetInputBuffers();
@@ -748,8 +744,6 @@ bool Cellular::ReadIntoBuffer(TickType_t timeout)
 
 bool Cellular::SwitchToLowPowerMode()
 {
-    // ESP_LOGW(tag, "trying to wait for 3 seconds before switching to command mode:  mbCommandMode=%s", mbCommandMode ? "true" : "false");
-    // vTaskDelay(3000 / portTICK_PERIOD_MS);
     SwitchToCommandMode();
 
     String response;
@@ -804,6 +798,7 @@ bool Cellular::SwitchToFullPowerMode()
     // simcom documentation: "Anytime host want send data to module, it must be pull down DTR then wait 20ms"
     vTaskDelay(20 / portTICK_PERIOD_MS);
 
+    ResetInputBuffers();
     if (Command("AT+CFUN=1", "OK", &response, "Set modem to full power mode and reset it too."))
     { // mode 4 would shut down RF entirely to "flight-mode"; mode 0 still keeps SMS receiption intact
         ESP_LOGI(tag, "Switched to full power mode.");
@@ -811,12 +806,6 @@ bool Cellular::SwitchToFullPowerMode()
     }
 
     ESP_LOGD(tag, "Switching back to full power....");
-
-    //---------------
-
-    /*if (!Command("AT", "OK", &response, "ATtention")) {
-        ESP_LOGE(tag, "Severe problem, no connection to Modem");
-    };*/
 
     int maxWaitForNetworkRegistration = 120;
     while (maxWaitForNetworkRegistration--)
@@ -921,7 +910,7 @@ bool Cellular::SwitchToCommandMode()
         .size = 0,
         .timeout_flag = true};
 
-    if (pdTRUE == xQueueSend(mhUartEventQueueHandle, (void *)&uartSwitchToPppEvent, 0))
+    if (pdTRUE == xQueueSend(mhUartEventQueueHandle, (void *)&uartSwitchToPppEvent, 1000 / portTICK_PERIOD_MS))
     {
         ESP_LOGD(tag, "sent break event.");
     }
@@ -931,22 +920,13 @@ bool Cellular::SwitchToCommandMode()
     }
 
     vTaskDelay(200 / portTICK_PERIOD_MS);
-    ResetInputBuffers();
-
-    /*String response;
-    int attempts = 10;
-    while (attempts--) {
-        if (Command("AT", "OK", &response, "AT")) {
-            break;
-        };
-        ESP_LOGI(tag, "Retrying testing command mode. Remaining attempts %i", attempts);
-    }*/
 
     String response;
     int attempts = 10;
     while (attempts--)
     {
         vTaskDelay(100 / portTICK_PERIOD_MS); // v25.ter specification requires 100ms wait period before reissuing another call
+        ResetInputBuffers();
         if (ModemWriteLine("AT"))
         {
             if (ModemReadResponse(response, "OK", 10, UART_INPUT_TIMEOUT_CMDSHORT))
@@ -955,7 +935,7 @@ bool Cellular::SwitchToCommandMode()
             }
             ESP_LOGI(tag, "Retrying testing command mode due to %s. Remaining attempts %i", response.c_str(), attempts);
 
-            if (attempts < 9)
+            if (attempts < 5)
             {
                 // esp_netif_action_stop(mpEspNetif, 0, 0, nullptr); --- this calls already +++
                 //  esp_netif_action_disconnected
@@ -1010,6 +990,11 @@ bool Cellular::SwitchToCommandMode()
 
 bool Cellular::SwitchToPppMode()
 {
+
+    if (mbPowerSaverActive)
+    {
+        SwitchToFullPowerMode();
+    }
     // reading on PPP handshake and LCP start frame https://lateblt.tripod.com/bit60.txt
 
     if (!mbCommandMode)
@@ -1017,57 +1002,48 @@ bool Cellular::SwitchToPppMode()
         if (esp_netif_is_netif_up(mpEspNetif))
         {
             ESP_LOGW(tag, "SwitchToPppMode() already in PPP mode");
+            if (!mbConnected)
+            {
+                //***************************************************
+                ESP_LOGW(tag, "SwitchToPppMode() BUT mbConnected is FALSE???");
+            }
             return true;
         };
         ESP_LOGW(tag, "SwitchToPppMode() Network Down - restarting PPP mode");
     }
 
-    // ESP_LOGI(tag, "SwitchToPppMode()");
-    //*   String command = "AT+CGDCONT=1,\"IP\",\"";
+    // ESP_LOGW(tag, "Skipping check PDP context command");
+    // // Command("AT+CGDCONT=?", "OK", &response, "check PDP context");
 
-#ifdef CONFIG_LILYGO_TTGO_TCALL14_SIM800
-    String command = "AT+CGDCONT=1,\"IP\",\""; // it did work with IP, but also with PPP??
-    command += msApn;
-    command += "\"";
+    // String command = "AT+CGDCONT=1,\"IP\",\""; //#################### PPP or IP ?????
+    // command += msApn;
+    // command += "\"";
+    // if (!Command(command.c_str(), "OK", &response, "Define PDP Context"))
+    // {
+    //     ESP_LOGE(tag, "SwitchToPppMode(PDP Context) FAILED");
+    //     mbCommandMode = true;
+    //     return false;
+    // }
+
+    // Command("AT+CGDATA=?", "OK", &response, "check PPP switching");
+
     String response;
-    if (!Command(command.c_str(), "OK", &response, "Define PDP Context"))
-    {
-        ESP_LOGE(tag, "SwitchToPppMode(PDP Context) FAILED");
-        mbCommandMode = true;
-        return false;
-    }
-
-    if (Command("ATD*99#", "CONNECT", &response, "Connect for data connection."))
-    {
-        ESP_LOGI(tag, "SwitchToPppMode(NEW) CONNECTED");
-        mbCommandMode = false;
-        esp_netif_action_start(mpEspNetif, 0, 0, nullptr);
-        return true;
-    }
-#endif
-
-#ifdef CONFIG_LILYGO_TTGO_TPCIE_SIM7600
-    String response;
-    Command("AT+CGDCONT=?", "OK", &response, "check PDP context");
-
-    String command = "AT+CGDCONT=1,\"IP\",\""; //#################### PPP or IP ?????
-    command += msApn;
-    command += "\"";
-    if (!Command(command.c_str(), "OK", &response, "Define PDP Context"))
-    {
-        ESP_LOGE(tag, "SwitchToPppMode(PDP Context) FAILED");
-        mbCommandMode = true;
-        return false;
-    }
-
-    Command("AT+CGDATA=?", "OK", &response, "check PPP switching");
-
     if (Command("AT+CGDATA=\"PPP\",1", "CONNECT", &response, "Connect for data connection."))
     {
-        //        if (Command("AT+CGDATA=\"PPP\",1", "CONNECT", &response, "Connect for data connection.")) {
-        ESP_LOGI(tag, "SwitchToPppMode(NEW) CONNECTED");
+        ESP_LOGI(tag, "SwitchToPppMode(AT+CGDATA) CONNECTED");
         mbCommandMode = false;
-        esp_netif_action_start(mpEspNetif, 0, 0, nullptr);
+
+        if (esp_netif_is_netif_up(mpEspNetif))
+        {
+            ESP_LOGI(tag, "SwitchToPppMode(Netif) ISUP, CONNECTED");
+            esp_netif_action_connected(mpEspNetif, 0, 0, nullptr);
+        }
+        else
+        {
+            ESP_LOGI(tag, "SwitchToPppMode(Netif) START");
+            esp_netif_action_start(mpEspNetif, 0, 0, nullptr);
+            esp_netif_action_connected(mpEspNetif, 0, 0, nullptr);
+        }
 
         // WAIT FOR IP ADDRESS
         ESP_LOGI(tag, "Waiting up to 60 seconds for getting IP address");
@@ -1077,17 +1053,20 @@ bool Cellular::SwitchToPppMode()
             return true;
         }
 
+        ESP_LOGE(tag, "Stopped Netif because IP address could not be optained");
+        esp_netif_action_disconnected(mpEspNetif, 0, 0, nullptr);
+        mbCommandMode = true;
+        mbConnected = false;
         return false;
     }
     else
     {
-        // ESP_LOGW(tag, "Not yet connected!! Later??"); //******************************************************
-        // mbCommandMode = false;
-        // esp_netif_action_start(mpEspNetif, 0, 0, nullptr);
         ESP_LOGW(tag, "Not yet connected!! Staying in command mode. Other action needed here????"); //******************************************************
+        esp_netif_action_disconnected(mpEspNetif, 0, 0, nullptr);
+        mbCommandMode = true;
+        mbConnected = false;
         return false;
     }
-#endif
 
     return false;
 }
@@ -1146,7 +1125,7 @@ int Cellular::ModemWriteData(const char *data, int len)
     int iWriteLen = uart_write_bytes(muiUartNo, data, len);
     if (iWriteLen == len)
     {
-        ESP_LOGD(tag, "UART bytes sent %d", len);
+        ESP_LOGD(tag, "UART DATA bytes sent %d", len);
         ESP_LOG_BUFFER_HEXDUMP(tag, data, len, ESP_LOG_VERBOSE);
         // ESP_LOGI(tag, "ModemWriteData(): %d bytes", len);
         mullSentTotal += len;
@@ -1217,7 +1196,7 @@ bool Cellular::ModemReadResponse(String &sResponse, const char *expectedLastLine
             ESP_LOGI(tag, "PPP Daemon disconnected.");
             return false;
         }
-        else if (sLine.startsWith("ERROR") || sLine.startsWith("NO CARRIER"))
+        else if (sLine.startsWith("ERROR") || sLine.startsWith("NO CARRIER") || sLine.startsWith("+CME ERROR"))
         {
             ESP_LOGD(tag, "Unexpected '%s' instead of '%s', response: '%s'", sLine.c_str(), expectedLastLineResponse, sResponse.c_str());
             return false;
@@ -1297,6 +1276,7 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
         }
         else if (id == IP_EVENT_PPP_LOST_IP)
         {
+            esp_netif_action_disconnected(mpEspNetif, 0, 0, nullptr);
             ESP_LOGI(tag, "Cellular Disconnect from PPP Server");
             mbConnected = false;
         }
@@ -1325,6 +1305,7 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
             break;
         case NETIF_PPP_ERROROPEN:
             status = "Unable to open PPP session.";
+            mbConnected = false;
             break;
         case NETIF_PPP_ERRORDEVICE:
             status = "Invalid I/O device for PPP.";
@@ -1334,9 +1315,11 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
             break;
         case NETIF_PPP_ERRORUSER:
             status = "User interrupt.";
+            mbConnected = false;
             break;
         case NETIF_PPP_ERRORCONNECT:
             status = "Connection lost.";
+            mbConnected = false;
             break;
         case NETIF_PPP_ERRORAUTHFAIL:
             status = "Failed authentication challenge.";
@@ -1394,10 +1377,15 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
             break;
         case NETIF_PPP_PHASE_DISCONNECT:
             status = "NETIF_PPP_PHASE_DISCONNECT";
+            mbConnected = false;
+            break;
+        case NETIF_PPP_CONNECT_FAILED:
+            status = "NETIF_PPP_CONNECT_FAILED";
+            mbConnected = false;
             break;
         default:
             ESP_LOGW(tag, "Unknown Netif PPP event! id=%d", id);
-            status = "UNKOWN";
+            status = "UNKNOWN";
         }
 
         if (id > NETIF_PPP_ERRORNONE && id < NETIF_PP_PHASE_OFFSET)
