@@ -922,7 +922,7 @@ bool Cellular::SwitchToCommandMode()
     vTaskDelay(200 / portTICK_PERIOD_MS);
 
     String response;
-    int attempts = 10;
+    int attempts = 5;
     while (attempts--)
     {
         vTaskDelay(100 / portTICK_PERIOD_MS); // v25.ter specification requires 100ms wait period before reissuing another call
@@ -935,7 +935,7 @@ bool Cellular::SwitchToCommandMode()
             }
             ESP_LOGI(tag, "Retrying testing command mode due to %s. Remaining attempts %i", response.c_str(), attempts);
 
-            if (attempts < 5)
+            if (attempts == 1)
             {
                 // esp_netif_action_stop(mpEspNetif, 0, 0, nullptr); --- this calls already +++
                 //  esp_netif_action_disconnected
@@ -955,6 +955,8 @@ bool Cellular::SwitchToCommandMode()
                 vTaskDelay(1000 / portTICK_PERIOD_MS); // spec: 1s delay for the modem to recognize the escape sequence
                 ModemWriteData(write.c_str(), write.length());
                 vTaskDelay(1200 / portTICK_PERIOD_MS); // spec: 1s
+                ESP_LOGD(tag, "sent another break event.");
+                xQueueSend(mhUartEventQueueHandle, (void *)&uartSwitchToPppEvent, 1000 / portTICK_PERIOD_MS);
             }
         }
     }

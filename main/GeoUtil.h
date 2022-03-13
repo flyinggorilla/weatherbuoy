@@ -13,7 +13,7 @@ inline double deg2rad(double deg)
 // Calculate distance of two GPS coordinates (lat/lon in degrees)
 // Equirectangular approximation
 // returns distance in meters
-double geoDistance(double lat1, double lon1, double lat2, double lon2)
+inline double geoDistance(double lat1, double lon1, double lat2, double lon2)
 {
   static const double earthRadius = 6371 * 1000; // radius of the earth in m
   double u = deg2rad(lon2 - lon1) * cos(0.5 * deg2rad(lat2 + lat1));
@@ -22,7 +22,7 @@ double geoDistance(double lat1, double lon1, double lat2, double lon2)
 }
 
 // https://en.wikipedia.org/wiki/Haversine_formula
-double geoDistanceHaversine(double lat1d, double lon1d, double lat2d, double lon2d)
+inline double geoDistanceHaversine(double lat1d, double lon1d, double lat2d, double lon2d)
 {
   static const double earthRadius = 6371 * 1000; // meters
   double lat1r, lon1r, lat2r, lon2r, u, v;

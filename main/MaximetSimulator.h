@@ -34,6 +34,7 @@ private:
     bool CommandResponse(float &inoutValue, const char* format = "%06.2f");
     bool CommandResponse(int &inoutValue, const char* format = "%03i");
 
+    Data mData;
 
     String msInputLine;
     String msCommand;
@@ -57,6 +58,8 @@ private:
     bool mbRun = true;
     bool mbStopped = true;
     bool mbCommandline = false;
+
+
 
 };
 
