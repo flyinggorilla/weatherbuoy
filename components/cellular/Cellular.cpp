@@ -1038,6 +1038,7 @@ bool Cellular::SwitchToPppMode()
         ESP_LOGI(tag, "Waiting up to 60 seconds for getting IP address");
         if (xSemaphoreTake(mxConnected, 60 * 1000 / portTICK_PERIOD_MS) == pdTRUE)
         {
+            // note that esp_netif_action_ calls should all happen in THIS thread, and not in the event handler
             esp_netif_action_connected(mpEspNetif, 0, 0, nullptr);
             mbConnected = true;
             return true;
@@ -1264,7 +1265,6 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
         }
         else if (id == IP_EVENT_PPP_LOST_IP)
         {
-            //esp_netif_action_disconnected(mpEspNetif, 0, 0, nullptr);
             ESP_LOGI(tag, "Cellular Disconnect from PPP Server");
         }
         else if (id == IP_EVENT_GOT_IP6)

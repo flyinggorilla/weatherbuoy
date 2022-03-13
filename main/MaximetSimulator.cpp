@@ -306,6 +306,7 @@ void MaximetSimulator::SetTemperature(float temperature)
 void MaximetSimulator::SendDataPoint()
 {
     mData.uptime = esp_timer_get_time() / 1000000; // seconds since start (good enough as int can store seconds over 68 years in 31 bits)
+    int mode = (mData.uptime / 60 / 5 ) % 2;  // MODE 0, MODE 1 every 5 minutes
 
     time_t now;
     time(&now);
@@ -314,28 +315,47 @@ void MaximetSimulator::SendDataPoint()
     isoTime[0] = 0;
     strftime(isoTime, sizeof(isoTime) - 1, "%FT%T.0", pUtcTime);
 
-    mData.gpsspeed = 3;
     mData.temp = mfTemp;
-    mData.speed = KnotsToms(10);
-    mData.dir = 0;
-    mData.gpsspeed = KnotsToms(10);
-    mData.gpsheading = (mData.uptime % (2*60*60)) * 180;
     strcpy(mData.status, "0000");
     strcpy(mData.windstat, "0000");
 
-    mData.xtilt = 33;
-    mData.ytilt = -33;
+    mData.xtilt = mode;
+    mData.ytilt = 70.0 * sin((float)mData.uptime / 12.5 * 2 * M_PI);
     mData.zorient = 1;
-    mData.solarrad = 1000 * std::abs(sin(mData.uptime / 3600 * 2 * M_PI));
+    mData.solarrad = 1000 * std::abs(sin((float)mData.uptime / 3600.0 * 2 * M_PI));
     mData.rh = 50;
     mData.ah = 2.5;
     mData.pasl = 1000;
 
-    float gspeed = mData.cspeed = mData.speed + std::max(sin(mData.uptime/3600*2*M_PI)*KnotsToms(10), 0.0);
-    float avgspeed = mData.avgcspeed = gspeed;
+
+    if (mode == 0) {
+        mData.compassh = 90;
+        mData.dir = -90;
+        mData.cdir = mData.dir + mData.compassh;
+        mData.gpsspeed = KnotsToms(5);
+        mData.gpsheading = 180;
+        mData.speed = KnotsToms(10);
+        mData.cspeed = mData.speed - mData.gpsspeed;
+        mData.cgspeed = mData.speed + std::max(sin((float)mData.uptime/60.0/15.0*2*M_PI)*KnotsToms(10), 0.0);
+        mData.avgcspeed = mData.cspeed;
+    } else {
+        mData.compassh = 90;
+        mData.dir = 90;
+        mData.cdir = mData.dir + mData.compassh;
+        mData.gpsspeed = KnotsToms(5);
+        mData.gpsheading = 180;
+        mData.speed = KnotsToms(10);
+        mData.cspeed = mData.speed + mData.gpsspeed;
+        mData.cgspeed = mData.speed + std::max(sin((float)mData.uptime/60.0/15.0*2*M_PI)*KnotsToms(10), 0.0);
+        mData.avgcspeed = mData.cspeed;
+    }
+
+    float gspeed = mData.cgspeed;
+    float avgspeed = mData.avgcspeed;
     int avgdir = mData.dir;
     int gdir = mData.dir;
-    mData.avgcdir = mData.dir;
+    mData.avgcdir = mData.cdir;
+
     String gpsStatus("0106");
 
     // 0.000001° ~= 11cm distance. --> 5 to 6 digits after comma is required
@@ -363,8 +383,8 @@ void MaximetSimulator::SendDataPoint()
         mData.lon = minLongitude;
     }
 
-    double latdist =  0.0000091 * mData.gpsspeed;
-    ESP_LOGI(tag, "GPS movement: %fm at speed of %f m/s", geoDistanceHaversine(mData.lat, mData.lon, mData.lat - latdist, mData.lon), mData.gpsspeed);
+    double latdist =  0.0000090 * mData.gpsspeed;
+    ESP_LOGV(tag, "GPS movement: %fm at speed of %f m/s", geoDistanceHaversine(mData.lat, mData.lon, mData.lat - latdist, mData.lon), mData.gpsspeed);
     mData.lat -= latdist;
     //mData.lat -= 0.000101; // move south (towards equator)
     //mData.lon += 0.00001; // move east
@@ -387,10 +407,10 @@ void MaximetSimulator::SendDataPoint()
         // -,-,MS,DEG,MS,MS,MS,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,DEG,-,-,-,-,-
 
         // GMX200GPS,+48.339284:+014.309088:+0021.20, 000.22,035,000.20,000.00,000.00,000.13,000.00,000.00,038,000,000,249,000,000,287,-02,-01,0004,0100,0104,2022-01-22T14:11:06.8,68
-        line += Maximet::GetModelName(mMaximetModel);
+        line = Maximet::GetModelName(mMaximetModel);
         line.printf(",%+010.6f:%+010.6f:+2.00", mData.lat, mData.lon);
         line.printf(fmtFloat, mData.gpsspeed);
-        line.printf(fmtFloat, mData.gpsheading);
+        line.printf(fmtInt, mData.gpsheading);
         line.printf(fmtFloat, mData.cspeed);
         line.printf(fmtFloat, mData.cgspeed);
         line.printf(fmtFloat, mData.avgcspeed);
@@ -411,14 +431,12 @@ void MaximetSimulator::SendDataPoint()
         line.printf(",%s", mData.windstat);
         line.printf(",%s", gpsStatus.c_str());
         line.printf(",%s", isoTime);
-
-        // data += ".,003.0,004,%0.1f,006.00,007.00,008.00,009.00,010.00,011,012,013,014,015,016,017,-018,+019,0020,0021,0022,%s",  temperature, isoTime);
         break;
     }
     case Maximet::Model::GMX501:
     {
         // MAXIMET_REPORT_GMX501[] = "USERINF,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,CHECK";
-        line += Maximet::GetModelName(mMaximetModel);
+        line = Maximet::GetModelName(mMaximetModel);
         line.printf(fmtFloat, mData.cspeed);
         line.printf(fmtFloat, mData.cgspeed);
         line.printf(fmtFloat, mData.avgcspeed);
@@ -433,7 +451,7 @@ void MaximetSimulator::SendDataPoint()
         line.printf(fmtFloat, mData.rh);
         line.printf(fmtFloat, mData.ah);
         line.printf(fmtFloat, mData.temp);
-        line.printf(fmtFloat, mData.solarrad);
+        line.printf(fmtInt, mData.solarrad);
         line.printf(",%+03i", mData.xtilt);
         line.printf(",%+03i", mData.ytilt);
         line.printf(",%+03i", mData.zorient);
@@ -449,7 +467,7 @@ void MaximetSimulator::SendDataPoint()
         // USERINF,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,GPSLOCATION,GPSSTATUS,TIME,CHECK
         // -,MS,MS,MS,DEG,DEG,DEG,DEG,DEG,DEG,HPA,HPA,%,G/M3,C,WM2,DEG,DEG,-,-,-,-,-,-,-
 
-        line += Maximet::GetModelName(mMaximetModel);
+        line = Maximet::GetModelName(mMaximetModel);
         line.printf(fmtFloat, mData.cspeed);
         line.printf(fmtFloat, mData.cgspeed);
         line.printf(fmtFloat, mData.avgcspeed);
@@ -464,7 +482,7 @@ void MaximetSimulator::SendDataPoint()
         line.printf(fmtFloat, mData.rh);
         line.printf(fmtFloat, mData.ah);
         line.printf(fmtFloat, mData.temp);
-        line.printf(fmtFloat, mData.solarrad);
+        line.printf(fmtInt, mData.solarrad);
         line.printf(",%+03i", mData.xtilt);
         line.printf(",%+03i", mData.ytilt);
         line.printf(",%+03i", mData.zorient);
@@ -473,12 +491,6 @@ void MaximetSimulator::SendDataPoint()
         line.printf(",%+010.6f:%+010.6f:+2.00", mData.lat, mData.lon);
         line.printf(",%s", gpsStatus.c_str());
         line.printf(",%s", isoTime);
-
-        // line.printf(fmtFloat, mData.speed);
-        // line.printf(fmtFloat, gspeed);
-        // line.printf(fmtFloat, avgspeed);
-        // line.printf(fmtFloat, mData.gpsspeed);
-        // line.printf(fmtFloat, mData.gpsheading);
         break;
     }
     case Maximet::Model::GMX501RAIN:

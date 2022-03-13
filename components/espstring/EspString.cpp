@@ -49,7 +49,7 @@ int String::printf(const char *format, ...)
         concat(s);
     }
     else
-    { // printf into empty string, so simply reuse sting
+    { // printf into empty string, so simply reuse string
         reserve(addLen + 1);
         addLen = vsnprintf((char *)c_str(), addLen + 1, format, args);
         len = addLen;

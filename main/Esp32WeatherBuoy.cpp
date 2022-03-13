@@ -175,7 +175,7 @@ void Esp32WeatherBuoy::Start()
     }
     else // try wifi if configured
     {
-        if (mConfig.msSTASsid.length())
+         if (mConfig.msSTASsid.length())
         {
             // config.msSTASsid = "";
             // config.msSTAPass = "";
