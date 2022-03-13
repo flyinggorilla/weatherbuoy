@@ -902,26 +902,25 @@ void Cellular::QuerySignalStatus()
 
 bool Cellular::SwitchToCommandMode()
 {
-    // Waiting for UART event.
-    esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
-    ESP_LOGI(tag, "netif action stopped.");
+    ESP_LOGI(tag, "Switching to command mode...");
     vTaskDelay(100 / portTICK_PERIOD_MS);
-    esp_netif_action_disconnected(mpEspNetif, 0, 0, nullptr);
-    ESP_LOGI(tag, "netif action disconnected.");
+    esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
+    ESP_LOGD(tag, "netif action stopped.");
     vTaskDelay(100 / portTICK_PERIOD_MS);
 
     mbCommandMode = true;
+    mbConnected = false;
 
     ESP_LOGD(tag, "resetting input buffers.");
     ResetInputBuffers();
 
     ESP_LOGD(tag, "sending break event.");
-    uart_event_t uartSwitchToPppEvent = {
+    uart_event_t uartBreakEvent = {
         .type = UART_BREAK,
         .size = 0,
         .timeout_flag = true};
 
-    if (pdTRUE == xQueueSend(mhUartEventQueueHandle, (void *)&uartSwitchToPppEvent, 1000 / portTICK_PERIOD_MS))
+    if (pdTRUE == xQueueSend(mhUartEventQueueHandle, (void *)&uartBreakEvent, 1000 / portTICK_PERIOD_MS))
     {
         ESP_LOGD(tag, "sent break event.");
     }
@@ -948,9 +947,6 @@ bool Cellular::SwitchToCommandMode()
 
             if (attempts < 3)
             {
-                // esp_netif_action_stop(mpEspNetif, 0, 0, nullptr); --- this calls already +++
-                //  esp_netif_action_disconnected
-
                 // The +++ character sequence causes the TA to cancel the data flow over the
                 // AT interface and switch to Command mode. This allows you to enter AT
                 // Command while maintaining the data connection to the remote server.
@@ -967,7 +963,7 @@ bool Cellular::SwitchToCommandMode()
                 ModemWriteData(write.c_str(), write.length());
                 vTaskDelay(1200 / portTICK_PERIOD_MS); // spec: 1s
                 ESP_LOGD(tag, "sent another break event.");
-                xQueueSend(mhUartEventQueueHandle, (void *)&uartSwitchToPppEvent, 1000 / portTICK_PERIOD_MS);
+                xQueueSend(mhUartEventQueueHandle, (void *)&uartBreakEvent, 1000 / portTICK_PERIOD_MS);
             }
         }
     }
@@ -977,25 +973,6 @@ bool Cellular::SwitchToCommandMode()
         ESP_LOGE(tag, "Could not enter commandline mode. %s", response.c_str());
         return false;
     }
-
-    // esp_netif_action_stop(mpEspNetif, 0, 0, nullptr); --- this calls already +++
-    //  esp_netif_action_disconnected
-
-    // The +++ character sequence causes the TA to cancel the data flow over the
-    // AT interface and switch to Command mode. This allows you to enter AT
-    // Command while maintaining the data connection to the remote server.
-    // To prevent the +++ escape sequence from being misinterpreted as data, it
-    // should comply to following sequence:
-    // No characters entered for T1 time (1 second)
-    // "+++" characters entered with no characters in between (1 second)
-    // No characters entered for T1 timer (1 second)
-    // Switch to Command mode, otherwise go to step 1.
-
-    // ESP_LOGI(tag, "Switching to command mode with +++");
-    // String write("+++\r\n");
-    // vTaskDelay(1000 / portTICK_PERIOD_MS); // spec: 1s delay for the modem to recognize the escape sequence
-    // int iWriteLen = ModemWriteData(write.c_str(), write.length());
-    // vTaskDelay(1200 / portTICK_PERIOD_MS); // spec: 1s
 
     ESP_LOGI(tag, "SwitchToCommandMode() finished.");
     return true;
@@ -1037,49 +1014,36 @@ bool Cellular::SwitchToPppMode()
         ESP_LOGW(tag, "SwitchToPppMode() Network Down - restarting PPP mode");
     }
 
-    // ESP_LOGW(tag, "Skipping check PDP context command");
-    // // Command("AT+CGDCONT=?", "OK", &response, "check PDP context");
-
-    // String command = "AT+CGDCONT=1,\"IP\",\""; //#################### PPP or IP ?????
-    // command += msApn;
-    // command += "\"";
-    // if (!Command(command.c_str(), "OK", &response, "Define PDP Context"))
-    // {
-    //     ESP_LOGE(tag, "SwitchToPppMode(PDP Context) FAILED");
-    //     mbCommandMode = true;
-    //     return false;
-    // }
-
-    // Command("AT+CGDATA=?", "OK", &response, "check PPP switching");
-
     String response;
     if (Command("AT+CGDATA=\"PPP\",1", "CONNECT", &response, "Connect for data connection."))
     {
-        ESP_LOGI(tag, "SwitchToPppMode(AT+CGDATA) CONNECTED");
+        ESP_LOGI(tag, "Switch to PPP: CONNECTED");
         mbCommandMode = false;
+        mbConnected = false;
 
         if (esp_netif_is_netif_up(mpEspNetif))
         {
-            ESP_LOGI(tag, "SwitchToPppMode(Netif) ISUP, CONNECTED");
-            //esp_netif_action_connected(mpEspNetif, 0, 0, nullptr);
+            ESP_LOGI(tag, "Switch to PPP: ISUP, CONNECTED");
         }
         else
         {
-            ESP_LOGI(tag, "SwitchToPppMode(Netif) START");
+            ESP_LOGI(tag, "Starting network interface.");
+            esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
+            ESP_LOGD(tag, "esp_netif_action_stopped");
             esp_netif_action_start(mpEspNetif, 0, 0, nullptr);
-            //esp_netif_action_connected(mpEspNetif, 0, 0, nullptr);
+            ESP_LOGD(tag, "esp_netif_action_started");
         }
 
         // WAIT FOR IP ADDRESS
         ESP_LOGI(tag, "Waiting up to 60 seconds for getting IP address");
         if (xSemaphoreTake(mxConnected, 60 * 1000 / portTICK_PERIOD_MS) == pdTRUE)
         {
+            esp_netif_action_connected(mpEspNetif, 0, 0, nullptr);
             mbConnected = true;
             return true;
         }
 
         ESP_LOGE(tag, "Stopped Netif because IP address could not be optained");
-        //esp_netif_action_disconnected(mpEspNetif, 0, 0, nullptr);
         esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
         mbCommandMode = true;
         mbConnected = false;
@@ -1088,7 +1052,6 @@ bool Cellular::SwitchToPppMode()
     else
     {
         ESP_LOGW(tag, "Not yet connected!! Staying in command mode. Other action needed here????"); //******************************************************
-        //esp_netif_action_disconnected(mpEspNetif, 0, 0, nullptr);
         esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
         mbCommandMode = true;
         mbConnected = false;
@@ -1296,16 +1259,13 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
             esp_netif_get_dns_info(netif, ESP_NETIF_DNS_BACKUP, &dns_info);
             ESP_LOGI(tag, "Name Server2: " IPSTR, IP2STR(&dns_info.ip.u_addr.ip4));
             ESP_LOGI(tag, "~~~~~~~~~~~~~~");
-            mbConnected = true;
-            xSemaphoreGive(mxConnected);
             ESP_LOGI(tag, "GOT ip event!!!");
-            esp_netif_action_connected(mpEspNetif, 0, 0, nullptr);
+            xSemaphoreGive(mxConnected);
         }
         else if (id == IP_EVENT_PPP_LOST_IP)
         {
-            esp_netif_action_disconnected(mpEspNetif, 0, 0, nullptr);
+            //esp_netif_action_disconnected(mpEspNetif, 0, 0, nullptr);
             ESP_LOGI(tag, "Cellular Disconnect from PPP Server");
-            mbConnected = false;
         }
         else if (id == IP_EVENT_GOT_IP6)
         {
@@ -1332,7 +1292,6 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
             break;
         case NETIF_PPP_ERROROPEN:
             status = "Unable to open PPP session.";
-            mbConnected = false;
             break;
         case NETIF_PPP_ERRORDEVICE:
             status = "Invalid I/O device for PPP.";
@@ -1342,11 +1301,9 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
             break;
         case NETIF_PPP_ERRORUSER:
             status = "User interrupt.";
-            mbConnected = false;
             break;
         case NETIF_PPP_ERRORCONNECT:
             status = "Connection lost.";
-            mbConnected = false;
             break;
         case NETIF_PPP_ERRORAUTHFAIL:
             status = "Failed authentication challenge.";
