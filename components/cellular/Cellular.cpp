@@ -661,6 +661,7 @@ void Cellular::InitNetwork()
 
 void Cellular::ResetInputBuffers()
 {
+    ESP_LOGD(tag, "ResetInputbuffers()");
     uart_flush_input(muiUartNo);
     muiBufferLen = 0;
     muiBufferPos = 0;
@@ -677,7 +678,7 @@ bool Cellular::ReadIntoBuffer(TickType_t timeout)
     // Waiting for UART event.
     if (pdTRUE != xQueueReceive(mhUartEventQueueHandle, (void *)&event, timeout))
     {
-        ESP_LOGD(tag, "ReadIntoBuffer timeout at xQueueReceive. ");
+        ESP_LOGD(tag, "ReadIntoBuffer timeout at xQueueReceive. Mode=%s, Connected=%s", mbCommandMode ? "CMD" : "DATA", mbConnected ? "Y" : "N");
         return false;
     }
 
@@ -770,10 +771,11 @@ bool Cellular::SwitchToLowPowerMode()
     {
         ESP_LOGE(tag, "Setting modem to minimum functionality failed.");
     }
-
+    vTaskDelay(100 / portTICK_PERIOD_MS);
     ESP_LOGI(tag, "Switched to power saving mode via DTR.");
     gpio_set_level(CELLULAR_GPIO_DTR, 1);
     mbPowerSaverActive = true;
+    vTaskDelay(100 / portTICK_PERIOD_MS);
     return true;
 
     // SIM7100/SIM7500/SIM7600/SIM7800 module must in idle mode (no data transmission, no audio playing, no other at command running and so on) in order to let SIM7100/SIM7500/SIM7600/SIM7800 module enter
@@ -794,15 +796,19 @@ bool Cellular::SwitchToFullPowerMode()
     String response;
     String command;
 
-    gpio_set_level(CELLULAR_GPIO_DTR, 0);
-    // simcom documentation: "Anytime host want send data to module, it must be pull down DTR then wait 20ms"
-    vTaskDelay(20 / portTICK_PERIOD_MS);
-
     ResetInputBuffers();
-    if (Command("AT+CFUN=1", "OK", &response, "Set modem to full power mode and reset it too."))
+
+    gpio_set_level(CELLULAR_GPIO_DTR, 0);
+    // simcom documentation: "Anytime host want send data to module, it must be pull down DTR then wait minimum 20ms"
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+
+    if (Command("AT+CFUN=1", "OK", &response, "Set modem to full power mode."))
     { // mode 4 would shut down RF entirely to "flight-mode"; mode 0 still keeps SMS receiption intact
         ESP_LOGI(tag, "Switched to full power mode.");
         mbPowerSaverActive = false;
+    } else {
+        ESP_LOGE(tag, "Could not switch to full power mode.");
+        return false;
     }
 
     ESP_LOGD(tag, "Switching back to full power....");
@@ -813,7 +819,12 @@ bool Cellular::SwitchToFullPowerMode()
         if (Command("AT+CREG?", "OK", &response, "Network Registration Information States "))
         { // +CREG: 0,2 // +CREG: 1,5
             if (response.indexOf("+CREG: ") >= 0 && ((response.indexOf(",5") >= 0) || (response.indexOf(",1") >= 0)))
-                break;
+                break; 
+        } else {
+            ESP_LOGE(tag, "Could not register on on network. Switching off power.");
+            mbPowerSaverActive = true;
+            gpio_set_level(CELLULAR_GPIO_DTR, 1);
+            return false;
         }
         // 0 – not registered, ME is not currently searching a new operator to register to
         // 1 – registered, home network
@@ -935,7 +946,7 @@ bool Cellular::SwitchToCommandMode()
             }
             ESP_LOGI(tag, "Retrying testing command mode due to %s. Remaining attempts %i", response.c_str(), attempts);
 
-            if (attempts == 1)
+            if (attempts < 3)
             {
                 // esp_netif_action_stop(mpEspNetif, 0, 0, nullptr); --- this calls already +++
                 //  esp_netif_action_disconnected
@@ -995,7 +1006,19 @@ bool Cellular::SwitchToPppMode()
 
     if (mbPowerSaverActive)
     {
-        SwitchToFullPowerMode();
+        int attempts = 3;
+        while(attempts && !SwitchToFullPowerMode())
+        { 
+            ESP_LOGW(tag, "Retrying SwitchToFullPowerMode() - remaining attempts: %i", attempts); 
+            attempts--;
+        };
+        if (!attempts)
+        {
+            ESP_LOGE(tag, "SEVERE, could not switch modem to full power mode. Need to reboot");
+            vTaskDelay(1000/portTICK_PERIOD_MS);
+            esp_restart();
+            return false;
+        }
     }
     // reading on PPP handshake and LCP start frame https://lateblt.tripod.com/bit60.txt
 
@@ -1038,13 +1061,13 @@ bool Cellular::SwitchToPppMode()
         if (esp_netif_is_netif_up(mpEspNetif))
         {
             ESP_LOGI(tag, "SwitchToPppMode(Netif) ISUP, CONNECTED");
-            esp_netif_action_connected(mpEspNetif, 0, 0, nullptr);
+            //esp_netif_action_connected(mpEspNetif, 0, 0, nullptr);
         }
         else
         {
             ESP_LOGI(tag, "SwitchToPppMode(Netif) START");
             esp_netif_action_start(mpEspNetif, 0, 0, nullptr);
-            esp_netif_action_connected(mpEspNetif, 0, 0, nullptr);
+            //esp_netif_action_connected(mpEspNetif, 0, 0, nullptr);
         }
 
         // WAIT FOR IP ADDRESS
@@ -1056,7 +1079,8 @@ bool Cellular::SwitchToPppMode()
         }
 
         ESP_LOGE(tag, "Stopped Netif because IP address could not be optained");
-        esp_netif_action_disconnected(mpEspNetif, 0, 0, nullptr);
+        //esp_netif_action_disconnected(mpEspNetif, 0, 0, nullptr);
+        esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
         mbCommandMode = true;
         mbConnected = false;
         return false;
@@ -1064,7 +1088,8 @@ bool Cellular::SwitchToPppMode()
     else
     {
         ESP_LOGW(tag, "Not yet connected!! Staying in command mode. Other action needed here????"); //******************************************************
-        esp_netif_action_disconnected(mpEspNetif, 0, 0, nullptr);
+        //esp_netif_action_disconnected(mpEspNetif, 0, 0, nullptr);
+        esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
         mbCommandMode = true;
         mbConnected = false;
         return false;
