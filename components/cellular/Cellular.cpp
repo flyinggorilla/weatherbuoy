@@ -502,6 +502,26 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
     }
 #endif
 
+    // set PDP context 1 to providers APN
+    command = "AT+CGDCONT=1,\"IP\",\"";
+    command += msApn;
+    command += "\"";
+    if (Command(command.c_str(), "OK", &response, "Define PDP Context"))
+    {
+        ESP_LOGI(tag, "PDP context APN: %s", msApn.c_str());
+    }
+    else
+    {
+        ESP_LOGE(tag, "Could not set PDP context for APN: %s, %s", msApn.c_str(), response.c_str());
+    }
+
+    #if LOG_LOCAL_LEVEL >= ESP_LOG_VERBOSE
+    if (Command("AT+CGDCONT?", "OK", &response, "Read PDP Context"))
+    {   // +CGDCONT: 1,"IP","webapn.at","0.0.0.0",0,0,0,0
+        ESP_LOGD(tag, "Configured PDP context: %s", response.c_str());
+    }
+    #endif 
+
     if (Command("AT+CSQ", "OK", &response, "Signal Quality Report"))
     { // +CSQ: 13,0
         String sq;
@@ -806,7 +826,9 @@ bool Cellular::SwitchToFullPowerMode()
     { // mode 4 would shut down RF entirely to "flight-mode"; mode 0 still keeps SMS receiption intact
         ESP_LOGI(tag, "Switched to full power mode.");
         mbPowerSaverActive = false;
-    } else {
+    }
+    else
+    {
         ESP_LOGE(tag, "Could not switch to full power mode.");
         return false;
     }
@@ -819,8 +841,10 @@ bool Cellular::SwitchToFullPowerMode()
         if (Command("AT+CREG?", "OK", &response, "Network Registration Information States "))
         { // +CREG: 0,2 // +CREG: 1,5
             if (response.indexOf("+CREG: ") >= 0 && ((response.indexOf(",5") >= 0) || (response.indexOf(",1") >= 0)))
-                break; 
-        } else {
+                break;
+        }
+        else
+        {
             ESP_LOGE(tag, "Could not register on on network. Switching off power.");
             mbPowerSaverActive = true;
             gpio_set_level(CELLULAR_GPIO_DTR, 1);
@@ -984,15 +1008,15 @@ bool Cellular::SwitchToPppMode()
     if (mbPowerSaverActive)
     {
         int attempts = 3;
-        while(attempts && !SwitchToFullPowerMode())
-        { 
-            ESP_LOGW(tag, "Retrying SwitchToFullPowerMode() - remaining attempts: %i", attempts); 
+        while (attempts && !SwitchToFullPowerMode())
+        {
+            ESP_LOGW(tag, "Retrying SwitchToFullPowerMode() - remaining attempts: %i", attempts);
             attempts--;
         };
         if (!attempts)
         {
             ESP_LOGE(tag, "SEVERE, could not switch modem to full power mode. Need to reboot");
-            vTaskDelay(1000/portTICK_PERIOD_MS);
+            vTaskDelay(1000 / portTICK_PERIOD_MS);
             esp_restart();
             return false;
         }
@@ -1187,7 +1211,7 @@ bool Cellular::ModemReadResponse(String &sResponse, const char *expectedLastLine
             ESP_LOGI(tag, "PPP Daemon disconnected.");
             return false;
         }
-        else if (sLine.startsWith("ERROR") || sLine.startsWith("NO CARRIER") || sLine.startsWith("+CME ERROR"))
+        else if (sLine.startsWith("ERROR") || sLine.startsWith("NO CARRIER") || sLine.startsWith("+CME ERROR") || sLine.startsWith("+CMS ERROR"))
         {
             ESP_LOGD(tag, "Unexpected '%s' instead of '%s', response: '%s'", sLine.c_str(), expectedLastLineResponse, sResponse.c_str());
             return false;

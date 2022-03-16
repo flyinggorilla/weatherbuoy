@@ -102,7 +102,7 @@ bool Config::Save()
 		ret = false;
 	if (!WriteString(h, "Hostname", msHostname))
 		ret = false;
-	if (!WriteString(h, "CellularApn", msCellularPass))
+	if (!WriteString(h, "CellularApn", msCellularApn))
 		ret = false;
 	if (!WriteString(h, "CellularUser", msCellularUser))
 		ret = false;

@@ -115,6 +115,13 @@ void Esp32WeatherBuoy::Start()
         ESP_LOGE(tag, "Error, could not load configuration.");
     }
 
+    if (!mConfig.msCellularApn.length() && strlen(CONFIG_WEATHERBUOY_CELLULAR_APN))
+    {
+        mConfig.msCellularApn = CONFIG_WEATHERBUOY_CELLULAR_APN;
+        mConfig.Save();
+        ESP_LOGW(tag, "Saved firmware default APN configuration! %s", mConfig.msCellularApn.c_str());
+    }
+
     if (mConfig.miSimulator)
     {
         ESP_LOGI(tag, "Maximet Simulation: GMX%d%s", mConfig.miSimulator / 10, mConfig.miSimulator % 10 ? "GPS" : "");
@@ -163,7 +170,6 @@ void Esp32WeatherBuoy::Start()
     }
 
     // detect available Simcom 7600E Modem, such as on Lillygo PCI board
-    ESP_LOGW(tag, "lower modem speed to 460kbaud again?");
     ESP_LOGE(tag, "remove simulator check!");
     if (!mConfig.miSimulator && mCellular.InitModem())
     {

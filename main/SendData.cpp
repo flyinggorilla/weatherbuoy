@@ -207,6 +207,8 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
             mPostData += mrCellular.msOperator;
             mPostData += "\",\"subscriber\": \"";
             mPostData += mrCellular.msSubscriber;
+            mPostData += "\",\"apn\": \"";
+            mPostData += mrConfig.msCellularApn;
             mPostData += "\",\"hardware\": \"";
             mPostData += mrCellular.msHardware;
             mPostData += "\",\"networkmode\": \"";

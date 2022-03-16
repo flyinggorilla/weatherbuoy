@@ -527,6 +527,16 @@ void Maximet::MaximetTask()
                     data.avgcdir = (maximetAvgDir + data.compassh) % 360; // as avgcdir is not populated when GNSS is not available, lets do the math with compass
                 }
 
+                // maximet enters "average is building" mode when entering commandline mode,
+                // and as such we need to ignore zero values while building averages
+                if ( (data.cgspeed == 0) && (data.avgcspeed == 0) && strcmp(data.windstat, "0100") == 0)
+                {
+                    data.cgspeed = data.cspeed;
+                    data.cgdir = data.cdir;
+                    data.avgcspeed = data.cspeed;
+                    data.avgcdir = data.cdir;
+                }
+
                 mrDataQueue.PutLatestData(data);
                 mrDataQueue.PutAlarmData(data);
 
