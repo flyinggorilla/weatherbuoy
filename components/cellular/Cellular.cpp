@@ -506,12 +506,12 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
         ESP_LOGE(tag, "Could not set PDP context for APN: %s, %s", msApn.c_str(), response.c_str());
     }
 
-    #if LOG_LOCAL_LEVEL >= ESP_LOG_VERBOSE
+#if LOG_LOCAL_LEVEL >= ESP_LOG_VERBOSE
     if (Command("AT+CGDCONT?", "OK", &response, "Read PDP Context"))
-    {   // +CGDCONT: 1,"IP","webapn.at","0.0.0.0",0,0,0,0
+    { // +CGDCONT: 1,"IP","webapn.at","0.0.0.0",0,0,0,0
         ESP_LOGD(tag, "Configured PDP context: %s", response.c_str());
     }
-    #endif 
+#endif
 
     if (Command("AT+CSQ", "OK", &response, "Signal Quality Report"))
     { // +CSQ: 13,0
@@ -793,7 +793,7 @@ bool Cellular::SwitchToFullPowerMode()
     String command;
 
     ESP_LOGW(tag, "Skip resetting input buffer.");
-    //ResetInputBuffers();
+    // ResetInputBuffers();
 
     gpio_set_level(CELLULAR_GPIO_DTR, 0);
     // simcom documentation: "Anytime host want send data to module, it must be pull down DTR then wait minimum 20ms"
@@ -913,8 +913,8 @@ bool Cellular::SwitchToCommandMode()
     mbConnected = false;
 
     ESP_LOGW(tag, "Skip resetting input buffer.");
-    //ESP_LOGD(tag, "resetting input buffers.");
-    //ResetInputBuffers();
+    // ESP_LOGD(tag, "resetting input buffers.");
+    // ResetInputBuffers();
 
     ESP_LOGD(tag, "sending break event.");
     uart_event_t uartBreakEvent = {
@@ -1001,30 +1001,16 @@ bool Cellular::SwitchToPppMode()
     }
     // reading on PPP handshake and LCP start frame https://lateblt.tripod.com/bit60.txt
 
-    if (!mbCommandMode)
+    if (!mbCommandMode && mbConnected && esp_netif_is_netif_up(mpEspNetif))
     {
-        if (esp_netif_is_netif_up(mpEspNetif))
-        {
-            ESP_LOGW(tag, "SwitchToPppMode() already in PPP mode");
-            if (!mbConnected)
-            {
-                ESP_LOGE(tag, "SwitchToPppMode() BUT mbConnected is FALSE???");
-            }
-            return true;
-        };
-
-        // Data mode is still active, but connection broke!
-        ESP_LOGW(tag, "SwitchToPppMode(DATA) Network Down - restarting PPP mode");
-    } else {
-        ESP_LOGW(tag, "SwitchToPppMode(CMD) Network Down - restarting PPP mode");
+        ESP_LOGI(tag, "SwitchToPppMode() already in PPP mode");
+        return true;
     }
 
-    // *****************************
-    ESP_LOGI(tag, "SwitchToPppMode() Ensure netif is really STOPPPPEED!!!");
+    ESP_LOGI(tag, "SwitchToPppMode() restarting PPP mode");
     esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
     mbCommandMode = true;
     mbConnected = false;
-
 
     String response;
     if (Command("AT+CGDATA=\"PPP\",1", "CONNECT", &response, "Connect for data connection."))
@@ -1033,18 +1019,7 @@ bool Cellular::SwitchToPppMode()
         mbCommandMode = false;
         mbConnected = false;
 
-        if (esp_netif_is_netif_up(mpEspNetif))
-        {
-            ESP_LOGI(tag, "Switch to PPP: ISUP, CONNECTED");
-        }
-        else
-        {
-//            ESP_LOGI(tag, "Starting network interface.");
-//            esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
-//            ESP_LOGD(tag, "esp_netif_action_stopped");
-            esp_netif_action_start(mpEspNetif, 0, 0, nullptr);
-            ESP_LOGD(tag, "esp_netif_action_started");
-        }
+        esp_netif_action_start(mpEspNetif, 0, 0, nullptr);
 
         // WAIT FOR IP ADDRESS
         ESP_LOGI(tag, "Waiting up to 60 seconds for getting IP address");
@@ -1278,16 +1253,6 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
         else if (id == IP_EVENT_PPP_LOST_IP)
         {
             ESP_LOGI(tag, "Cellular Disconnect from PPP Server");
-
-//*************** TESTING TESTING
-/*            ESP_LOGW(tag, "SWITCHING TO COMMANDMODE - espnetifactionstop, commandmode, not-connected : Cellular Disconnect from PPP Server");
-            esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
-            mbCommandMode = true;
-            mbConnected = false; */
-//******************
-
-
-
         }
         else if (id == IP_EVENT_GOT_IP6)
         {
