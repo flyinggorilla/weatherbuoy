@@ -792,8 +792,7 @@ bool Cellular::SwitchToFullPowerMode()
     String response;
     String command;
 
-    ESP_LOGW(tag, "Skip resetting input buffer.");
-    // ResetInputBuffers();
+    ResetInputBuffers();
 
     gpio_set_level(CELLULAR_GPIO_DTR, 0);
     // simcom documentation: "Anytime host want send data to module, it must be pull down DTR then wait minimum 20ms"
@@ -911,10 +910,6 @@ bool Cellular::SwitchToCommandMode()
 
     mbCommandMode = true;
     mbConnected = false;
-
-    ESP_LOGW(tag, "Skip resetting input buffer.");
-    // ESP_LOGD(tag, "resetting input buffers.");
-    // ResetInputBuffers();
 
     ESP_LOGD(tag, "sending break event.");
     uart_event_t uartBreakEvent = {
