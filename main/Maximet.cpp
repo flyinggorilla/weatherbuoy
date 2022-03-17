@@ -529,7 +529,7 @@ void Maximet::MaximetTask()
 
                 // maximet enters "average is building" mode when entering commandline mode,
                 // and as such we need to ignore zero values while building averages
-                if ( (data.cgspeed == 0) && (data.avgcspeed == 0) && strcmp(data.windstat, "0100") == 0)
+                if ( (data.cgspeed == 0.0) && (data.avgcspeed == 0.0) && (strcmp(data.windstat, "0100") == 0) )
                 {
                     data.cgspeed = data.cspeed;
                     data.cgdir = data.cdir;

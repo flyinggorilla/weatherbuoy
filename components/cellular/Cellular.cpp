@@ -253,7 +253,6 @@ bool Cellular::PowerOn(void)
         if (line.contains("RDY"))
         {
             ESP_LOGI(tag, "Modem ready.");
-            ResetInputBuffers();
             return true;
         }
         vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -283,14 +282,6 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
     // #define ESP_TASKD_EVENT_PRIO          (ESP_TASK_PRIO_MAX - 5)
     // #define ESP_TASK_TCPIP_PRIO           (ESP_TASK_PRIO_MAX - 7)
     // #define ESP_TASK_MAIN_PRIO            (ESP_TASK_PRIO_MIN + 1)
-
-    /*
-    //EXPERIMENTING WITH POWER
-    if (!Command("AT+CPOF", "OK", nullptr, "Turn OFF")) {
-        ESP_LOGW(tag, "Turning off modem");
-    };
-
-    return; */
 
     if (!Command("AT", "OK", nullptr, "ATtention"))
     {
@@ -768,21 +759,6 @@ bool Cellular::SwitchToLowPowerMode()
     SwitchToCommandMode();
 
     String response;
-
-    /* NETIF_DISCONNECT DID IT ALREADY????
-
-
-        if (Command("ATH", "+PPPD: DISCONNECTED", &response, "Disconnect data call."))
-        {
-            ESP_LOGI(tag, "Disconnected data call.");
-        }
-        else
-        {
-            ESP_LOGE(tag, "Disconnecting data call failed.");
-        }
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-    */
-
     if (Command("AT+CFUN=0", "OK", &response, "Set modem to minimum functionality."))
     { // mode 4 would shut down RF entirely to "flight-mode"; mode 0 still keeps SMS receiption intact
         ESP_LOGI(tag, "Set modem to minimum functionality.");
@@ -816,7 +792,8 @@ bool Cellular::SwitchToFullPowerMode()
     String response;
     String command;
 
-    ResetInputBuffers();
+    ESP_LOGW(tag, "Skip resetting input buffer.");
+    //ResetInputBuffers();
 
     gpio_set_level(CELLULAR_GPIO_DTR, 0);
     // simcom documentation: "Anytime host want send data to module, it must be pull down DTR then wait minimum 20ms"
@@ -935,8 +912,9 @@ bool Cellular::SwitchToCommandMode()
     mbCommandMode = true;
     mbConnected = false;
 
-    ESP_LOGD(tag, "resetting input buffers.");
-    ResetInputBuffers();
+    ESP_LOGW(tag, "Skip resetting input buffer.");
+    //ESP_LOGD(tag, "resetting input buffers.");
+    //ResetInputBuffers();
 
     ESP_LOGD(tag, "sending break event.");
     uart_event_t uartBreakEvent = {
@@ -1030,13 +1008,23 @@ bool Cellular::SwitchToPppMode()
             ESP_LOGW(tag, "SwitchToPppMode() already in PPP mode");
             if (!mbConnected)
             {
-                //***************************************************
-                ESP_LOGW(tag, "SwitchToPppMode() BUT mbConnected is FALSE???");
+                ESP_LOGE(tag, "SwitchToPppMode() BUT mbConnected is FALSE???");
             }
             return true;
         };
-        ESP_LOGW(tag, "SwitchToPppMode() Network Down - restarting PPP mode");
+
+        // Data mode is still active, but connection broke!
+        ESP_LOGW(tag, "SwitchToPppMode(DATA) Network Down - restarting PPP mode");
+    } else {
+        ESP_LOGW(tag, "SwitchToPppMode(CMD) Network Down - restarting PPP mode");
     }
+
+    // *****************************
+    ESP_LOGI(tag, "SwitchToPppMode() Ensure netif is really STOPPPPEED!!!");
+    esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
+    mbCommandMode = true;
+    mbConnected = false;
+
 
     String response;
     if (Command("AT+CGDATA=\"PPP\",1", "CONNECT", &response, "Connect for data connection."))
@@ -1051,9 +1039,9 @@ bool Cellular::SwitchToPppMode()
         }
         else
         {
-            ESP_LOGI(tag, "Starting network interface.");
-            esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
-            ESP_LOGD(tag, "esp_netif_action_stopped");
+//            ESP_LOGI(tag, "Starting network interface.");
+//            esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
+//            ESP_LOGD(tag, "esp_netif_action_stopped");
             esp_netif_action_start(mpEspNetif, 0, 0, nullptr);
             ESP_LOGD(tag, "esp_netif_action_started");
         }
@@ -1290,6 +1278,16 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
         else if (id == IP_EVENT_PPP_LOST_IP)
         {
             ESP_LOGI(tag, "Cellular Disconnect from PPP Server");
+
+//*************** TESTING TESTING
+/*            ESP_LOGW(tag, "SWITCHING TO COMMANDMODE - espnetifactionstop, commandmode, not-connected : Cellular Disconnect from PPP Server");
+            esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
+            mbCommandMode = true;
+            mbConnected = false; */
+//******************
+
+
+
         }
         else if (id == IP_EVENT_GOT_IP6)
         {
