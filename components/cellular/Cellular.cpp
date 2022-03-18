@@ -247,7 +247,7 @@ bool Cellular::PowerOn(void)
     String line;
     while (maxModemReadyTime--)
     {
-        if (ModemReadLine(line, UART_INPUT_TIMEOUT_CMDSHORT))
+        if (ModemReadLine(line, UART_INPUT_TIMEOUT_CMDNORMAL))
             ESP_LOGD(tag, "ModemReadLine: '%s'", line.c_str());
 
         if (line.contains("RDY"))
@@ -792,12 +792,28 @@ bool Cellular::SwitchToFullPowerMode()
     String response;
     String command;
 
-    ResetInputBuffers();
+    //ResetInputBuffers();
 
     gpio_set_level(CELLULAR_GPIO_DTR, 0);
     // simcom documentation: "Anytime host want send data to module, it must be pull down DTR then wait minimum 20ms"
     vTaskDelay(100 / portTICK_PERIOD_MS);
 
+/*
+    int64_t timeLimit = esp_timer_get_time() + 1000000 * 60; // wait max 60 seconds
+    while (true)
+    {
+        if (Command("AT+CSCLK=1", "OK", &response, "Ensure UART is back."), 10, UART_INPUT_TIMEOUT_CMDSHORT)
+        { 
+            return true;
+        }
+
+        if (esp_timer_get_time() > timeLimit)
+        {
+            ESP_LOGE(tag, "Could not communicate with modem after waking from sleep.");
+            return false;
+        }
+    }
+*/
     if (Command("AT+CFUN=1", "OK", &response, "Set modem to full power mode."))
     { // mode 4 would shut down RF entirely to "flight-mode"; mode 0 still keeps SMS receiption intact
         ESP_LOGI(tag, "Switched to full power mode.");
@@ -936,7 +952,7 @@ bool Cellular::SwitchToCommandMode()
         ResetInputBuffers();
         if (ModemWriteLine("AT"))
         {
-            if (ModemReadResponse(response, "OK", 10, UART_INPUT_TIMEOUT_CMDSHORT))
+            if (ModemReadResponse(response, "OK", 10, UART_INPUT_TIMEOUT_CMDNORMAL))
             {
                 return true;
             }
@@ -1003,9 +1019,9 @@ bool Cellular::SwitchToPppMode()
     }
 
     ESP_LOGI(tag, "SwitchToPppMode() restarting PPP mode");
-    esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
     mbCommandMode = true;
     mbConnected = false;
+    esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
 
     String response;
     if (Command("AT+CGDATA=\"PPP\",1", "CONNECT", &response, "Connect for data connection."))
