@@ -776,15 +776,6 @@ bool Cellular::SwitchToLowPowerMode()
 
     // SIM7100/SIM7500/SIM7600/SIM7800 module must in idle mode (no data transmission, no audio playing, no other at command running and so on) in order to let SIM7100/SIM7500/SIM7600/SIM7800 module enter
     // into sleep mode
-
-    // .Wakeup Module
-    // SIM7100/SIM7500/SIM7600/SIM7800 module can exit from sleep mode automatically when the following
-    // events are satisfied:
-    //  UART event, DTR is pulled down if wants to wakeup module.
-    // wake through sleeping UART: continuously send AT+CSCLK=1\r\n  until  OK comes back
-
-    // ESP_LOGE(tag, "Switching to low power mode failed.");
-    // return false;
 }
 
 bool Cellular::SwitchToFullPowerMode()
@@ -795,25 +786,42 @@ bool Cellular::SwitchToFullPowerMode()
     //ResetInputBuffers();
 
     gpio_set_level(CELLULAR_GPIO_DTR, 0);
-    // simcom documentation: "Anytime host want send data to module, it must be pull down DTR then wait minimum 20ms"
-    vTaskDelay(100 / portTICK_PERIOD_MS);
+    // simcom documentation: "Anytime host want send data to module, it must be pull down DTR then wait minimum 20ms" --> Command() waits 100ms anyway
 
-/*
-    int64_t timeLimit = esp_timer_get_time() + 1000000 * 60; // wait max 60 seconds
+    // .Wakeup Module
+    // SIM7100/SIM7500/SIM7600/SIM7800 module can exit from sleep mode automatically when the following
+    // events are satisfied:
+    // UART event, DTR is pulled down if wants to wakeup module.
+    // wake through sleeping UART: continuously send AT+CSCLK=1\r\n  until  OK comes back
+
+    int timeLimit = esp_timer_get_time() / 1000000 + 60; // wait max 60 seconds
+    int timeLast = 0;
     while (true)
     {
-        if (Command("AT+CSCLK=1", "OK", &response, "Ensure UART is back."), 10, UART_INPUT_TIMEOUT_CMDSHORT)
+        if (Command("AT+CSCLK=1", "OK", &response, "Ensure UART is back.", 10, UART_INPUT_TIMEOUT_CMDSHORT))
         { 
-            return true;
+            break;
         }
 
-        if (esp_timer_get_time() > timeLimit)
+        int timeCurrent = esp_timer_get_time() / 1000000; // seconds
+
+        if (timeCurrent != timeLast)
+        {
+            ESP_LOGI(tag, "Waiting for modem to wake up, up to %is", timeLimit - timeCurrent);
+            timeLast = timeCurrent;
+        }
+
+        if (timeCurrent >= timeLimit)
         {
             ESP_LOGE(tag, "Could not communicate with modem after waking from sleep.");
+            gpio_set_level(CELLULAR_GPIO_DTR, 1);
             return false;
         }
+
+        vTaskDelay(200 / portTICK_PERIOD_MS);
+
     }
-*/
+
     if (Command("AT+CFUN=1", "OK", &response, "Set modem to full power mode."))
     { // mode 4 would shut down RF entirely to "flight-mode"; mode 0 still keeps SMS receiption intact
         ESP_LOGI(tag, "Switched to full power mode.");
@@ -827,8 +835,9 @@ bool Cellular::SwitchToFullPowerMode()
 
     ESP_LOGD(tag, "Switching back to full power....");
 
-    int maxWaitForNetworkRegistration = 120;
-    while (maxWaitForNetworkRegistration--)
+    timeLimit = esp_timer_get_time() / 1000000 + 120; // wait max 120 seconds
+    timeLast = 0;
+    while (true)
     {
         if (Command("AT+CREG?", "OK", &response, "Network Registration Information States "))
         { // +CREG: 0,2 // +CREG: 1,5
@@ -849,8 +858,21 @@ bool Cellular::SwitchToFullPowerMode()
         // 4 – unknown
         // 5 – registered, roaming
 
-        ESP_LOGI(tag, "Waiting for network %d", maxWaitForNetworkRegistration);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        int timeCurrent = esp_timer_get_time() / 1000000; // seconds
+
+        if (timeCurrent != timeLast)
+        {
+            ESP_LOGI(tag, "Waiting for network up to %is", timeLimit - timeCurrent);
+            timeLast = timeCurrent;
+        }
+
+        if (timeCurrent >= timeLimit)
+        {
+            ESP_LOGE(tag, "Could not communicate with modem after waking from sleep.");
+            return false;
+        }
+
+        vTaskDelay(200 / portTICK_PERIOD_MS);
     }
 
     QuerySignalStatus();

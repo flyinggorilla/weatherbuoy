@@ -8,7 +8,7 @@
 #include "esp_netif.h"
 
 
-static const TickType_t UART_INPUT_TIMEOUT_CMDSHORT = 250 / portTICK_PERIOD_MS;  // 250ms only used for quickly pinging
+static const TickType_t UART_INPUT_TIMEOUT_CMDSHORT = 1* 1000 / portTICK_PERIOD_MS;  // 1s only used for quickly pinging
 static const TickType_t UART_INPUT_TIMEOUT_CMDNORMAL = 30 * 1000 / portTICK_PERIOD_MS;
 static const TickType_t UART_INPUT_TIMEOUT_CMDLONG = 120 * 1000 / portTICK_PERIOD_MS; // 120s is defined in spec as max response time for such long running queries
 static const TickType_t UART_INPUT_TIMEOUT_PPP = 30 * 1000 / portTICK_PERIOD_MS;
