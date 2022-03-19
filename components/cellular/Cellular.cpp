@@ -1,4 +1,4 @@
-#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "sdkconfig.h"
 #include "Cellular.h"
 #include "EspString.h"
@@ -735,7 +735,7 @@ bool Cellular::ReadIntoBuffer(TickType_t timeout)
         return false;
     case UART_BREAK:
         // stopping data mode
-        ESP_LOGI(tag, "uart break.");
+        ESP_LOGD(tag, "uart break.");
         return true;
     case UART_PARITY_ERR:
         ESP_LOGE(tag, "uart parity error");
@@ -1262,7 +1262,7 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
 
     if (base == IP_EVENT)
     {
-        ESP_LOGI(tag, "IP event! %d", id);
+        ESP_LOGD(tag, "IP event! %d", id);
         if (id == IP_EVENT_PPP_GOT_IP)
         {
             esp_netif_dns_info_t dns_info;
@@ -1396,7 +1396,7 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
         {
             if (id == NETIF_PPP_ERRORUSER)
             {
-                ESP_LOGI(tag, "Netif PPP user interrupted.");
+                ESP_LOGD(tag, "Netif PPP user interrupted.");
             }
             else
             {

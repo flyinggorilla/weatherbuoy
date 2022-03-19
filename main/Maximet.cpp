@@ -154,6 +154,13 @@ void Maximet::MaximetTask()
         }
         ESP_LOGD(tag, "THE LINE: %s", line.c_str());
 
+// THIS IS FOR DEBUGGING ONLY
+if (mMaximetModel == Model::GMX200GPS)
+{
+    String truncatedLine = line.substring(1, line.length() - 4);
+    ESP_LOGI(tag, "RAWLINE: %s", truncatedLine.c_str());
+}
+
         int cpos = 0;
         int len = line.length();
         int col = 0;
