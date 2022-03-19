@@ -923,7 +923,11 @@ void Cellular::QuerySignalStatus()
 
     Command("AT+COPS?", "OK", &response, "Operator Selection"); // +COPS: 0,0,"A1" // CONFIG_LILYGO_TTGO_TCALL14_SIM800
                                                                 // +COPS: 0,0,"yesss!",2 // SIM7600
-    ESP_LOGI(tag, "Operator: %s", response.c_str());
+    if (response.startsWith("+COPS: "))
+    {
+        msOperator = response.substring(response.indexOf(",\"") + 2, response.lastIndexOf("\""));
+    }
+    ESP_LOGI(tag, "Operator: %s", msOperator.c_str());
 
     if (Command("AT+CSQ", "OK", &response, "Signal Quality Report"))
     { // +CSQ: 13,0
