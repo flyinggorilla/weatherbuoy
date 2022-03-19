@@ -359,7 +359,7 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
                 }
 
                 ESP_LOGI(tag, "Switching to PPP mode next...");
-                if (!mCellular.SwitchToPppMode())
+                if (!mCellular.SwitchToPppMode(attempts < 2))
                 {
                     ESP_LOGE(tag, "Failed to switch to PPP mode. Shutting down modem. Remaining attempts: %i", attempts);
                     mCellular.SwitchToLowPowerMode();
@@ -533,7 +533,7 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
         while (attempts--)
         {
             ESP_LOGI(tag, "switching to PPP mode next...");
-            if (mCellular.SwitchToPppMode())
+            if (mCellular.SwitchToPppMode(!attempts))
             {
 
                 if (!prepared)

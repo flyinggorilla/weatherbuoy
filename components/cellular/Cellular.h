@@ -34,7 +34,7 @@ public:
 
     bool Command(const char *sCommand,const char *sSuccess, String *sResponse = nullptr, const char *sInfo = nullptr, unsigned short maxLines = 100, TickType_t timeout = UART_INPUT_TIMEOUT_CMDNORMAL);
     bool SwitchToCommandMode(); // todo, move to private
-    bool SwitchToPppMode(); // can be moved to private
+    bool SwitchToPppMode(bool forceRestartPpp = false); // can be moved to private
     bool SwitchToLowPowerMode();
     bool SwitchToFullPowerMode();
     void QuerySignalStatus();

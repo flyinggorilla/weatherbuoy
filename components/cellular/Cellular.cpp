@@ -1013,7 +1013,7 @@ bool Cellular::SwitchToCommandMode()
     return true;
 }
 
-bool Cellular::SwitchToPppMode()
+bool Cellular::SwitchToPppMode(bool forceRestartPpp)
 {
 
     if (mbPowerSaverActive)
@@ -1034,7 +1034,7 @@ bool Cellular::SwitchToPppMode()
     }
     // reading on PPP handshake and LCP start frame https://lateblt.tripod.com/bit60.txt
 
-    if (!mbCommandMode && mbConnected && esp_netif_is_netif_up(mpEspNetif))
+    if (!mbCommandMode && mbConnected && !forceRestartPpp && esp_netif_is_netif_up(mpEspNetif))
     {
         ESP_LOGI(tag, "SwitchToPppMode() already in PPP mode");
         return true;
