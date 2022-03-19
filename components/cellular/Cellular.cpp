@@ -1286,6 +1286,7 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
         else if (id == IP_EVENT_PPP_LOST_IP)
         {
             ESP_LOGI(tag, "Cellular Disconnect from PPP Server");
+            mbConnected = false;
         }
         else if (id == IP_EVENT_GOT_IP6)
         {
@@ -1309,42 +1310,55 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
             break;
         case NETIF_PPP_ERRORPARAM:
             status = "Invalid parameter.";
+            mbConnected = false;
             break;
         case NETIF_PPP_ERROROPEN:
             status = "Unable to open PPP session.";
+            mbConnected = false;
             break;
         case NETIF_PPP_ERRORDEVICE:
             status = "Invalid I/O device for PPP.";
+            mbConnected = false;
             break;
         case NETIF_PPP_ERRORALLOC:
             status = "Unable to allocate resources.";
+            mbConnected = false;
             break;
         case NETIF_PPP_ERRORUSER:
             status = "User interrupt.";
+            mbConnected = false;
             break;
         case NETIF_PPP_ERRORCONNECT:
             status = "Connection lost.";
+            mbConnected = false;
             break;
         case NETIF_PPP_ERRORAUTHFAIL:
             status = "Failed authentication challenge.";
+            mbConnected = false;
             break;
         case NETIF_PPP_ERRORPROTOCOL:
             status = "Failed to meet protocol.";
+            mbConnected = false;
             break;
         case NETIF_PPP_ERRORPEERDEAD:
             status = "Connection timeout";
+            mbConnected = false;
             break;
         case NETIF_PPP_ERRORIDLETIMEOUT:
             status = "Idle Timeout";
+            mbConnected = false;
             break;
         case NETIF_PPP_ERRORCONNECTTIME:
             status = "Max connect time reached";
+            mbConnected = false;
             break;
         case NETIF_PPP_ERRORLOOPBACK:
             status = "Loopback detected";
+            mbConnected = false;
             break;
         case NETIF_PPP_PHASE_DEAD:
             status = "NETIF_PPP_PHASE_DEAD";
+            mbConnected = false;
             break;
         case NETIF_PPP_PHASE_MASTER:
             status = "NETIF_PPP_PHASE_MASTER";
@@ -1397,10 +1411,12 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
             if (id == NETIF_PPP_ERRORUSER)
             {
                 ESP_LOGD(tag, "Netif PPP user interrupted.");
+                mbConnected = false;
             }
             else
             {
                 ESP_LOGE(tag, "Netif PPP Status Error: %s", status);
+                mbConnected = false;
             }
         }
         else
