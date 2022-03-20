@@ -431,6 +431,7 @@ void MaximetSimulator::SendDataPoint()
         line.printf(",%s", mData.windstat);
         line.printf(",%s", gpsStatus.c_str());
         line.printf(",%s", isoTime);
+        line += ",";
         break;
     }
     case Maximet::Model::GMX501:
@@ -457,6 +458,7 @@ void MaximetSimulator::SendDataPoint()
         line.printf(",%+03i", mData.zorient);
         line.printf(",%s", mData.status);
         line.printf(",%s", mData.windstat);
+        line += ",";
         break;
     }
     case Maximet::Model::GMX501GPS:
@@ -491,6 +493,7 @@ void MaximetSimulator::SendDataPoint()
         line.printf(",%+010.6f:%+010.6f:+2.00", mData.lat, mData.lon);
         line.printf(",%s", gpsStatus.c_str());
         line.printf(",%s", isoTime);
+        line += ",";
         break;
     }
     case Maximet::Model::GMX501RAIN:
@@ -505,7 +508,7 @@ void MaximetSimulator::SendDataPoint()
     unsigned char checksum = CalculateChecksum(line);
 
     String sendLine;
-    sendLine.printf("\x02%s\x03%02X", line.c_str(), checksum);
+    sendLine.printf("%c%s%c%02X", STX, line.c_str(), ETX, checksum);
     // ESP_LOG_BUFFER_HEXDUMP(tag, line.c_str(), line.length(), ESP_LOG_INFO);
     ESP_LOGI(tag, "%s", sendLine.c_str());
     SendLine(sendLine);
