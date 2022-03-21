@@ -785,7 +785,7 @@ bool Cellular::SwitchToFullPowerMode()
     String response;
     String command;
 
-    //ResetInputBuffers();
+    ResetInputBuffers();
 
     gpio_set_level(CELLULAR_GPIO_DTR, 0);
     // simcom documentation: "Anytime host want send data to module, it must be pull down DTR then wait minimum 20ms" --> Command() waits 100ms anyway
@@ -952,6 +952,7 @@ bool Cellular::SwitchToCommandMode()
     ESP_LOGD(tag, "netif action stopped.");
     vTaskDelay(100 / portTICK_PERIOD_MS);
 
+    ResetInputBuffers();
     mbCommandMode = true;
     //mbConnected = false;
 
