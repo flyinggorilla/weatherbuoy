@@ -258,9 +258,10 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
             mPostData += mrMaximetConfig.sSensor;
             mPostData += "\",\"serial\": \"";
             mPostData += mrMaximetConfig.sSerial;
+            mPostData += "\"";
             if (mrMaximetConfig.model != Maximet::Model::GMX200GPS)
             {
-                mPostData += "\",\"hasl\": ";
+                mPostData += ",\"hasl\": ";
                 mPostData += mrMaximetConfig.fHasl;
                 mPostData += ",\"hastn\": ";
                 mPostData += mrMaximetConfig.fHastn;
