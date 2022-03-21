@@ -672,7 +672,8 @@ void Cellular::InitNetwork()
 
 void Cellular::ResetInputBuffers()
 {
-    ESP_LOGI(tag, "ResetInputbuffers(Mode=%s, Connected=%s)", mbCommandMode ? "CMD" : "DATA", mbConnected ? "Y" : "N");
+    //ESP_LOGI(tag, "ResetInputbuffers(Mode=%s, Connected=%s)", mbCommandMode ? "CMD" : "DATA", mbConnected ? "Y" : "N");
+    ESP_LOGI(tag, "ResetInputbuffers(Mode=%s)", mbCommandMode ? "CMD" : "DATA");
     uart_flush_input(muiUartNo);
     muiBufferLen = 0;
     muiBufferPos = 0;
@@ -689,7 +690,8 @@ bool Cellular::ReadIntoBuffer(TickType_t timeout)
     // Waiting for UART event.
     if (pdTRUE != xQueueReceive(mhUartEventQueueHandle, (void *)&event, timeout))
     {
-        ESP_LOGD(tag, "ReadIntoBuffer timeout at xQueueReceive. Mode=%s, Connected=%s", mbCommandMode ? "CMD" : "DATA", mbConnected ? "Y" : "N");
+        //ESP_LOGD(tag, "ReadIntoBuffer timeout at xQueueReceive. Mode=%s, Connected=%s", mbCommandMode ? "CMD" : "DATA", mbConnected ? "Y" : "N");
+        ESP_LOGD(tag, "ReadIntoBuffer timeout at xQueueReceive. Mode=%s", mbCommandMode ? "CMD" : "DATA");
         return false;
     }
 
@@ -951,7 +953,7 @@ bool Cellular::SwitchToCommandMode()
     vTaskDelay(100 / portTICK_PERIOD_MS);
 
     mbCommandMode = true;
-    mbConnected = false;
+    //mbConnected = false;
 
     ESP_LOGD(tag, "sending break event.");
     uart_event_t uartBreakEvent = {
@@ -1038,44 +1040,39 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
     }
     // reading on PPP handshake and LCP start frame https://lateblt.tripod.com/bit60.txt
 
-    if (!mbCommandMode && mbConnected && !forceRestartPpp && esp_netif_is_netif_up(mpEspNetif))
+    if (!mbCommandMode /* && mbConnected */ && !forceRestartPpp && esp_netif_is_netif_up(mpEspNetif))
     {
         ESP_LOGI(tag, "SwitchToPppMode() already in PPP mode");
         return true;
     }
 
     ESP_LOGI(tag, "SwitchToPppMode() restarting PPP mode");
-    mbCommandMode = true;
-    mbConnected = false;
     esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
+    mbCommandMode = true;
+    //mbConnected = false;
 
     String response;
     if (Command("AT+CGDATA=\"PPP\",1", "CONNECT", &response, "Connect for data connection."))
     {
         ESP_LOGI(tag, "Switch to PPP: CONNECTED");
         mbCommandMode = false;
-        mbConnected = false;
-
+        //mbConnected = false;
         esp_netif_action_start(mpEspNetif, 0, 0, nullptr);
 
         // WAIT FOR IP ADDRESS
-        ESP_LOGI(tag, "Waiting up to 60 seconds for getting IP address");
-        if (xSemaphoreTake(mxConnected, 60 * 1000 / portTICK_PERIOD_MS) == pdTRUE)
+        ESP_LOGI(tag, "Waiting up to 180 seconds for getting IP address");
+        if (xSemaphoreTake(mxConnected, 180 * 1000 / portTICK_PERIOD_MS) == pdTRUE)
         {
             // note that esp_netif_action_ calls should all happen in THIS thread, and not in the event handler
+            //mbConnected = true;
             esp_netif_action_connected(mpEspNetif, 0, 0, nullptr);
-            mbConnected = true;
             return true;
         }
 
-
-///************ FIX TYPO in optained after debugging
-// ************ revie: https://www.esp32.com/viewtopic.php?t=23632
-
-        ESP_LOGE(tag, "Stopped Netif because IP address could not be optained");
+        ESP_LOGE(tag, "Stopped Netif because IP address could not be obtained");
         esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
         mbCommandMode = true;
-        mbConnected = false;
+        //mbConnected = false;
         return false;
     }
     else
@@ -1083,7 +1080,7 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
         ESP_LOGW(tag, "Not yet connected!! Staying in command mode. Other action needed here????"); //******************************************************
         esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
         mbCommandMode = true;
-        mbConnected = false;
+        //mbConnected = false;
         return false;
     }
 
@@ -1294,7 +1291,7 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
         else if (id == IP_EVENT_PPP_LOST_IP)
         {
             ESP_LOGI(tag, "Cellular Disconnect from PPP Server");
-            mbConnected = false;
+            //mbConnected = false;
         }
         else if (id == IP_EVENT_GOT_IP6)
         {
@@ -1318,55 +1315,55 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
             break;
         case NETIF_PPP_ERRORPARAM:
             status = "Invalid parameter.";
-            mbConnected = false;
+            //mbConnected = false;
             break;
         case NETIF_PPP_ERROROPEN:
             status = "Unable to open PPP session.";
-            mbConnected = false;
+            //mbConnected = false;
             break;
         case NETIF_PPP_ERRORDEVICE:
             status = "Invalid I/O device for PPP.";
-            mbConnected = false;
+            //mbConnected = false;
             break;
         case NETIF_PPP_ERRORALLOC:
             status = "Unable to allocate resources.";
-            mbConnected = false;
+            //mbConnected = false;
             break;
         case NETIF_PPP_ERRORUSER:
             status = "User interrupt.";
-            mbConnected = false;
+            //mbConnected = false;
             break;
         case NETIF_PPP_ERRORCONNECT:
             status = "Connection lost.";
-            mbConnected = false;
+            //mbConnected = false;
             break;
         case NETIF_PPP_ERRORAUTHFAIL:
             status = "Failed authentication challenge.";
-            mbConnected = false;
+            //mbConnected = false;
             break;
         case NETIF_PPP_ERRORPROTOCOL:
             status = "Failed to meet protocol.";
-            mbConnected = false;
+            //mbConnected = false;
             break;
         case NETIF_PPP_ERRORPEERDEAD:
             status = "Connection timeout";
-            mbConnected = false;
+            //mbConnected = false;
             break;
         case NETIF_PPP_ERRORIDLETIMEOUT:
             status = "Idle Timeout";
-            mbConnected = false;
+            //mbConnected = false;
             break;
         case NETIF_PPP_ERRORCONNECTTIME:
             status = "Max connect time reached";
-            mbConnected = false;
+            //mbConnected = false;
             break;
         case NETIF_PPP_ERRORLOOPBACK:
             status = "Loopback detected";
-            mbConnected = false;
+            //mbConnected = false;
             break;
         case NETIF_PPP_PHASE_DEAD:
             status = "NETIF_PPP_PHASE_DEAD";
-            mbConnected = false;
+            //mbConnected = false;
             break;
         case NETIF_PPP_PHASE_MASTER:
             status = "NETIF_PPP_PHASE_MASTER";
@@ -1403,11 +1400,11 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
             break;
         case NETIF_PPP_PHASE_DISCONNECT:
             status = "NETIF_PPP_PHASE_DISCONNECT";
-            mbConnected = false;
+            //mbConnected = false;
             break;
         case NETIF_PPP_CONNECT_FAILED:
             status = "NETIF_PPP_CONNECT_FAILED";
-            mbConnected = false;
+            //mbConnected = false;
             break;
         default:
             ESP_LOGW(tag, "Unknown Netif PPP event! id=%d", id);
@@ -1419,12 +1416,12 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
             if (id == NETIF_PPP_ERRORUSER)
             {
                 ESP_LOGD(tag, "Netif PPP user interrupted.");
-                mbConnected = false;
+                //mbConnected = false;
             }
             else
             {
                 ESP_LOGE(tag, "Netif PPP Status Error: %s", status);
-                mbConnected = false;
+                //mbConnected = false;
             }
         }
         else
