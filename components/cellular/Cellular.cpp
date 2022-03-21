@@ -1,4 +1,4 @@
-//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "sdkconfig.h"
 #include "Cellular.h"
 #include "EspString.h"
@@ -672,7 +672,7 @@ void Cellular::InitNetwork()
 
 void Cellular::ResetInputBuffers()
 {
-    ESP_LOGD(tag, "ResetInputbuffers()");
+    ESP_LOGI(tag, "ResetInputbuffers(Mode=%s, Connected=%s)", mbCommandMode ? "CMD" : "DATA", mbConnected ? "Y" : "N");
     uart_flush_input(muiUartNo);
     muiBufferLen = 0;
     muiBufferPos = 0;
@@ -735,7 +735,7 @@ bool Cellular::ReadIntoBuffer(TickType_t timeout)
         return false;
     case UART_BREAK:
         // stopping data mode
-        ESP_LOGD(tag, "uart break.");
+        ESP_LOGI(tag, "uart break.");
         return true;
     case UART_PARITY_ERR:
         ESP_LOGE(tag, "uart parity error");
@@ -1068,6 +1068,10 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
             return true;
         }
 
+
+///************ FIX TYPO in optained after debugging
+// ************ revie: https://www.esp32.com/viewtopic.php?t=23632
+
         ESP_LOGE(tag, "Stopped Netif because IP address could not be optained");
         esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
         mbCommandMode = true;
@@ -1225,7 +1229,7 @@ bool Cellular::ModemReadResponse(String &sResponse, const char *expectedLastLine
             sResponse += "\r\n";
         }
     }
-    ESP_LOGE(tag, "Error more lines than %d, expected %s: '%s', '%s'", maxLines, expectedLastLineResponse, sLine.c_str(), sResponse.c_str());
+    ESP_LOGE(tag, "Error more lines than %i, expected %s: '%s', '%s'", maxLines, expectedLastLineResponse, sLine.c_str(), sResponse.c_str());
     return false;
 }
 

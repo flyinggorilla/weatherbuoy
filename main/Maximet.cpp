@@ -153,13 +153,13 @@ void Maximet::MaximetTask()
             continue;
         }
         ESP_LOGD(tag, "THE LINE: %s", line.c_str());
-
+/*
 // THIS IS FOR DEBUGGING ONLY
 if (mMaximetModel == Model::GMX200GPS)
 {
     String truncatedLine = line.substring(1, line.length() - 4);
     ESP_LOGI(tag, "RAWLINE: %s", truncatedLine.c_str());
-}
+} */
 
         int cpos = 0;
         int len = line.length();
@@ -563,11 +563,11 @@ if (mMaximetModel == Model::GMX200GPS)
                 {
                     if (is1HzOutput)
                     {
-                        ESP_LOGW(tag, "Last records data.cspeed: %0.2f data.cdir: %d", data.cspeed, data.cdir);
+                        //ESP_LOGW(tag, "Last records data.cspeed: %0.2f data.cdir: %d", data.cspeed, data.cdir);
                         data.cspeed = shortAvgCSpeedVector.getSpeed();
                         data.cdir = shortAvgCSpeedVector.getDir();
                         shortAvgCSpeedVector.clear();
-                        ESP_LOGW(tag, "Averaged data.cspeed: %0.2f data.cdir: %d", data.cspeed, data.cdir);
+                        //ESP_LOGW(tag, "Averaged data.cspeed: %0.2f data.cdir: %d", data.cspeed, data.cdir);
                     }
 
                     ESP_LOGI(tag, "Pushing measurement data to queue: '%s', %d seconds since start (%d..%d)", line.c_str(cposDataStart), data.uptime, cposDataStart, cposDataEnd);
@@ -583,20 +583,6 @@ if (mMaximetModel == Model::GMX200GPS)
                     {
                         ESP_LOGE(tag, "Queue is full. We should never be here.");
                     }
-
-                    /*
-                        if (uxQueueSpacesAvailable(mxDataQueue) == 0) {
-                            // queue is full, so remove an element
-                            ESP_LOGW(tag, "Queue is full, dropping unsent oldest data.");
-                            Data receivedData;
-                            xQueueReceive(mxDataQueue, &receivedData, 0);
-                        }
-
-                        // PUT pData to queue
-                        if (xQueueSend(mxDataQueue, &data, 0) != pdTRUE) {
-                            // data could not put to queue, so make sure to delete the data
-                            ESP_LOGE(tag, "Queue is full. We should never be here.");
-                        }*/
 
                     lastUptime = data.uptime;
                 }
