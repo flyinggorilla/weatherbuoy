@@ -651,6 +651,20 @@ void Cellular::InitNetwork()
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, cellularEventHandler, this, nullptr));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, cellularEventHandler, this, nullptr));
 
+    NewNetif();
+}
+
+void Cellular::NewNetif()
+{
+
+    if (mpEspNetif)
+    {
+        esp_netif_destroy(mpEspNetif);
+        mpEspNetif = nullptr;
+        ESP_LOGI(tag, "Netif destroyed. Ready to renew.");
+    }
+
+
     // Init netif object
     esp_netif_config_t cfg = ESP_NETIF_DEFAULT_PPP();
     mpEspNetif = esp_netif_new(&cfg);
@@ -666,8 +680,10 @@ void Cellular::InitNetwork()
     }
     else
     {
-        ESP_LOGW(tag, "Failed to install cellular network driver. Retry later??");
+        ESP_LOGE(tag, "Failed to install cellular network driver. Restarting.");
+        esp_restart();
     }
+
 }
 
 void Cellular::ResetInputBuffers()
@@ -1012,7 +1028,8 @@ bool Cellular::SwitchToCommandMode()
 
     if (!attempts)
     {
-        ESP_LOGE(tag, "Could not enter commandline mode. %s", response.c_str());
+        ESP_LOGE(tag, "SEVERE, could not enter commandline mode. %s. restarting.", response.c_str());
+        esp_restart();
         return false;
     }
 
@@ -1052,6 +1069,12 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
     mbCommandMode = true;
     //mbConnected = false;
 
+    if (miPppPhase != NETIF_PPP_PHASE_DEAD)
+    {
+        ESP_LOGW(tag, "Netif not DEAD, recreating Netif. %i", miPppPhase);
+        NewNetif();
+    }
+
     String response;
     if (Command("AT+CGDATA=\"PPP\",1", "CONNECT", &response, "Connect for data connection."))
     {
@@ -1060,7 +1083,8 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
         //mbConnected = false;
         esp_netif_action_start(mpEspNetif, 0, 0, nullptr);
 
-        // WAIT FOR IP ADDRESS
+        // WAIT FOR IP ADDRESS 
+        // (IP Lost timer defaults to 120 seconds, so wait 60 additional seconds)
         ESP_LOGI(tag, "Waiting up to 180 seconds for getting IP address");
         if (xSemaphoreTake(mxConnected, 180 * 1000 / portTICK_PERIOD_MS) == pdTRUE)
         {
@@ -1308,6 +1332,12 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
     }
     else if (base == NETIF_PPP_STATUS)
     {
+
+        if (id >= NETIF_PP_PHASE_OFFSET)
+        {
+            miPppPhase = id;        
+        }
+
         const char *status;
         switch (id)
         {

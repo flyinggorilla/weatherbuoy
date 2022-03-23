@@ -6,6 +6,7 @@
 #include "driver/gpio.h"
 #include "esp_event.h"
 #include "esp_netif.h"
+#include "esp_netif_ppp.h"
 
 
 static const TickType_t UART_INPUT_TIMEOUT_CMDSHORT = 1* 1000 / portTICK_PERIOD_MS;  // 1s only used for quickly pinging
@@ -54,6 +55,7 @@ public:
 private:
     bool PowerOn();
     void InitNetwork();
+    void NewNetif();
 
     friend esp_err_t esp_cellular_post_attach_start(esp_netif_t * esp_netif, void * args);
 
@@ -92,9 +94,10 @@ private:
     String msUser;
     String msPass;
 
-    bool mbConnected = false;
+    //bool mbConnected = false;
     bool mbCommandMode = true;
     bool mbPowerSaverActive = false;
+    int miPppPhase = NETIF_PPP_PHASE_DEAD;
 
     SemaphoreHandle_t mxConnected;
 
