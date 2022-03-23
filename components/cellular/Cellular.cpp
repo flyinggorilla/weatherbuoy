@@ -17,6 +17,20 @@ static const char tag[] = "Cellular";
 #error UART function must be configured into IRAM, otherwise OTA will fail.
 #endif
 
+// these variables survive soft-restarts; dont initialize
+__NOINIT_ATTR int cellularRestarts;
+__NOINIT_ATTR int cellularRestartReason; 
+__NOINIT_ATTR int cellularNetifRecreates; 
+__NOINIT_ATTR int cellularNetifPppConnects;
+#define CELLULAR_RESTART_NONE 0
+#define CELLULAR_RESTART_NETIFATTACHFAILED 1
+#define CELLULAR_RESTART_ENTERCMDFAILED 2
+#define CELLULAR_RESTART_TURNONMODEMFAILED 3
+#define CELLULAR_RESTART_NONE 4
+
+
+
+
 // ------------------------------------------
 // change device in Menuconfig->Cellular
 // ------------------------------------------
@@ -91,7 +105,34 @@ void cellularEventHandler(void *ctx, esp_event_base_t base, int32_t id, void *ev
 Cellular::Cellular()
 {
     mxConnected = xSemaphoreCreateBinary();
+
+    if (esp_reset_reason() != ESP_RST_SW)
+    {
+        ESP_LOGI(tag, "Resetting diagnostics variables");
+        cellularNetifPppConnects = 0;
+        cellularRestarts = 0;
+        cellularNetifRecreates = 0;
+        cellularRestartReason = 0;
+    }
 }
+
+int Cellular::getCellularRestarts()
+{
+    return cellularRestarts;
+};
+int Cellular::getCellularRestartReason()
+{
+    return cellularRestartReason;
+};
+int Cellular::getCellularNetifRecreates()
+{
+    return cellularNetifRecreates;
+};
+int Cellular::getCellularNetifPppConnects()
+{
+    return cellularNetifPppConnects;
+};
+
 
 bool Cellular::InitModem()
 {
@@ -681,6 +722,7 @@ void Cellular::NewNetif()
     else
     {
         ESP_LOGE(tag, "Failed to install cellular network driver. Restarting.");
+        cellularRestartReason = CELLULAR_RESTART_NETIFATTACHFAILED;
         esp_restart();
     }
 
@@ -1029,6 +1071,7 @@ bool Cellular::SwitchToCommandMode()
     if (!attempts)
     {
         ESP_LOGE(tag, "SEVERE, could not enter commandline mode. %s. restarting.", response.c_str());
+        cellularRestartReason = CELLULAR_RESTART_ENTERCMDFAILED;
         esp_restart();
         return false;
     }
@@ -1052,6 +1095,7 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
         {
             ESP_LOGE(tag, "SEVERE, could not switch modem to full power mode. Need to reboot");
             vTaskDelay(1000 / portTICK_PERIOD_MS);
+            cellularRestartReason = CELLULAR_RESTART_TURNONMODEMFAILED;
             esp_restart();
             return false;
         }
@@ -1072,8 +1116,14 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
     if (miPppPhase != NETIF_PPP_PHASE_DEAD)
     {
         ESP_LOGW(tag, "Netif not DEAD, recreating Netif. %i", miPppPhase);
+        cellularNetifRecreates++;
         NewNetif();
     }
+
+    cellularNetifPppConnects++;
+
+    ESP_LOGD(tag, "Diagnostics: PPP-Connects=%i, Netif-Recreates=%i, Cellular-Restarts=%i, Cellular-Restart-Reason=%i", 
+            cellularNetifPppConnects, cellularNetifRecreates, cellularRestarts, cellularRestartReason);
 
     String response;
     if (Command("AT+CGDATA=\"PPP\",1", "CONNECT", &response, "Connect for data connection."))

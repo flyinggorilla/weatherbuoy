@@ -14,7 +14,6 @@ static const TickType_t UART_INPUT_TIMEOUT_CMDNORMAL = 30 * 1000 / portTICK_PERI
 static const TickType_t UART_INPUT_TIMEOUT_CMDLONG = 120 * 1000 / portTICK_PERIOD_MS; // 120s is defined in spec as max response time for such long running queries
 static const TickType_t UART_INPUT_TIMEOUT_PPP = 30 * 1000 / portTICK_PERIOD_MS;
 
-
 class Cellular;
 
 
@@ -42,6 +41,11 @@ public:
 
     unsigned long long getDataSent() { return mullSentTotal; };
     unsigned long long getDataReceived() { return mullReceivedTotal; };
+
+    int getCellularRestarts();
+    int getCellularRestartReason();
+    int getCellularNetifRecreates();
+    int getCellularNetifPppConnects();
 
     String msPreferredOperator;
     int miPreferredNetwork;
