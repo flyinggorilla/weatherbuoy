@@ -18,6 +18,7 @@ static const char tag[] = "Cellular";
 #endif
 
 // these variables survive soft-restarts; dont initialize
+__NOINIT_ATTR int cellularInit;
 __NOINIT_ATTR int cellularRestarts;
 __NOINIT_ATTR int cellularRestartReason; 
 __NOINIT_ATTR int cellularNetifRecreates; 
@@ -106,9 +107,10 @@ Cellular::Cellular()
 {
     mxConnected = xSemaphoreCreateBinary();
 
-    if (esp_reset_reason() != ESP_RST_SW)
+    if (esp_reset_reason() != ESP_RST_SW || cellularInit != 0)
     {
         ESP_LOGI(tag, "Resetting diagnostics variables");
+        cellularInit = 0;
         cellularNetifPppConnects = 0;
         cellularRestarts = 0;
         cellularNetifRecreates = 0;
@@ -723,6 +725,7 @@ void Cellular::NewNetif()
     {
         ESP_LOGE(tag, "Failed to install cellular network driver. Restarting.");
         cellularRestartReason = CELLULAR_RESTART_NETIFATTACHFAILED;
+        cellularRestarts++;
         esp_restart();
     }
 
@@ -1072,6 +1075,7 @@ bool Cellular::SwitchToCommandMode()
     {
         ESP_LOGE(tag, "SEVERE, could not enter commandline mode. %s. restarting.", response.c_str());
         cellularRestartReason = CELLULAR_RESTART_ENTERCMDFAILED;
+        cellularRestarts++;
         esp_restart();
         return false;
     }
@@ -1096,6 +1100,7 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
             ESP_LOGE(tag, "SEVERE, could not switch modem to full power mode. Need to reboot");
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             cellularRestartReason = CELLULAR_RESTART_TURNONMODEMFAILED;
+            cellularRestarts++;
             esp_restart();
             return false;
         }
