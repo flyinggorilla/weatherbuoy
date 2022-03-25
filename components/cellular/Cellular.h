@@ -42,11 +42,6 @@ public:
     unsigned long long getDataSent() { return mullSentTotal; };
     unsigned long long getDataReceived() { return mullReceivedTotal; };
 
-    int getCellularRestarts();
-    int getCellularRestartReason();
-    int getCellularNetifRecreates();
-    int getCellularNetifPppConnects();
-
     String msPreferredOperator;
     int miPreferredNetwork;
 
@@ -58,8 +53,10 @@ public:
 
 private:
     bool PowerOn();
-    void InitNetwork();
-    void NewNetif();
+    bool InitNetwork();
+
+    // creates a new PPP network interface; destroys the old one if exists.
+    bool RenewPppNetif();
 
     friend esp_err_t esp_cellular_post_attach_start(esp_netif_t * esp_netif, void * args);
 

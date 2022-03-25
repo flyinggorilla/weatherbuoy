@@ -98,8 +98,36 @@ void TestATCommands(Cellular &cellular);
 #include "VelocityVector.h"
 void TestVelocityVector();
 
+
+/****
+// these variables survive soft-restarts; dont initialize
+__NOINIT_ATTR unsigned int cellularInit;
+__NOINIT_ATTR unsigned int cellularRestarts;
+__NOINIT_ATTR unsigned int cellularRestartReason;
+__NOINIT_ATTR unsigned int cellularNetifRecreates;
+__NOINIT_ATTR unsigned int cellularNetifPppConnects;
+#define CELLULAR_RESTART_NONE 0
+#define CELLULAR_RESTART_NETIFATTACHFAILED 1
+#define CELLULAR_RESTART_ENTERCMDFAILED 2
+#define CELLULAR_RESTART_TURNONMODEMFAILED 3
+#define CELLULAR_RESTART_NONE 4
+***/
+
 void Esp32WeatherBuoy::Start()
 {
+    /***
+    // reset diagnostics variables, if not soft-restart
+    if (esp_reset_reason() != ESP_RST_SW || cellularInit != 0)
+    {
+        ESP_LOGI(tag, "Resetting diagnostics variables");
+        cellularInit = 0;
+        cellularNetifPppConnects = 0;
+        cellularRestarts = 0;
+        cellularNetifRecreates = 0;
+        cellularRestartReason = 0;
+    }
+    ***/
+
 
 #if LOG_LOCAL_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG || CONFIG_LOG_DEFAULT_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG
     esp_log_level_set("Cellular", ESP_LOG_DEBUG);
@@ -241,12 +269,9 @@ void Esp32WeatherBuoy::HandleAlarm(Alarm *pAlarm)
     ESP_LOGI(tag, "switching to full power mode next...");
     if (!mCellular.SwitchToFullPowerMode())
     {
-        ESP_LOGW(tag, "Retrying switching to full power mode ...");
-        if (!mCellular.SwitchToFullPowerMode())
-        {
-            ESP_LOGE(tag, "Switching to full power mode failed");
-            return;
-        }
+        ESP_LOGE(tag, "SEVERE, Switching to full power mode failed. Restarting.");
+        esp_restart();
+        return;
     }
 
     vTaskDelay(1000 / portTICK_PERIOD_MS);
@@ -353,16 +378,14 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
                 ESP_LOGI(tag, "Switching to full power mode next...");
                 if (!mCellular.SwitchToFullPowerMode())
                 {
-                    ESP_LOGE(tag, "Switching to full power mode failed. Shutting down again. Remaining attempts: %i", attempts);
-                    mCellular.SwitchToLowPowerMode();
+                    ESP_LOGE(tag, "SEVERE, Switching to full power mode failed. Remaining attempts: %i", attempts);
                     continue;
                 }
 
                 ESP_LOGI(tag, "Switching to PPP mode next...");
-                if (!mCellular.SwitchToPppMode(attempts < 2))
+                if (!mCellular.SwitchToPppMode(attempts < 3))
                 {
-                    ESP_LOGE(tag, "Failed to switch to PPP mode. Shutting down modem. Remaining attempts: %i", attempts);
-                    mCellular.SwitchToLowPowerMode();
+                    ESP_LOGE(tag, "SEVERE, Failed to switch to PPP mode. Remaining attempts: %i", attempts);
                     continue;
                 };
 
@@ -516,7 +539,13 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
         if (bDiagnostics)
         {
             // to retrieve updated network info we need to exit PPP mode
-            mCellular.SwitchToCommandMode();
+            if(!mCellular.SwitchToCommandMode())
+            {
+                //cellularRestartReason = CELLULAR_RESTART_ENTERCMDFAILED;
+                //cellularRestarts++;
+                ESP_LOGE(tag, "SwitchToCommandMode() failed. Restarting.");
+                esp_restart();
+            }
 
             // update network info
             mCellular.QuerySignalStatus();

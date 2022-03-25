@@ -201,14 +201,6 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
             mPostData += (unsigned long)(mrCellular.getDataSent() / 1024); // convert to kB
             mPostData += ",\"datareceived\":";
             mPostData += (unsigned long)(mrCellular.getDataReceived() / 1024); // convert to kB
-            mPostData += ",\"netifpppconnects\":";
-            mPostData += mrCellular.getCellularNetifPppConnects();
-            mPostData += ",\"netifrecreates\":";
-            mPostData += mrCellular.getCellularNetifRecreates();
-            mPostData += ",\"restartreason\":";
-            mPostData += mrCellular.getCellularRestartReason();
-            mPostData += ",\"restarts\":";
-            mPostData += mrCellular.getCellularRestarts();
             mPostData += ",\"network\": \"";
             mPostData += mrConfig.msCellularOperator;
             mPostData += "\",\"operator\": \"";
