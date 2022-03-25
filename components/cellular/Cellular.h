@@ -56,7 +56,17 @@ private:
     bool InitNetwork();
 
     // creates a new PPP network interface; destroys the old one if exists.
-    bool RenewPppNetif();
+    //bool RenewPppNetif();
+
+    // establish network connection on top of every successful modem CONNECT
+    bool PppNetifStart();
+
+    // make sure to destroy the netif after use.
+    void PppNetifStop();
+
+    // check if Ppp netif interface and Ppp mode is enabled
+    bool PppNetifUp();
+
 
     friend esp_err_t esp_cellular_post_attach_start(esp_netif_t * esp_netif, void * args);
 
@@ -98,7 +108,7 @@ private:
     //bool mbConnected = false;
     bool mbCommandMode = true;
     bool mbPowerSaverActive = false;
-    int miPppPhase = NETIF_PPP_PHASE_DEAD;
+    //int miPppPhase = NETIF_PPP_PHASE_DEAD;
 
     SemaphoreHandle_t mxConnected;
 

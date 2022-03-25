@@ -652,10 +652,11 @@ bool Cellular::InitNetwork()
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, cellularEventHandler, this, nullptr));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, cellularEventHandler, this, nullptr));
 
-    return RenewPppNetif();
+    //return RenewPppNetif();
+    return true;
 }
 
-bool Cellular::RenewPppNetif()
+/*bool Cellular::RenewPppNetif()
 {
 
     if (mpEspNetif)
@@ -684,12 +685,62 @@ bool Cellular::RenewPppNetif()
         return false;
     }
     return true;
+}*/
+
+bool Cellular::PppNetifUp()
+{
+    if (mpEspNetif && esp_netif_is_netif_up(mpEspNetif) && !mbCommandMode)
+    {
+        return true;
+    }
+    return false;
+}
+    
+
+void Cellular::PppNetifStop()
+{
+    if (mpEspNetif)
+    {
+        esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
+        mbCommandMode = true;
+
+        esp_netif_destroy(mpEspNetif);
+        mpEspNetif = nullptr;
+        ESP_LOGD(tag, "Netif action stopped, netif destroyed.");
+    }
+}
+
+bool Cellular::PppNetifStart()
+{
+    // ensure it is destroyed
+    PppNetifStop();
+
+    // Init netif object
+    esp_netif_config_t cfg = ESP_NETIF_DEFAULT_PPP();
+    mpEspNetif = esp_netif_new(&cfg);
+    assert(mpEspNetif);
+
+    mModemNetifDriver.base.post_attach = esp_cellular_post_attach_start;
+    mModemNetifDriver.pCellular = this;
+    // esp_netif_ppp_set_auth(esp_netif, NETIF_PPP_AUTHTYPE_PAP, msUser.c_str(), msPass.c_str());
+    // esp_netif_ppp_set_auth(esp_netif, NETIF_PPP_AUTHTYPE_NONE, msUser.c_str(), msPass.c_str());
+    if (ESP_OK == esp_netif_attach(mpEspNetif, &mModemNetifDriver))
+    {
+        mbCommandMode = false;
+        esp_netif_action_start(mpEspNetif, 0, 0, nullptr);
+        ESP_LOGI(tag, "PPP network interface started.");
+        return true;
+    }
+
+    PppNetifStop();
+    ESP_LOGE(tag, "SEVERE, Failed to install cellular network driver.");
+    return false;
 }
 
 void Cellular::ResetInputBuffers()
 {
     // ESP_LOGI(tag, "ResetInputbuffers(Mode=%s, Connected=%s)", mbCommandMode ? "CMD" : "DATA", mbConnected ? "Y" : "N");
-    ESP_LOGI(tag, "ResetInputbuffers(Mode=%s)", mbCommandMode ? "CMD" : "DATA");
+    ESP_LOGD(tag, "ResetInputbuffers(Mode=%s)", mbCommandMode ? "CMD" : "DATA");
     uart_flush_input(muiUartNo);
     muiBufferLen = 0;
     muiBufferPos = 0;
@@ -753,7 +804,7 @@ bool Cellular::ReadIntoBuffer(TickType_t timeout)
         return false;
     case UART_BREAK:
         // stopping data mode
-        ESP_LOGI(tag, "uart break.");
+        ESP_LOGD(tag, "uart break.");
         return true;
     case UART_PARITY_ERR:
         ESP_LOGE(tag, "uart parity error");
@@ -972,14 +1023,8 @@ void Cellular::QuerySignalStatus()
 bool Cellular::SwitchToCommandMode()
 {
     ESP_LOGI(tag, "Switching to command mode...");
-    vTaskDelay(100 / portTICK_PERIOD_MS);
-    esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
-    ESP_LOGD(tag, "netif action stopped.");
-    vTaskDelay(100 / portTICK_PERIOD_MS);
-
+    PppNetifStop();
     ResetInputBuffers();
-    mbCommandMode = true;
-    // mbConnected = false;
 
     ESP_LOGD(tag, "sending break event.");
     uart_event_t uartBreakEvent = {
@@ -1023,16 +1068,17 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
 
     // reading on PPP handshake and LCP start frame https://lateblt.tripod.com/bit60.txt
 
-    if (!mbCommandMode && !forceRestartPpp && esp_netif_is_netif_up(mpEspNetif))
+    if (PppNetifUp() && !forceRestartPpp)
     {
         ESP_LOGI(tag, "SwitchToPppMode() already in PPP mode");
         return true;
     }
 
     ESP_LOGI(tag, "SwitchToPppMode() restarting PPP mode");
-    esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
-    mbCommandMode = true;
+    //esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
+    //mbCommandMode = true;
 
+    /****
     if (miPppPhase != NETIF_PPP_PHASE_DEAD)
     {
         ESP_LOGW(tag, "Netif not DEAD, recreating Netif. %i", miPppPhase);
@@ -1041,14 +1087,18 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
             ESP_LOGE(tag, "SEVERE, Renewing PPP Network interface failed.");
             return false;
         }
-    }
+    } ****/
 
     String response;
     if (Command("AT+CGDATA=\"PPP\",1", "CONNECT", &response, "Connect for data connection."))
     {
-        ESP_LOGI(tag, "Switch to PPP: CONNECTED");
-        mbCommandMode = false;
-        esp_netif_action_start(mpEspNetif, 0, 0, nullptr);
+        ESP_LOGI(tag, "Modem ready for PPP: CONNECTED");
+        if (!PppNetifStart())
+        {
+            ESP_LOGE(tag, "SEVERE, could not start network interface.");
+            PppNetifStop();
+            return false;
+        };
 
         // WAIT FOR IP ADDRESS
         // (IP Lost timer defaults to 120 seconds, so wait 60 additional seconds)
@@ -1061,18 +1111,12 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
         }
 
         ESP_LOGE(tag, "Stopped Netif because IP address could not be obtained");
-        esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
-        mbCommandMode = true;
-        return false;
-    }
-    else
-    {
-        ESP_LOGW(tag, "SEVERE, Not yet connected!! Staying in command mode."); 
-        esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
-        mbCommandMode = true;
+        PppNetifStop();
         return false;
     }
 
+    ESP_LOGW(tag, "SEVERE, Not yet connected!! Staying in command mode."); 
+    mbCommandMode = true;
     return false;
 }
 
@@ -1274,7 +1318,6 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
             esp_netif_get_dns_info(netif, ESP_NETIF_DNS_BACKUP, &dns_info);
             ESP_LOGI(tag, "Name Server2: " IPSTR, IP2STR(&dns_info.ip.u_addr.ip4));
             ESP_LOGI(tag, "~~~~~~~~~~~~~~");
-            ESP_LOGI(tag, "GOT ip event!!!");
             xSemaphoreGive(mxConnected);
         }
         else if (id == IP_EVENT_PPP_LOST_IP)
@@ -1296,10 +1339,10 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
     else if (base == NETIF_PPP_STATUS)
     {
 
-        if (id >= NETIF_PP_PHASE_OFFSET)
-        {
-            miPppPhase = id;
-        }
+        //if (id >= NETIF_PP_PHASE_OFFSET)
+        //{
+        //    miPppPhase = id;
+        //}
 
         const char *status;
         switch (id)
