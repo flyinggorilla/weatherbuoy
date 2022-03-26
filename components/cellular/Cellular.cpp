@@ -578,7 +578,7 @@ bool Cellular::SendSMS(String &rsTo, String &rsMsg)
 
     String command;
     static const char CTRLZ = 0x1A;
-    static const char ESC = 0x1B;
+    //static const char ESC = 0x1B;
     ESP_LOGI(tag, "Sending SMS to:%s, message:%s", rsTo.c_str(), rsMsg.c_str());
     command.printf("AT+CMGS=\"%s\"\r\n", rsTo.c_str());
     if (!Command(command.c_str(), ">", &response, "prepare to send SMS text"))
