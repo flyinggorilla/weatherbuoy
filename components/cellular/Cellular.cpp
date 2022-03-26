@@ -700,9 +700,12 @@ void Cellular::PppNetifStop()
 {
     if (mpEspNetif)
     {
+        // stop Ppp activity and clear UART
         esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
         mbCommandMode = true;
+        ResetInputBuffers();
 
+        // delete network interface
         esp_netif_destroy(mpEspNetif);
         mpEspNetif = nullptr;
         ESP_LOGD(tag, "Netif action stopped, netif destroyed.");
@@ -1023,7 +1026,6 @@ bool Cellular::SwitchToCommandMode()
 {
     ESP_LOGI(tag, "Switching to command mode...");
     PppNetifStop();
-    ResetInputBuffers();
 
     ESP_LOGD(tag, "sending break event.");
     uart_event_t uartBreakEvent = {
