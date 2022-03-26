@@ -632,9 +632,9 @@ void Cellular::ReceiverTask()
                 {
                     ESP_LOGW(tag, "ReceiverTask(CMD) dropping remaining PPP data from UART");
                 }
-                else
+                else if (mpEspNetif)
                 {
-                    esp_netif_receive(mModemNetifDriver.base.netif, mpBuffer, muiBufferLen, NULL);
+                    esp_netif_receive(mpEspNetif, mpBuffer, muiBufferLen, NULL);
                 }
             }
         }
@@ -689,7 +689,7 @@ bool Cellular::InitNetwork()
 
 bool Cellular::PppNetifUp()
 {
-    if (mpEspNetif && esp_netif_is_netif_up(mpEspNetif) && !mbCommandMode)
+    if (!mbCommandMode && mpEspNetif && esp_netif_is_netif_up(mpEspNetif))
     {
         return true;
     }
@@ -698,6 +698,11 @@ bool Cellular::PppNetifUp()
 
 void Cellular::PppNetifStop()
 {
+    if (mbCommandMode)
+    {
+        return;
+    }
+
     if (mpEspNetif)
     {
         // stop Ppp activity and clear UART
@@ -705,20 +710,27 @@ void Cellular::PppNetifStop()
         mbCommandMode = true;
         ResetInputBuffers();
 
-        // delete network interface
-        esp_netif_destroy(mpEspNetif);
-        mpEspNetif = nullptr;
-        ESP_LOGD(tag, "Netif action stopped, netif destroyed.");
+        ESP_LOGD(tag, "Netif action stopped");
     }
 }
 
 bool Cellular::PppNetifStart()
 {
-    // ensure it is destroyed
+    esp_netif_config_t cfg = ESP_NETIF_DEFAULT_PPP();
+
     PppNetifStop();
 
+    // ensure it is destroyed
+    if (mpEspNetif)
+    {
+        // delete network interface
+        ESP_LOGD(tag, "Destroying network interface.");
+        esp_netif_destroy(mpEspNetif);
+        //mModemNetifDriver.base.netif = nullptr; // not required as msEspNetif is used
+        mpEspNetif = nullptr;
+    }
+
     // Init netif object
-    esp_netif_config_t cfg = ESP_NETIF_DEFAULT_PPP();
     mpEspNetif = esp_netif_new(&cfg);
     assert(mpEspNetif);
 
