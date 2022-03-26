@@ -159,7 +159,7 @@ esp_err_t esp_cellular_post_attach_start(esp_netif_t *esp_netif, void *args)
         .ppp_phase_event_enabled = true,
         .ppp_error_event_enabled = true};
     esp_netif_ppp_set_params(esp_netif, &ppp_config);
-    ESP_LOGI(tag, "Netif Post-Attach called.");
+    ESP_LOGD(tag, "Netif Post-Attach called.");
     return ESP_OK;
 }
 
@@ -1093,7 +1093,7 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
     String response;
     if (Command("AT+CGDATA=\"PPP\",1", "CONNECT", &response, "Connect for data connection."))
     {
-        ESP_LOGI(tag, "Modem ready for PPP: CONNECTED");
+        ESP_LOGI(tag, "Modem CONNECTED. Ready for PPP.");
         if (!PppNetifStart())
         {
             ESP_LOGE(tag, "SEVERE, could not start network interface.");
@@ -1301,7 +1301,6 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
 
     if (base == IP_EVENT)
     {
-        ESP_LOGD(tag, "IP event! %d", id);
         if (id == IP_EVENT_PPP_GOT_IP)
         {
             esp_netif_dns_info_t dns_info;
@@ -1309,7 +1308,7 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
             ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
             esp_netif_t *netif = event->esp_netif;
 
-            ESP_LOGI(tag, "Cellular Connect to PPP Server");
+            ESP_LOGI(tag, "PPP Connection established.");
             ESP_LOGI(tag, "~~~~~~~~~~~~~~");
             ESP_LOGI(tag, "IP          : " IPSTR, IP2STR(&event->ip_info.ip));
             ESP_LOGI(tag, "Netmask     : " IPSTR, IP2STR(&event->ip_info.netmask));
