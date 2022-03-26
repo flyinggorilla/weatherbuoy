@@ -17,7 +17,6 @@ static const char tag[] = "Cellular";
 #error UART function must be configured into IRAM, otherwise OTA will fail.
 #endif
 
-
 // ------------------------------------------
 // change device in Menuconfig->Cellular
 // ------------------------------------------
@@ -161,13 +160,7 @@ esp_err_t esp_cellular_post_attach_start(esp_netif_t *esp_netif, void *args)
         .ppp_error_event_enabled = true};
     esp_netif_ppp_set_params(esp_netif, &ppp_config);
     ESP_LOGI(tag, "Netif Post-Attach called.");
-
-    // ESP_LOGW(tag, "esp_cellular_post_attach_start() - register too many event handlers? NETIF_PPP_STATUS should have been already registered!!");
-    // ESP_ERROR_CHECK(esp_event_handler_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, cellularEventHandler, pModem));
     return ESP_OK;
-
-    //**************************************************
-    // return pModem->SwitchToPppMode() ? ESP_OK : ESP_ERR_ESP_NETIF_DRIVER_ATTACH_FAILED;
 }
 
 void fReceiverTask(void *pvParameter)
@@ -635,7 +628,14 @@ void Cellular::ReceiverTask()
         {
             if (muiBufferLen)
             {
-                esp_netif_receive(mModemNetifDriver.base.netif, mpBuffer, muiBufferLen, NULL);
+                if (mbCommandMode)
+                {
+                    ESP_LOGW(tag, "ReceiverTask(CMD) dropping remaining PPP data from UART");
+                }
+                else
+                {
+                    esp_netif_receive(mModemNetifDriver.base.netif, mpBuffer, muiBufferLen, NULL);
+                }
             }
         }
         else
@@ -652,7 +652,7 @@ bool Cellular::InitNetwork()
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, cellularEventHandler, this, nullptr));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, cellularEventHandler, this, nullptr));
 
-    //return RenewPppNetif();
+    // return RenewPppNetif();
     return true;
 }
 
@@ -695,7 +695,6 @@ bool Cellular::PppNetifUp()
     }
     return false;
 }
-    
 
 void Cellular::PppNetifStop()
 {
@@ -1075,8 +1074,8 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
     }
 
     ESP_LOGI(tag, "SwitchToPppMode() restarting PPP mode");
-    //esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
-    //mbCommandMode = true;
+    // esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
+    // mbCommandMode = true;
 
     /****
     if (miPppPhase != NETIF_PPP_PHASE_DEAD)
@@ -1115,7 +1114,7 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
         return false;
     }
 
-    ESP_LOGW(tag, "SEVERE, Not yet connected!! Staying in command mode."); 
+    ESP_LOGW(tag, "SEVERE, Not yet connected!! Staying in command mode.");
     mbCommandMode = true;
     return false;
 }
@@ -1339,10 +1338,10 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
     else if (base == NETIF_PPP_STATUS)
     {
 
-        //if (id >= NETIF_PP_PHASE_OFFSET)
+        // if (id >= NETIF_PP_PHASE_OFFSET)
         //{
-        //    miPppPhase = id;
-        //}
+        //     miPppPhase = id;
+        // }
 
         const char *status;
         switch (id)
