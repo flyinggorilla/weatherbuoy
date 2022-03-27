@@ -120,6 +120,12 @@ Cellular::~Cellular()
 esp_err_t esp_cellular_transmit(void *h, void *buffer, size_t len)
 {
     Cellular *modem = (Cellular *)h;
+    if (!modem)
+    {
+        ESP_LOGE(tag, "SEVERE, esp_cellular_transmit() called, but handle is invalid");
+        return ESP_FAIL;
+    }
+
     if (modem->mbCommandMode)
     {
         ESP_LOGE(tag, "esp_cellular_transmit() cannot send because we are still in command mode");
@@ -132,6 +138,28 @@ esp_err_t esp_cellular_transmit(void *h, void *buffer, size_t len)
     return ESP_FAIL;
 }
 
+void esp_cellular_free_rx_buffer(void *h, void *buffer)
+{
+    Cellular *modem = (Cellular *)h;
+    if (!modem)
+    {
+        ESP_LOGE(tag, "SEVERE, esp_cellular_free_rx_buffer() called, but handle is invalid");
+        return;
+    }
+
+    if (modem->mbCommandMode)
+    {
+        ESP_LOGE(tag, "esp_cellular_free_rx_buffer(), cannot free because we are still in command mode");
+    }
+
+    ESP_LOGW(tag, "Netif driver. Free RX buffer.");
+    // modem->ResetInputBuffers()
+    modem->muiBufferLen = 0;
+    modem->muiBufferPos = 0;
+
+    void esp_netif_free_rx_buffer(void *h, void *buffer);
+}
+
 esp_err_t esp_cellular_post_attach_start(esp_netif_t *esp_netif, void *args)
 {
     esp_cellular_netif_driver_t *pDriver = (esp_cellular_netif_driver_t *)args;
@@ -140,7 +168,7 @@ esp_err_t esp_cellular_post_attach_start(esp_netif_t *esp_netif, void *args)
         .handle = pModem,
         .transmit = esp_cellular_transmit,
         .transmit_wrap = NULL,
-        .driver_free_rx_buffer = NULL};
+        .driver_free_rx_buffer = esp_cellular_free_rx_buffer};
     pDriver->base.netif = esp_netif;
     ESP_ERROR_CHECK(esp_netif_set_driver_config(esp_netif, &driver_ifconfig));
 
@@ -568,7 +596,7 @@ bool Cellular::SendSMS(String &rsTo, String &rsMsg)
 
     String command;
     static const char CTRLZ = 0x1A;
-    //static const char ESC = 0x1B;
+    // static const char ESC = 0x1B;
     ESP_LOGI(tag, "Sending SMS to:%s, message:%s", rsTo.c_str(), rsMsg.c_str());
     command.printf("AT+CMGS=\"%s\"\r\n", rsTo.c_str());
     if (!Command(command.c_str(), ">", &response, "prepare to send SMS text"))
@@ -643,7 +671,7 @@ bool Cellular::InitNetwork()
     ESP_ERROR_CHECK(esp_event_handler_instance_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, cellularEventHandler, this, nullptr));
 
     return PppNetifRenew();
-    //return true;
+    // return true;
 }
 
 bool Cellular::PppNetifRenew()
@@ -652,7 +680,7 @@ bool Cellular::PppNetifRenew()
     if (mpEspNetif)
     {
         esp_netif_destroy(mpEspNetif);
-        mModemNetifDriver.base.netif = nullptr; 
+        mModemNetifDriver.base.netif = nullptr;
         mpEspNetif = nullptr;
         ESP_LOGW(tag, "Netif destroyed. Ready to renew.");
     }
@@ -701,6 +729,9 @@ bool Cellular::PppNetifStop()
         mbCommandMode = true;
 
         // validate if netif could be stopped properly.
+        ESP_LOGW(tag, "REMOVE RENEWING PPP this test.");
+        miPppPhase = NETIF_PPP_PHASE_DORMANT;
+
         if (miPppPhase == NETIF_PPP_PHASE_DEAD)
         {
             ESP_LOGD(tag, "Netif action stopped");
@@ -1045,7 +1076,7 @@ bool Cellular::SwitchToCommandMode()
     while (attempts--)
     {
         vTaskDelay(100 / portTICK_PERIOD_MS); // v25.ter specification requires 100ms wait period before reissuing another call
-        //ResetInputBuffers();
+        // ResetInputBuffers();
         if (ModemWriteLine("AT"))
         {
             if (ModemReadResponse(response, "OK", 10, UART_INPUT_TIMEOUT_CMDNORMAL))
@@ -1064,7 +1095,6 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
 {
 
     // reading on PPP handshake and LCP start frame https://lateblt.tripod.com/bit60.txt
-
     if (forceRestartPpp)
     {
         PppNetifStop();
@@ -1319,7 +1349,7 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
 
         if (id >= NETIF_PP_PHASE_OFFSET)
         {
-             miPppPhase = id;
+            miPppPhase = id;
         }
 
         const char *status;

@@ -88,6 +88,7 @@ private:
     
     int ModemWriteData(const char* data, int len);
     friend esp_err_t esp_cellular_transmit(void *h, void *buffer, size_t len);
+    friend void esp_cellular_free_rx_buffer(void *h, void *buffer);
 
     bool ReadIntoBuffer(TickType_t timeout);
     void ResetInputBuffers();
