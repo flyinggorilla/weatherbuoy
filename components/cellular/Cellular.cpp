@@ -73,16 +73,6 @@ std::wstring utf8ToWstring(const std::string &str)
 }
 #endif
 
-/* TODO to keep up with buffer performance issues? intterrupt handler and copy buffer myself?
-
-Create a proper ISR and mark it IRAM_ATTR so that it's always in the cache.
-
-In the ISR, copy the data from uart_read_bytes into a queue (xQueueSendFromISR) and don't do any other work, to keep the ISR small and fast.
-
-Definitely don't call printf or log from an ISR. Create another (user) task and call xQueueReceive in a loop there, where you can print the data and do any other work.
-
-*/
-
 void cellularEventHandler(void *ctx, esp_event_base_t base, int32_t id, void *event_data)
 {
     return ((Cellular *)ctx)->OnEvent(base, id, event_data);
@@ -1086,21 +1076,7 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
         return true;
     }
 
-    ESP_LOGI(tag, "SwitchToPppMode() restarting PPP mode");
-/*
-    // esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
-    // mbCommandMode = true;
-
-
-    if (miPppPhase != NETIF_PPP_PHASE_DEAD)
-    {
-        ESP_LOGW(tag, "Netif not DEAD, recreating Netif. %i", miPppPhase);
-        if (!PppNetifRenew())
-        {
-            ESP_LOGE(tag, "SEVERE, Renewing PPP Network interface failed.");
-            return false;
-        }
-    }  */
+    ESP_LOGI(tag, "SwitchToPppMode() establishing modem PPP connection.");
 
     String response;
     if (Command("AT+CGDATA=\"PPP\",1", "CONNECT", &response, "Connect for data connection."))
@@ -1226,14 +1202,6 @@ bool Cellular::ModemReadResponse(String &sResponse, const char *expectedLastLine
     sResponse = "";
     while (maxLines--)
     {
-        // int attempts = 0;
-        // while(!ModemReadLine(sLine)) {
-        //     attempts++;
-        //     ESP_LOGW(tag, "ModemReadLine retry #%d", attempts);
-        //     if (attempts > 5) {
-        //         return false;
-        //     }
-        // }
 
         if (ModemReadLine(sLine, timeout))
         {
@@ -1301,8 +1269,6 @@ bool Cellular::Command(const char *sCommand, const char *sSuccess, String *spRes
     }
 
     ESP_LOGE(tag, "Unexpected response: '%s', expected: '%s' for command: %s %s", spResponse->c_str(), sSuccess ? sSuccess : "OK", sInfo ? sInfo : "", sCommand);
-
-    // ESP_LOGE(tag, "%s --> Command(%s)=?%s:\r\n%s", sInfo ? sInfo : "", sCommand, sSuccess, spResponse->c_str());
     return false;
 }
 

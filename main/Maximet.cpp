@@ -819,7 +819,7 @@ bool Maximet::EnterCommandLine()
             ESP_LOGI(tag, "Already in commandline mode.");
             return mbCommandline = true;
         }
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
         ESP_LOGI(tag, "Remaining attempts switching Maximet to commandline: %i", attempts);
     }
 
