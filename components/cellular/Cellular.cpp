@@ -728,10 +728,9 @@ bool Cellular::PppNetifStop()
         esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
         mbCommandMode = true;
 
-        // validate if netif could be stopped properly.
-        ESP_LOGW(tag, "REMOVE RENEWING PPP this test.");
-        miPppPhase = NETIF_PPP_PHASE_DORMANT;
+        vTaskDelay(100 / portTICK_PERIOD_MS);
 
+        // validate if netif could be stopped properly.
         if (miPppPhase == NETIF_PPP_PHASE_DEAD)
         {
             ESP_LOGD(tag, "Netif action stopped");
