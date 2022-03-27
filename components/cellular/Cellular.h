@@ -62,7 +62,9 @@ private:
     bool PppNetifStart();
 
     // make sure to destroy the netif after use.
-    void PppNetifStop();
+    bool PppNetifStop();
+
+    bool PppNetifRenew();
 
     // check if Ppp netif interface and Ppp mode is enabled
     bool PppNetifUp();
@@ -99,16 +101,13 @@ private:
 
     unsigned int muiUartNo;
     QueueHandle_t mhUartEventQueueHandle = nullptr;
-    //String mData;
-    //String mBuffer;
     String msApn;
     String msUser;
     String msPass;
 
-    //bool mbConnected = false;
     bool mbCommandMode = true;
     bool mbPowerSaverActive = false;
-    //int miPppPhase = NETIF_PPP_PHASE_DEAD;
+    int miPppPhase = NETIF_PPP_PHASE_DEAD;
 
     SemaphoreHandle_t mxConnected;
 

@@ -652,16 +652,17 @@ bool Cellular::InitNetwork()
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, cellularEventHandler, this, nullptr));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, cellularEventHandler, this, nullptr));
 
-    // return RenewPppNetif();
-    return true;
+    return PppNetifRenew();
+    //return true;
 }
 
-/*bool Cellular::RenewPppNetif()
+bool Cellular::PppNetifRenew()
 {
 
     if (mpEspNetif)
     {
         esp_netif_destroy(mpEspNetif);
+        mModemNetifDriver.base.netif = nullptr; 
         mpEspNetif = nullptr;
         ESP_LOGW(tag, "Netif destroyed. Ready to renew.");
     }
@@ -685,7 +686,7 @@ bool Cellular::InitNetwork()
         return false;
     }
     return true;
-}*/
+}
 
 bool Cellular::PppNetifUp()
 {
@@ -696,11 +697,11 @@ bool Cellular::PppNetifUp()
     return false;
 }
 
-void Cellular::PppNetifStop()
+bool Cellular::PppNetifStop()
 {
     if (mbCommandMode)
     {
-        return;
+        return true;
     }
 
     if (mpEspNetif)
@@ -708,52 +709,46 @@ void Cellular::PppNetifStop()
         // stop Ppp activity and clear UART
         esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
         mbCommandMode = true;
-        ResetInputBuffers();
 
-        ESP_LOGD(tag, "Netif action stopped");
+        // validate if netif could be stopped properly.
+        if (miPppPhase == NETIF_PPP_PHASE_DEAD)
+        {
+            ESP_LOGD(tag, "Netif action stopped");
+            return true;
+        }
+
+        ESP_LOGW(tag, "Netif not DEAD, recreating Netif, which was left in phase %i", miPppPhase);
     }
+
+    if (PppNetifRenew())
+    {
+        return true;
+    }
+
+    ESP_LOGE(tag, "SEVERE, PppNetifStop(). Renewing PPP Network interface failed.");
+    return false;
 }
 
 bool Cellular::PppNetifStart()
 {
-    esp_netif_config_t cfg = ESP_NETIF_DEFAULT_PPP();
-
-    PppNetifStop();
-
-    // ensure it is destroyed
-    if (mpEspNetif)
+    // create the network interface if not yet exists
+    if (!mpEspNetif)
     {
-        // delete network interface
-        ESP_LOGD(tag, "Destroying network interface.");
-        esp_netif_destroy(mpEspNetif);
-        //mModemNetifDriver.base.netif = nullptr; // not required as msEspNetif is used
-        mpEspNetif = nullptr;
+        if (!PppNetifRenew())
+        {
+            return false;
+        }
     }
 
-    // Init netif object
-    mpEspNetif = esp_netif_new(&cfg);
-    assert(mpEspNetif);
+    mbCommandMode = false;
+    esp_netif_action_start(mpEspNetif, 0, 0, nullptr);
+    ESP_LOGI(tag, "PPP network interface started.");
 
-    mModemNetifDriver.base.post_attach = esp_cellular_post_attach_start;
-    mModemNetifDriver.pCellular = this;
-    // esp_netif_ppp_set_auth(esp_netif, NETIF_PPP_AUTHTYPE_PAP, msUser.c_str(), msPass.c_str());
-    // esp_netif_ppp_set_auth(esp_netif, NETIF_PPP_AUTHTYPE_NONE, msUser.c_str(), msPass.c_str());
-    if (ESP_OK == esp_netif_attach(mpEspNetif, &mModemNetifDriver))
-    {
-        mbCommandMode = false;
-        esp_netif_action_start(mpEspNetif, 0, 0, nullptr);
-        ESP_LOGI(tag, "PPP network interface started.");
-        return true;
-    }
-
-    PppNetifStop();
-    ESP_LOGE(tag, "SEVERE, Failed to install cellular network driver.");
-    return false;
+    return true;
 }
 
 void Cellular::ResetInputBuffers()
 {
-    // ESP_LOGI(tag, "ResetInputbuffers(Mode=%s, Connected=%s)", mbCommandMode ? "CMD" : "DATA", mbConnected ? "Y" : "N");
     ESP_LOGD(tag, "ResetInputbuffers(Mode=%s)", mbCommandMode ? "CMD" : "DATA");
     uart_flush_input(muiUartNo);
     muiBufferLen = 0;
@@ -771,7 +766,6 @@ bool Cellular::ReadIntoBuffer(TickType_t timeout)
     // Waiting for UART event.
     if (pdTRUE != xQueueReceive(mhUartEventQueueHandle, (void *)&event, timeout))
     {
-        // ESP_LOGD(tag, "ReadIntoBuffer timeout at xQueueReceive. Mode=%s, Connected=%s", mbCommandMode ? "CMD" : "DATA", mbConnected ? "Y" : "N");
         ESP_LOGD(tag, "ReadIntoBuffer timeout at xQueueReceive. Mode=%s", mbCommandMode ? "CMD" : "DATA");
         return false;
     }
@@ -1061,7 +1055,7 @@ bool Cellular::SwitchToCommandMode()
     while (attempts--)
     {
         vTaskDelay(100 / portTICK_PERIOD_MS); // v25.ter specification requires 100ms wait period before reissuing another call
-        ResetInputBuffers();
+        //ResetInputBuffers();
         if (ModemWriteLine("AT"))
         {
             if (ModemReadResponse(response, "OK", 10, UART_INPUT_TIMEOUT_CMDNORMAL))
@@ -1081,26 +1075,32 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
 
     // reading on PPP handshake and LCP start frame https://lateblt.tripod.com/bit60.txt
 
-    if (PppNetifUp() && !forceRestartPpp)
+    if (forceRestartPpp)
+    {
+        PppNetifStop();
+    }
+
+    if (PppNetifUp())
     {
         ESP_LOGI(tag, "SwitchToPppMode() already in PPP mode");
         return true;
     }
 
     ESP_LOGI(tag, "SwitchToPppMode() restarting PPP mode");
+/*
     // esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
     // mbCommandMode = true;
 
-    /****
+
     if (miPppPhase != NETIF_PPP_PHASE_DEAD)
     {
         ESP_LOGW(tag, "Netif not DEAD, recreating Netif. %i", miPppPhase);
-        if (!RenewPppNetif())
+        if (!PppNetifRenew())
         {
             ESP_LOGE(tag, "SEVERE, Renewing PPP Network interface failed.");
             return false;
         }
-    } ****/
+    }  */
 
     String response;
     if (Command("AT+CGDATA=\"PPP\",1", "CONNECT", &response, "Connect for data connection."))
@@ -1351,10 +1351,10 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
     else if (base == NETIF_PPP_STATUS)
     {
 
-        // if (id >= NETIF_PP_PHASE_OFFSET)
-        //{
-        //     miPppPhase = id;
-        // }
+        if (id >= NETIF_PP_PHASE_OFFSET)
+        {
+             miPppPhase = id;
+        }
 
         const char *status;
         switch (id)
