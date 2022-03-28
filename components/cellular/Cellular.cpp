@@ -740,12 +740,7 @@ bool Cellular::PppNetifStop()
         ESP_LOGW(tag, "Netif not DEAD, recreating Netif, which was left in phase %i", miPppPhase);
     }
 
-    if (PppNetifRenew())
-    {
-        return true;
-    }
-
-    ESP_LOGE(tag, "SEVERE, PppNetifStop(). Renewing PPP Network interface failed.");
+    ESP_LOGW(tag, "PppNetifStop() failed, PPP connection not properly terminated (dead).");
     return false;
 }
 
@@ -1051,7 +1046,10 @@ void Cellular::QuerySignalStatus()
 bool Cellular::SwitchToCommandMode()
 {
     ESP_LOGI(tag, "Switching to command mode...");
-    PppNetifStop();
+    if (!PppNetifStop()) 
+    {
+        PppNetifRenew();
+    };
 
     ESP_LOGD(tag, "sending break event.");
     uart_event_t uartBreakEvent = {
@@ -1096,7 +1094,9 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
     // reading on PPP handshake and LCP start frame https://lateblt.tripod.com/bit60.txt
     if (forceRestartPpp)
     {
+        ESP_LOGW(tag, "Forcing restarting of PPP Netif driver.");
         PppNetifStop();
+        PppNetifRenew();
     }
 
     if (PppNetifUp())
@@ -1115,6 +1115,7 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
         {
             ESP_LOGE(tag, "SEVERE, could not start network interface.");
             PppNetifStop();
+            PppNetifRenew();
             return false;
         };
 
@@ -1130,6 +1131,7 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
 
         ESP_LOGE(tag, "Stopped Netif because IP address could not be obtained");
         PppNetifStop();
+        PppNetifRenew();
         return false;
     }
 
