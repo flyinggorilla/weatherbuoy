@@ -81,6 +81,7 @@ void cellularEventHandler(void *ctx, esp_event_base_t base, int32_t id, void *ev
 Cellular::Cellular()
 {
     mxConnected = xSemaphoreCreateBinary();
+    mxUartCleared = xSemaphoreCreateBinary();
 }
 
 bool Cellular::InitModem()
@@ -153,10 +154,6 @@ void esp_cellular_free_rx_buffer(void *h, void *buffer)
     }
 
     ESP_LOGW(tag, "Netif driver. Free RX buffer.");
-    // modem->ResetInputBuffers()
-    modem->muiBufferLen = 0;
-    modem->muiBufferPos = 0;
-
     void esp_netif_free_rx_buffer(void *h, void *buffer);
 }
 
@@ -697,13 +694,11 @@ bool Cellular::PppNetifRenew()
     if (ESP_OK == esp_netif_attach(mpEspNetif, &mModemNetifDriver))
     {
         ESP_LOGI(tag, "Installed cellular network driver.");
+        return true;
     }
-    else
-    {
-        ESP_LOGE(tag, "Failed to install cellular network driver. Restarting.");
-        return false;
-    }
-    return true;
+
+    ESP_LOGE(tag, "SEVERE, Failed to install cellular network driver.");
+    return false;
 }
 
 bool Cellular::PppNetifUp()
@@ -764,7 +759,7 @@ bool Cellular::PppNetifStart()
 
 void Cellular::ResetInputBuffers()
 {
-    ESP_LOGD(tag, "ResetInputbuffers(Mode=%s)", mbCommandMode ? "CMD" : "DATA");
+    ESP_LOGW(tag, "ResetInputbuffers(Mode=%s)", mbCommandMode ? "CMD" : "DATA");
     uart_flush_input(muiUartNo);
     muiBufferLen = 0;
     muiBufferPos = 0;
@@ -827,8 +822,17 @@ bool Cellular::ReadIntoBuffer(TickType_t timeout)
         return false;
     case UART_BREAK:
         // stopping data mode
-        ESP_LOGD(tag, "uart break.");
+        ESP_LOGD(tag, "uart break event. size=%u, timeout=%s", event.size, event.timeout_flag ? "true" : "false");
+        // if timeout_flag is true, even is sent from main thread, false if sent from driver
+        //if (event.timeout_flag)
+        //{
+        //}
         return true;
+    case UART_DATA_BREAK:
+        ESP_LOGW(tag, "uart data break event. size=%u, timeout=%s", event.size, event.timeout_flag ? "true" : "false");
+        ResetInputBuffers();
+        xSemaphoreGive(mxUartCleared);
+        return false;
     case UART_PARITY_ERR:
         ESP_LOGE(tag, "uart parity error");
         ResetInputBuffers();
@@ -880,8 +884,6 @@ bool Cellular::SwitchToFullPowerMode()
     {
         return true;
     }
-
-    ResetInputBuffers();
 
     gpio_set_level(CELLULAR_GPIO_DTR, 0);
     // simcom documentation: "Anytime host want send data to module, it must be pull down DTR then wait minimum 20ms" --> Command() waits 100ms anyway
@@ -1051,29 +1053,33 @@ bool Cellular::SwitchToCommandMode()
         PppNetifRenew();
     };
 
-    ESP_LOGD(tag, "sending break event.");
+    ESP_LOGV(tag, "sending break event.");
     uart_event_t uartBreakEvent = {
-        .type = UART_BREAK,
+        //.type = UART_BREAK,
+        .type = UART_DATA_BREAK,
         .size = 0,
         .timeout_flag = true};
 
     if (pdTRUE == xQueueSend(mhUartEventQueueHandle, (void *)&uartBreakEvent, 1000 / portTICK_PERIOD_MS))
     {
-        ESP_LOGD(tag, "sent break event.");
+        ESP_LOGD(tag, "Waiting for UART clearance.");
+        if (xSemaphoreTake(mxUartCleared, 1000 / portTICK_PERIOD_MS) == pdTRUE)
+        {
+            ESP_LOGI(tag, "Switched to command mode, UART cleared.");
+        }
     }
     else
     {
         ESP_LOGE(tag, "SwitchToCommandMode() could not send send break event.");
     }
 
-    vTaskDelay(200 / portTICK_PERIOD_MS);
 
     String response;
     int attempts = 3;
     while (attempts--)
     {
         vTaskDelay(100 / portTICK_PERIOD_MS); // v25.ter specification requires 100ms wait period before reissuing another call
-        // ResetInputBuffers();
+
         if (ModemWriteLine("AT"))
         {
             if (ModemReadResponse(response, "OK", 10, UART_INPUT_TIMEOUT_CMDNORMAL))

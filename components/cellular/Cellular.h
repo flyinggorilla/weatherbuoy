@@ -111,6 +111,7 @@ private:
     int miPppPhase = NETIF_PPP_PHASE_DEAD;
 
     SemaphoreHandle_t mxConnected;
+    SemaphoreHandle_t mxUartCleared;
 
     esp_cellular_netif_driver_t mModemNetifDriver;
     esp_netif_t *mpEspNetif = nullptr;
