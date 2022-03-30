@@ -110,7 +110,8 @@ private:
     bool mbPowerSaverActive = false;
     int miPppPhase = NETIF_PPP_PHASE_DEAD;
 
-    SemaphoreHandle_t mxConnected;
+    SemaphoreHandle_t mxPppConnected;
+    SemaphoreHandle_t mxPppPhaseDead;
     SemaphoreHandle_t mxUartCleared;
 
     esp_cellular_netif_driver_t mModemNetifDriver;

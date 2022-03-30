@@ -80,8 +80,9 @@ void cellularEventHandler(void *ctx, esp_event_base_t base, int32_t id, void *ev
 
 Cellular::Cellular()
 {
-    mxConnected = xSemaphoreCreateBinary();
+    mxPppConnected = xSemaphoreCreateBinary();
     mxUartCleared = xSemaphoreCreateBinary();
+    mxPppPhaseDead = xSemaphoreCreateBinary();
 }
 
 bool Cellular::InitModem()
@@ -183,6 +184,41 @@ void fReceiverTask(void *pvParameter)
     ((Cellular *)pvParameter)->ReceiverTask();
     vTaskDelete(NULL);
 }
+
+const char* PppPhaseText(int pppPhase)
+{
+    switch (pppPhase)
+    {
+        case NETIF_PPP_PHASE_DEAD:
+            return "NETIF_PPP_PHASE_DEAD";
+        case NETIF_PPP_PHASE_MASTER:
+            return "NETIF_PPP_PHASE_MASTER";
+        case NETIF_PPP_PHASE_HOLDOFF:
+            return "NETIF_PPP_PHASE_HOLDOFF";
+        case NETIF_PPP_PHASE_INITIALIZE:
+            return "NETIF_PPP_PHASE_INITIALIZE";
+        case NETIF_PPP_PHASE_SERIALCONN:
+            return "NETIF_PPP_PHASE_SERIALCONN";
+        case NETIF_PPP_PHASE_DORMANT:
+            return "NETIF_PPP_PHASE_DORMANT";
+        case NETIF_PPP_PHASE_ESTABLISH:
+            return "NETIF_PPP_PHASE_ESTABLISH";
+        case NETIF_PPP_PHASE_AUTHENTICATE:
+            return "NETIF_PPP_PHASE_AUTHENTICATE";
+        case NETIF_PPP_PHASE_CALLBACK:
+            return "NETIF_PPP_PHASE_CALLBACK";
+        case NETIF_PPP_PHASE_NETWORK:
+            return "NETIF_PPP_PHASE_NETWORK";
+        case NETIF_PPP_PHASE_RUNNING:
+            return "NETIF_PPP_PHASE_RUNNING";
+        case NETIF_PPP_PHASE_TERMINATE:
+            return "NETIF_PPP_PHASE_TERMINATE";
+        case NETIF_PPP_PHASE_DISCONNECT:
+            return "NETIF_PPP_PHASE_DISCONNECT";
+    }
+    return "unknown";
+}
+
 
 bool Cellular::PowerOn(void)
 {
@@ -710,7 +746,7 @@ bool Cellular::PppNetifUp()
     return false;
 }
 
-bool Cellular::PppNetifStop()
+/* bool Cellular::PppNetifStop()
 {
     if (mbCommandMode)
     {
@@ -737,7 +773,38 @@ bool Cellular::PppNetifStop()
 
     ESP_LOGW(tag, "PppNetifStop() failed, PPP connection not properly terminated (dead).");
     return false;
+} */
+
+bool Cellular::PppNetifStop()
+{
+    if (mbCommandMode)
+    {
+        return true;
+    }
+
+    int attempts = 10;
+    while(attempts)
+    {
+        // stop Ppp activity and clear UART
+        esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
+        mbCommandMode = true;
+
+        //vTaskDelay(100 / portTICK_PERIOD_MS);
+
+        // validate if netif could be stopped properly.
+        if (miPppPhase == NETIF_PPP_PHASE_DEAD)
+        {
+            ESP_LOGI(tag, "Netif action stopped");
+            return true;
+        }
+        ESP_LOGW(tag, "Netif not DEAD, which was left in phase %i %s, remaining attempts: %i", miPppPhase, PppPhaseText(miPppPhase), attempts);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+
+    ESP_LOGE(tag, "Netif not DEAD, recreating Netif, which was left in phase %i, %s", miPppPhase, PppPhaseText(miPppPhase));
+    return false;
 }
+
 
 bool Cellular::PppNetifStart()
 {
@@ -1128,7 +1195,7 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
         // WAIT FOR IP ADDRESS
         // (IP Lost timer defaults to 120 seconds, so wait 60 additional seconds)
         ESP_LOGI(tag, "Waiting up to 180 seconds for getting IP address");
-        if (xSemaphoreTake(mxConnected, 180 * 1000 / portTICK_PERIOD_MS) == pdTRUE)
+        if (xSemaphoreTake(mxPppConnected, 180 * 1000 / portTICK_PERIOD_MS) == pdTRUE)
         {
             // note that esp_netif_action_ calls should all happen in THIS thread, and not in the event handler
             esp_netif_action_connected(mpEspNetif, 0, 0, nullptr);
@@ -1333,7 +1400,7 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
             esp_netif_get_dns_info(netif, ESP_NETIF_DNS_BACKUP, &dns_info);
             ESP_LOGI(tag, "Name Server2: " IPSTR, IP2STR(&dns_info.ip.u_addr.ip4));
             ESP_LOGI(tag, "~~~~~~~~~~~~~~");
-            xSemaphoreGive(mxConnected);
+            xSemaphoreGive(mxPppConnected);
         }
         else if (id == IP_EVENT_PPP_LOST_IP)
         {
@@ -1403,6 +1470,7 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
             break;
         case NETIF_PPP_PHASE_DEAD:
             status = "NETIF_PPP_PHASE_DEAD";
+            xSemaphoreGive(mxPppPhaseDead);
             break;
         case NETIF_PPP_PHASE_MASTER:
             status = "NETIF_PPP_PHASE_MASTER";
