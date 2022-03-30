@@ -393,6 +393,22 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
 
 #endif
 
+    // ensure modem connection works properly after switching to high-speed by performing ATtention tests
+    int attempts = 10;
+    while (attempts--)
+    {
+        if (Command("AT", "OK", &response, "Attention."))
+        {
+            break;
+        }
+        if (attempts)
+        {
+            ESP_LOGE(tag, "SEVERE, could not enter commandline mode. %s. restarting.", response.c_str());
+        } else {
+            ESP_LOGD(tag, "Retrying testing command mode due to %s. Remaining attempts %i", response.c_str(), attempts);
+        }
+    }
+
 #ifdef CONFIG_LILYGO_TTGO_TCALL14_SIM800
     int maxWaitForNetworkRegistration = 120;
     while (maxWaitForNetworkRegistration--)
@@ -775,7 +791,7 @@ bool Cellular::PppNetifUp()
     return false;
 } */
 
-bool Cellular::PppNetifStop()
+/* bool Cellular::PppNetifStop()
 {
     if (mbCommandMode)
     {
@@ -799,6 +815,32 @@ bool Cellular::PppNetifStop()
         }
         ESP_LOGW(tag, "Netif not DEAD, which was left in phase %i %s, remaining attempts: %i", miPppPhase, PppPhaseText(miPppPhase), attempts);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+
+    ESP_LOGE(tag, "Netif not DEAD, recreating Netif, which was left in phase %i, %s", miPppPhase, PppPhaseText(miPppPhase));
+    return false;
+} */
+
+bool Cellular::PppNetifStop()
+{
+    if (mbCommandMode)
+    {
+        return true;
+    }
+
+    int attempts = 3;
+    while(attempts)
+    {
+        // stop Ppp activity and clear UART
+        esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
+        mbCommandMode = true;
+
+        if (xSemaphoreTake(mxPppPhaseDead, 30*1000/portTICK_PERIOD_MS) == pdTRUE)
+        {
+            ESP_LOGI(tag, "Netif action stopped");
+            return true;
+        }
+        ESP_LOGW(tag, "Netif not DEAD after 30 seconds, which was left in phase %i %s, remaining attempts: %i", miPppPhase, PppPhaseText(miPppPhase), attempts);
     }
 
     ESP_LOGE(tag, "Netif not DEAD, recreating Netif, which was left in phase %i, %s", miPppPhase, PppPhaseText(miPppPhase));
@@ -897,9 +939,9 @@ bool Cellular::ReadIntoBuffer(TickType_t timeout)
         return true;
     case UART_DATA_BREAK:
         ESP_LOGW(tag, "uart data break event. size=%u, timeout=%s", event.size, event.timeout_flag ? "true" : "false");
-        ResetInputBuffers();
-        xSemaphoreGive(mxUartCleared);
-        return false;
+//        ResetInputBuffers();
+//        xSemaphoreGive(mxUartCleared);
+        return true;
     case UART_PARITY_ERR:
         ESP_LOGE(tag, "uart parity error");
         ResetInputBuffers();
@@ -1129,11 +1171,13 @@ bool Cellular::SwitchToCommandMode()
 
     if (pdTRUE == xQueueSend(mhUartEventQueueHandle, (void *)&uartBreakEvent, 1000 / portTICK_PERIOD_MS))
     {
-        ESP_LOGD(tag, "Waiting for UART clearance.");
-        if (xSemaphoreTake(mxUartCleared, 1000 / portTICK_PERIOD_MS) == pdTRUE)
+/*        ESP_LOGD(tag, "Waiting for UART clearance up to 30 seonds.");
+        if (xSemaphoreTake(mxUartCleared, 30*1000 / portTICK_PERIOD_MS) == pdTRUE)
         {
             ESP_LOGI(tag, "Switched to command mode, UART cleared.");
-        }
+        } else {
+            ESP_LOGE(tag, "UART clearance timed out.");
+        } */
     }
     else
     {
