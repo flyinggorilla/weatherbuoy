@@ -200,6 +200,7 @@ void Esp32WeatherBuoy::Start()
 
     // detect available Simcom 7600E Modem, such as on Lillygo PCI board
     ESP_LOGE(tag, "remove simulator check!");
+    ESP_LOGE(tag, "remove http client logging!");
     if (!mConfig.miSimulator && mCellular.InitModem())
     {
         mCellular.Start(mConfig.msCellularApn, mConfig.msCellularUser, mConfig.msCellularPass, mConfig.msCellularOperator, mConfig.miCellularNetwork);
@@ -372,7 +373,7 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
 
         if (mOnlineMode == MODE_CELLULAR)
         {
-            int attempts = 3;
+            int attempts = 5;
             bool prepared = false;
             do
             {
@@ -384,7 +385,7 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
                 }
 
                 ESP_LOGI(tag, "Switching to PPP mode next...");
-                if (!mCellular.SwitchToPppMode(attempts < 3))
+                if (!mCellular.SwitchToPppMode(attempts < 2))
                 {
                     ESP_LOGE(tag, "SEVERE, Failed to switch to PPP mode. Remaining attempts: %i", attempts);
                     continue;

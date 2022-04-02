@@ -1211,10 +1211,10 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
     // reading on PPP handshake and LCP start frame https://lateblt.tripod.com/bit60.txt
     if (forceRestartPpp)
     {
-        ESP_LOGW(tag, "IGNORING FORCERESTARTPPP: Forcing restarting of PPP Netif driver.");
+        //ESP_LOGW(tag, "IGNORING FORCERESTARTPPP: Forcing restarting of PPP Netif driver.");
         PppNetifStop();
         //ESP_LOGW(tag, "Forcing restarting of PPP Netif driver.");
-        //PppNetifRenew();
+        PppNetifRenew();
     }
 
     if (PppNetifUp())
@@ -1442,7 +1442,7 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
             {
                 ESP_LOGE(tag, "Unexpected!: event->esp_netif != mpEspNetif");
             }
-
+        
             ESP_LOGI(tag, "PPP Connection established.");
             ESP_LOGI(tag, "~~~~~~~~~~~~~~");
             ESP_LOGI(tag, "IP          : " IPSTR, IP2STR(&event->ip_info.ip));
