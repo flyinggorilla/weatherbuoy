@@ -135,6 +135,7 @@ void Esp32WeatherBuoy::Start()
     esp_log_level_set("Maximet", ESP_LOG_INFO);
     esp_log_level_set("MaximetSimulator", ESP_LOG_DEBUG);
     esp_log_level_set("Serial", ESP_LOG_DEBUG);
+    esp_log_level_set("HTTP_CLIENT", ESP_LOG_VERBOSE);
 #endif
 
     ESP_LOGI(tag, "Atterwind WeatherBuoy starting!");

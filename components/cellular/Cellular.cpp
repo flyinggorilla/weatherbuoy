@@ -1211,9 +1211,10 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
     // reading on PPP handshake and LCP start frame https://lateblt.tripod.com/bit60.txt
     if (forceRestartPpp)
     {
-        ESP_LOGW(tag, "Forcing restarting of PPP Netif driver.");
+        ESP_LOGW(tag, "IGNORING FORCERESTARTPPP: Forcing restarting of PPP Netif driver.");
         PppNetifStop();
-        PppNetifRenew();
+        //ESP_LOGW(tag, "Forcing restarting of PPP Netif driver.");
+        //PppNetifRenew();
     }
 
     if (PppNetifUp())
@@ -1232,7 +1233,8 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
         {
             ESP_LOGE(tag, "SEVERE, could not start network interface.");
             PppNetifStop();
-            PppNetifRenew();
+            ESP_LOGW(tag, "IGNORING RENEW PPP");
+            ///PppNetifRenew();
             return false;
         };
 
@@ -1248,7 +1250,8 @@ bool Cellular::SwitchToPppMode(bool forceRestartPpp)
 
         ESP_LOGE(tag, "Stopped Netif because IP address could not be obtained");
         PppNetifStop();
-        PppNetifRenew();
+        ESP_LOGW(tag, "IGNORING RENEW PPP");
+        //PppNetifRenew();
         return false;
     }
 
@@ -1429,10 +1432,16 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
     {
         if (id == IP_EVENT_PPP_GOT_IP)
         {
+
             esp_netif_dns_info_t dns_info;
 
             ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
             esp_netif_t *netif = event->esp_netif;
+
+            if (event->esp_netif != mpEspNetif)
+            {
+                ESP_LOGE(tag, "Unexpected!: event->esp_netif != mpEspNetif");
+            }
 
             ESP_LOGI(tag, "PPP Connection established.");
             ESP_LOGI(tag, "~~~~~~~~~~~~~~");
@@ -1448,7 +1457,7 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
         }
         else if (id == IP_EVENT_PPP_LOST_IP)
         {
-            ESP_LOGI(tag, "Cellular Disconnect from PPP Server");
+            ESP_LOGW(tag, "Cellular Disconnect from PPP Server");
         }
         else if (id == IP_EVENT_GOT_IP6)
         {
