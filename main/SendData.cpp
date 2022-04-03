@@ -298,16 +298,21 @@ bool SendData::PerformHttpPost()
             ESP_LOGE(tag, "No proper target URL in form of'http(s)://server/' defined: url='%s'", CONFIG_WEATHERBUOY_TARGET_URL);
             return false;
         }*/
-        memset(&mEspHttpClientConfig, 0, sizeof(esp_http_client_config_t));
+        
+        mEspHttpClientConfig = {0}; //memset(&mEspHttpClientConfig, 0, sizeof(esp_http_client_config_t));
         mEspHttpClientConfig.url = CONFIG_WEATHERBUOY_TARGET_URL; // mrConfig.msTargetUrl.c_str();
         mEspHttpClientConfig.method = HTTP_METHOD_POST;
+        mEspHttpClientConfig.timeout_ms = 60*1000; // default of 5000ms (5s) is too short
         mhEspHttpClient = esp_http_client_init(&mEspHttpClientConfig);
+        ESP_LOGW(tag, "Http timeout set to: %is", mEspHttpClientConfig.timeout_ms/1000);
     }
 
+
     // prepare and send HTTP headers and content length
-    ESP_LOGI(tag, "Sending %d bytes to %s", mPostData.length(), mEspHttpClientConfig.url);
-    //esp_http_client_set_header(mhEspHttpClient, "Content-Type", "text/plain");
+    ESP_LOGI(tag, "Sending %d bytes to '%s'", mPostData.length(), mEspHttpClientConfig.url);
+
     esp_http_client_set_header(mhEspHttpClient, "Content-Type", "application/json");
+
     esp_err_t err;
     err = esp_http_client_open(mhEspHttpClient, mPostData.length());
     if (err != ESP_OK)

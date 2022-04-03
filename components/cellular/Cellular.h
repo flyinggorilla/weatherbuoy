@@ -34,7 +34,7 @@ public:
 
     bool Command(const char *sCommand,const char *sSuccess, String *sResponse = nullptr, const char *sInfo = nullptr, unsigned short maxLines = 100, TickType_t timeout = UART_INPUT_TIMEOUT_CMDNORMAL);
     bool SwitchToCommandMode(); // todo, move to private
-    bool SwitchToPppMode(bool forceRestartPpp = false); // can be moved to private
+    bool SwitchToPppMode(); // can be moved to private
     bool SwitchToLowPowerMode();
     bool SwitchToFullPowerMode();
     void QuerySignalStatus();
@@ -55,8 +55,6 @@ private:
     bool PowerOn();
     bool InitNetwork();
 
-    // creates a new PPP network interface; destroys the old one if exists.
-    //bool RenewPppNetif();
 
     // establish network connection on top of every successful modem CONNECT
     bool PppNetifStart();
@@ -64,9 +62,10 @@ private:
     // make sure to destroy the netif after use.
     bool PppNetifStop();
 
-    bool PppNetifRenew();
+    // creates a new PPP network interface; destroys the old one if exists.
+    bool PppNetifCreate();
 
-    // check if Ppp netif interface and Ppp mode is enabled
+    // check if Ppp netif interface and Ppp mode is enabled, and ready for data communication
     bool PppNetifUp();
 
 
