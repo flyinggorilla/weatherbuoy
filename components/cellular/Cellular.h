@@ -30,6 +30,10 @@ public:
 	virtual ~Cellular();
     void Start(String apn, String user, String pass, String preferredOperator, int preferredNetwork); // call after Init()
     void ReadSMS();
+
+    // send SMS message
+    // rsTo is a comma separted list of phone numbers e.g. "0664123456,08611234567"
+    // rsMsg is the ASCII text message
     bool SendSMS(String &rsTo, String &rsMsg);
 
     bool Command(const char *sCommand,const char *sSuccess, String *sResponse = nullptr, const char *sInfo = nullptr, unsigned short maxLines = 100, TickType_t timeout = UART_INPUT_TIMEOUT_CMDNORMAL);

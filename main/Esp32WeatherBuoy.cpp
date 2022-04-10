@@ -278,33 +278,41 @@ void Esp32WeatherBuoy::HandleAlarm(Alarm *pAlarm)
         return;
     }
 
-    vTaskDelay(1000 / portTICK_PERIOD_MS);
+    //vTaskDelay(100 / portTICK_PERIOD_MS);
 
     ESP_LOGI(tag, "SMS Numbers: %s", mConfig.msAlarmSms.c_str());
     String msg;
+    //String numbers(mConfig.msAlarmSms); // copy phone numbers, so to split later
     msg = "ALARM ";
     msg += mConfig.msHostname;
     msg += "!\r\n";
     msg += pAlarm->GetAlarmInfo();
     msg += "\r\n";
 
-    int startPos = 0;
-    int endPos = 0;
+    int startPos = 0; // start of phone number
+    int endPos = 0; // end of phone number, before position of delimiter or end of string
+    const int length = mConfig.msAlarmSms.length();
     int sent = 0;
-    while (endPos < mConfig.msAlarmSms.length())
+    while (startPos < length)
     {
-        endPos = mConfig.msAlarmSms.indexOf(',');
+        endPos = mConfig.msAlarmSms.indexOf(',', startPos);
         if (endPos < 0)
         {
-            endPos = mConfig.msAlarmSms.length();
-        }
+            endPos = length;
+        } 
         String to = mConfig.msAlarmSms.substring(startPos, endPos);
-        ESP_LOGI(tag, "Sending SMS: to: %s msg: %s", to.c_str(), msg.c_str());
-        if (mCellular.SendSMS(to, msg))
-        {
-            sent++;
-        }
+        to.trim();
 
+        if (to.length())
+        {
+            //ESP_LOGI(tag, "Sending SMS: to: %s msg: %s", to.c_str(), msg.c_str());
+            if (mCellular.SendSMS(to, msg))
+            {
+                sent++;
+            }
+        } else  {
+            break;
+        }
         startPos = endPos + 1;
     }
 
