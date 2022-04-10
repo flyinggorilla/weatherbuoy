@@ -7,14 +7,88 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_http_client.h"
+#include "esp_tls.h"
 #include "esp_ota_ops.h"
 #include "esp_https_ota.h"
 #include "esputil.h"
 #include "Maximet.h"
+#include "string.h"
 
 static const char tag[] = "SendData";
 static const int SENDDATA_QUEUE_SIZE = (3);
 static const unsigned int MAX_ACCEPTABLE_RESPONSE_BODY_LENGTH = 16 * 1024;
+
+
+
+
+
+
+
+
+esp_err_t http_event_handler(esp_http_client_event_t *evt)
+{
+    switch(evt->event_id) {
+        case HTTP_EVENT_ERROR:
+            ESP_LOGD(tag, "HTTP_EVENT_ERROR");
+            break;
+        case HTTP_EVENT_ON_CONNECTED:
+            ESP_LOGD(tag, "HTTP_EVENT_ON_CONNECTED");
+            break;
+        case HTTP_EVENT_HEADER_SENT:
+            ESP_LOGD(tag, "HTTP_EVENT_HEADER_SENT");
+            break;
+        case HTTP_EVENT_ON_HEADER:
+            ESP_LOGD(tag, "HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
+
+            // retreive UTC timestamp in milliseconds from HTTP response header and update system time if needed
+            if (strcmp("Timestamp", evt->header_key) == 0 && evt->header_value)
+            {
+                char* endptr = nullptr;
+                long long timestamp_ms = strtoll(evt->header_value, &endptr, 10);
+
+                ESP_LOGD(tag, "HTTP response header Timestamp: %s, %lli", evt->header_value, timestamp_ms);
+
+                struct timeval now;        
+                gettimeofday(&now, NULL);
+                time_t delta_s = abs(timestamp_ms/1000 - now.tv_sec);
+
+                // adjust system time if more than 10 seconds off
+                if (delta_s > 10)
+                {
+                    now.tv_sec = timestamp_ms/1000;
+                    now.tv_usec = (timestamp_ms % 1000) * 1000;
+                    settimeofday(&now, NULL);
+                    ESP_LOGI(tag, "Adjusted system time by %li seconds.", delta_s);
+                }
+            }
+
+            break;
+        case HTTP_EVENT_ON_DATA:
+            ESP_LOGD(tag, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+            break;
+        case HTTP_EVENT_ON_FINISH:
+            ESP_LOGD(tag, "HTTP_EVENT_ON_FINISH");
+            break;
+        case HTTP_EVENT_DISCONNECTED:
+            ESP_LOGD(tag, "HTTP_EVENT_DISCONNECTED");
+            int mbedtls_err = 0;
+            esp_err_t err = esp_tls_get_and_clear_last_error((esp_tls_error_handle_t)(evt->data), &mbedtls_err, NULL);
+            if (err != 0) {
+                ESP_LOGE(tag, "TLS: esp error code: 0x%x, mbedtls: 0x%x. Error cleared.", err, mbedtls_err);
+            }
+            break;
+        //case HTTP_EVENT_REDIRECT:
+        //    ESP_LOGD(tag, "HTTP_EVENT_REDIRECT");
+        //    esp_http_client_set_header(evt->client, "From", "user@example.com");
+        //    esp_http_client_set_header(evt->client, "Accept", "text/html");
+        //    break;
+    }
+    return ESP_OK;
+}
+
+
+
+
 
 String SendData::ReadMessageValue(const char *key)
 {
@@ -303,6 +377,7 @@ bool SendData::PerformHttpPost()
         mEspHttpClientConfig.url = CONFIG_WEATHERBUOY_TARGET_URL; // mrConfig.msTargetUrl.c_str();
         mEspHttpClientConfig.method = HTTP_METHOD_POST;
         mEspHttpClientConfig.timeout_ms = 60*1000; // default of 5000ms (5s) is too short
+        mEspHttpClientConfig.event_handler = http_event_handler;
         mhEspHttpClient = esp_http_client_init(&mEspHttpClientConfig);
         ESP_LOGD(tag, "Http timeout set to: %is", mEspHttpClientConfig.timeout_ms/1000);
     }
@@ -356,6 +431,7 @@ bool SendData::PerformHttpPost()
         Cleanup();
         return false;
     }
+
 
     // Prevent overly memory allocation
     if (iContentLength > MAX_ACCEPTABLE_RESPONSE_BODY_LENGTH)
@@ -623,9 +699,6 @@ bool SendData::PerformHttpPost()
                 Cleanup();
                 memset(&mEspHttpClientConfig, 0, sizeof(esp_http_client_config_t));
 
-                //*** TODO ##################################### NEEDED ?????***************************************************
-                //mrMaximet.Stop();
-
                 const String &pem = ReadMessagePemValue("set-cert-pem:");
                 String targetUrl(CONFIG_WEATHERBUOY_TARGET_URL);
                 mEspHttpClientConfig.method = HTTP_METHOD_GET;
@@ -690,3 +763,5 @@ SendData::~SendData()
     esp_http_client_cleanup(mhEspHttpClient);
     mhEspHttpClient = nullptr;
 }
+
+
