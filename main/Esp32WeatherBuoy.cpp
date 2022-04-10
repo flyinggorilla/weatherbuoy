@@ -244,18 +244,15 @@ void Esp32WeatherBuoy::Start()
 
     SendData sendData(mConfig, dataQueue, mCellular, watchdog, maximet);
 
-    if (mConfig.mbNmeaDisplay)
+    if (mConfig.miSimulator)
     {
-        ESP_LOGI(tag, "Racing Committee Boat with Garmin GNX130 NMEA200 Display");
-        RunDisplay(tempSensors, dataQueue, max471Meter, sendData, maximet);
-    }
-    else if (mConfig.miSimulator)
-    {
+        // run Simulator
         ESP_LOGI(tag, "Starting: Gill Maximet Wind Sensor Simulator GMX%d%s", mConfig.miSimulator / 10, mConfig.miSimulator % 10 ? "GPS" : "");
         RunSimulator(tempSensors, dataQueue, max471Meter, sendData, maximet, static_cast<Maximet::Model>(mConfig.miSimulator));
     }
     else
     {
+        // run Weatherbuoy and Startboat
         Alarm *pAlarm = nullptr;
         if (mConfig.mbAlarmSound || mConfig.msAlarmSms.length())
         {
@@ -263,8 +260,8 @@ void Esp32WeatherBuoy::Start()
             pAlarm = new Alarm(dataQueue, mConfig, CONFIG_ALARM_BUZZER_PIN);
             pAlarm->Start();
         }
-        ESP_LOGI(tag, "Starting: Weatherbuoy %s", maximet.GetConfig().sUserinfo.c_str());
-        RunBuoy(tempSensors, dataQueue, max471Meter, sendData, maximet, pAlarm);
+
+        Run(tempSensors, dataQueue, max471Meter, sendData, maximet, pAlarm);
     }
 }
 
@@ -314,10 +311,12 @@ void Esp32WeatherBuoy::HandleAlarm(Alarm *pAlarm)
     pAlarm->ConfirmAlarm();
 };
 
-void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet, Alarm *pAlarm)
+void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet, Alarm *pAlarm)
 {
-    ESP_LOGI(tag, "Starting Weatherbuoy main task.");
-
+    ESP_LOGI(tag, "Running: %s, Maximet: %s", 
+            mpDisplay ? "Racing Committee Boat with Garmin GNX130 NMEA200 Display" : "Weatherbuoy", 
+            maximet.GetConfig().sUserinfo.c_str());
+  
     bool bDiagnostics;
     bool bDiagnosticsAtStartup = true;
     unsigned int lastSendTimestamp = 0;
@@ -330,7 +329,6 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
     while (true)
     {
         HandleAlarm(pAlarm); // check for alarm before and after waiting for the queue to minimize latency
-        tempSensors.Read();  // note, this causes approx 700ms delay
         vTaskDelay(1 * 1000 / portTICK_PERIOD_MS);
         bool isMaximetData = dataQueue.WaitForData(60);
         HandleAlarm(pAlarm); // check for alarm
@@ -371,6 +369,7 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
             continue;
         }
 
+        tempSensors.Read();  // note, this causes approx 700ms delay
         unsigned int voltage = max471Meter.Voltage();
         unsigned int current = max471Meter.Current();
         float boardtemp = tempSensors.GetBoardTemp();
@@ -420,6 +419,15 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
             } while (--attempts);
         }
 
+        // display runs on power, so no worries about power management
+        if (mpDisplay) 
+        {
+            secondsToSleep = mConfig.miIntervalDay;
+            continue;
+        }
+
+        // Power Managment
+        // -----------------------------------------------------------
         // determine nighttime by low solar radiation
         ESP_LOGI(tag, "Solarradiation: %d W/m²  Voltage: %.02fV", maximet.SolarRadiation(), voltage / 1000.0);
         if (maximet.SolarRadiation() > CONFIG_SOLARRADIATIONMIN_DAYTIME && voltage > 13100)
@@ -487,168 +495,6 @@ void Esp32WeatherBuoy::RunSimulator(TemperatureSensors &tempSensors, DataQueue &
                     ESP_LOGW(tag, "Retrying sending via wifi. Remaining attempts: %i", sendViaWifiTries);
                 }
             }
-        }
-    }
-}
-
-void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &dataQueue, Max471Meter &max471Meter, SendData &sendData, Maximet &maximet)
-{
-    ESP_LOGI(tag, "Starting: Startboat NMEA 2000 Display main task.");
-
-    bool bDiagnostics;
-    bool bDiagnosticsAtStartup = true;
-    unsigned int lastSendTimestamp = 0;
-    unsigned int lastDiagnosticsTimestamp = 0;
-
-    int secondsToSleep = 0;
-
-    int logInfoSeconds = 0;
-
-    while (true)
-    {
-        vTaskDelay(1 * 1000 / portTICK_PERIOD_MS);
-        bool isMaximetData = dataQueue.WaitForData(60);
-        unsigned int secondsSinceLastSend;
-        unsigned int secondsSinceLastDiagnostics;
-
-        // keep modem sleeping unless time to last send elapsed
-        unsigned int uptimeSeconds = (unsigned int)(esp_timer_get_time() / 1000000); // seconds since start
-        secondsSinceLastSend = uptimeSeconds - lastSendTimestamp;
-        if (secondsToSleep > secondsSinceLastSend)
-        {
-            if (logInfoSeconds == 0)
-            {
-                ESP_LOGI(tag, "Power management sleep: %d, Measurements in queue: %d", secondsToSleep - secondsSinceLastSend, dataQueue.GetQueueLength());
-                logInfoSeconds = 60;
-            }
-            logInfoSeconds--;
-            continue;
-        }
-        lastSendTimestamp = uptimeSeconds;
-
-        // when sending, add diagnostics information after 300 seconds
-        secondsSinceLastDiagnostics = uptimeSeconds - lastDiagnosticsTimestamp;
-        if (secondsSinceLastDiagnostics > mConfig.miIntervalDiagnostics || bDiagnosticsAtStartup)
-        {
-            bDiagnostics = true;
-            bDiagnosticsAtStartup = false;
-            lastDiagnosticsTimestamp = uptimeSeconds;
-        }
-        else
-        {
-            bDiagnostics = false;
-        }
-
-        // check if maximeta or info data should be sent at all
-        if (!isMaximetData && !bDiagnostics)
-        {
-            continue;
-        }
-
-        if (bDiagnostics)
-        {
-            // to retrieve updated network info we need to exit PPP mode
-            if(!mCellular.SwitchToCommandMode())
-            {
-                //cellularRestartReason = CELLULAR_RESTART_ENTERCMDFAILED;
-                //cellularRestarts++;
-                ESP_LOGE(tag, "SwitchToCommandMode() failed. Restarting.");
-                esp_restart();
-            }
-
-            // update network info
-            mCellular.QuerySignalStatus();
-        }
-
-        tempSensors.Read(); // note, this causes approx 700ms delay
-        unsigned int voltage = max471Meter.Voltage();
-        unsigned int current = max471Meter.Current();
-        float boardtemp = tempSensors.GetBoardTemp();
-        float watertemp = tempSensors.GetWaterTemp();
-
-        int attempts = 3;
-        bool prepared = false;
-        while (attempts--)
-        {
-            ESP_LOGI(tag, "switching to PPP mode next...");
-            if (mCellular.SwitchToPppMode())
-            {
-
-                if (!prepared)
-                {
-                    // read maximet data queue and create a HTTP POST message
-                    sendData.PrepareHttpPost(voltage, current, boardtemp, watertemp, bDiagnostics, mOnlineMode);
-                    prepared = true;
-                }
-
-                if (sendData.PerformHttpPost())
-                {
-                    int duration = (unsigned int)(esp_timer_get_time() / 1000000) - uptimeSeconds;
-                    ESP_LOGI(tag, "Total PPP/HTTP data send duration %is.", duration);
-                    break;
-                }
-            }
-            else
-            {
-                ESP_LOGW(tag, "Restarting modem, then Retrying HTTP Post. Remaining attempts: %i", attempts);
-                mCellular.SwitchToLowPowerMode();
-                vTaskDelay(1000 / portTICK_PERIOD_MS); // wait one second
-            };
-        };
-
-        secondsToSleep = mConfig.miIntervalDay;
-    }
-};
-
-void TestHttp()
-{
-    for (int i = 0; i < 5; i++)
-    {
-        //        cellular.Command("AT+CGDCONT=1,\"IP\",\"webapn.at\"", "Define PDP Context");
-        // cellular.Command("ATD*99#", "setup data connection");
-
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
-
-        esp_http_client_config_t httpConfig = {0};
-        httpConfig.url = "http://ptsv2.com/t/wb/post?testWeatherbuoy";
-
-        httpConfig.method = HTTP_METHOD_GET;
-        esp_http_client_handle_t httpClient = esp_http_client_init(&httpConfig);
-        // esp_http_client_set_header(httpClient, "Content-Type", "text/plain");
-        esp_err_t err;
-        err = esp_http_client_open(httpClient, 0);
-        if (err != ESP_OK)
-        {
-            ESP_LOGE(tag, "Error %s in esp_http_client_open(): %s", esp_err_to_name(err), httpConfig.url);
-        }
-
-        int sent = esp_http_client_write(httpClient, "", 0);
-        if (sent == 0)
-        {
-            ESP_LOGD(tag, "esp_http_client_write(): OK, sent: %d", sent);
-        }
-        else
-        {
-            ESP_LOGE(tag, "esp_http_client_write(): Could only send %d of %d bytes", sent, 0);
-        }
-
-        // retreive HTTP response and headers
-        int iContentLength = esp_http_client_fetch_headers(httpClient);
-        if (iContentLength == ESP_FAIL)
-        {
-            ESP_LOGE(tag, "esp_http_client_fetch_headers(): could not receive HTTP response");
-        }
-
-        // Check HTTP status code
-        int iHttpStatusCode = esp_http_client_get_status_code(httpClient);
-        if ((iHttpStatusCode >= 200) && (iHttpStatusCode < 400))
-        {
-            ESP_LOGI(tag, "HTTP response OK. Status %d, Content-Length %d", iHttpStatusCode, iContentLength);
-            return;
-        }
-        else
-        {
-            ESP_LOGE(tag, "HTTP response was not OK with status %d", iHttpStatusCode);
         }
     }
 }

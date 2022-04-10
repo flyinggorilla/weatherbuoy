@@ -72,6 +72,9 @@ public:
     // weatherbuoy electronics can be used to simulator a Gill Maximet Weatherstation via its RS232 serial interface. good for testing other weatherbuoys
     void StartSimulator(Model maximetModel, int gpioRX, int gpioTX, bool alternateUart = false);
 
+    // returns 
+    // * solar radiation level in [W/m2]
+    // * 999 if no solar sensor is available, or no measurement has been taken
     unsigned int SolarRadiation() { return muiSolarradiation; };
 
     Config &GetConfig() { return mMaximetConfig; };
