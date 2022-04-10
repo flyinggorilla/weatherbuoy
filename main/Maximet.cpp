@@ -804,7 +804,7 @@ bool Maximet::EnterCommandLine()
         mpSerial->Write(cmd);
         if (mpSerial->ReadLine(line, COMMANDLINE_TIMEOUT_MS))
         {
-            ESP_LOGI(tag, "Switch Maximet to commandline...  ReadLine: %s", line.c_str());
+            ESP_LOGD(tag, "Switch Maximet to commandline...  ReadLine: %s", line.c_str());
         } 
         else {
             ESP_LOGW(tag, "Timeout switching Maximet to commandline... ");
@@ -820,7 +820,7 @@ bool Maximet::EnterCommandLine()
             return mbCommandline = true;
         }
         vTaskDelay(2000 / portTICK_PERIOD_MS);
-        ESP_LOGI(tag, "Remaining attempts switching Maximet to commandline: %i", attempts);
+        ESP_LOGD(tag, "Remaining attempts switching Maximet to commandline: %i", attempts);
     }
 
     if (!attempts) {

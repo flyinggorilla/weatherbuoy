@@ -1,4 +1,4 @@
-#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "sdkconfig.h"
 #include "esp_system.h"
 #include "esp_log.h"
@@ -136,6 +136,7 @@ void Esp32WeatherBuoy::Start()
     esp_log_level_set("MaximetSimulator", ESP_LOG_DEBUG);
     esp_log_level_set("Serial", ESP_LOG_DEBUG);
     esp_log_level_set("HTTP_CLIENT", ESP_LOG_VERBOSE);
+    esp_log_level_set("esp-netif_lwip-ppp", ESP_LOG_WARN);
 #endif
 
     ESP_LOGI(tag, "Atterwind WeatherBuoy starting!");
@@ -198,10 +199,14 @@ void Esp32WeatherBuoy::Start()
         maximet.Start(maximetRxPin, maximetTxPin);
     }
 
+    
+    //ESP_LOGE(tag, "remove http client logging!");
+
+    //ESP_LOGE(tag, "remove simulator check!");
+    //if (!mConfig.miSimulator && mCellular.InitModem())
+
     // detect available Simcom 7600E Modem, such as on Lillygo PCI board
-    ESP_LOGE(tag, "remove simulator check!");
-    ESP_LOGE(tag, "remove http client logging!");
-    if (!mConfig.miSimulator && mCellular.InitModem())
+    if (mCellular.InitModem())
     {
         mCellular.Start(mConfig.msCellularApn, mConfig.msCellularUser, mConfig.msCellularPass, mConfig.msCellularOperator, mConfig.miCellularNetwork);
         mOnlineMode = MODE_CELLULAR;
@@ -402,6 +407,8 @@ void Esp32WeatherBuoy::RunBuoy(TemperatureSensors &tempSensors, DataQueue &dataQ
                 {
                     ESP_LOGI(tag, "Posting data succeeded. Switching to low power mode...");
                     mCellular.SwitchToLowPowerMode();
+                    int duration = (unsigned int)(esp_timer_get_time() / 1000000) - uptimeSeconds;
+                    ESP_LOGI(tag, "Total data send duration %is.", duration);
                     break;
                 }
                 else
@@ -576,6 +583,8 @@ void Esp32WeatherBuoy::RunDisplay(TemperatureSensors &tempSensors, DataQueue &da
 
                 if (sendData.PerformHttpPost())
                 {
+                    int duration = (unsigned int)(esp_timer_get_time() / 1000000) - uptimeSeconds;
+                    ESP_LOGI(tag, "Total PPP/HTTP data send duration %is.", duration);
                     break;
                 }
             }

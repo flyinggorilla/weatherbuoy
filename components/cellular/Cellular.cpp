@@ -1,4 +1,4 @@
-#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "sdkconfig.h"
 #include "Cellular.h"
 #include "EspString.h"
@@ -185,40 +185,39 @@ void fReceiverTask(void *pvParameter)
     vTaskDelete(NULL);
 }
 
-const char* PppPhaseText(int pppPhase)
+const char *PppPhaseText(int pppPhase)
 {
     switch (pppPhase)
     {
-        case NETIF_PPP_PHASE_DEAD:
-            return "NETIF_PPP_PHASE_DEAD";
-        case NETIF_PPP_PHASE_MASTER:
-            return "NETIF_PPP_PHASE_MASTER";
-        case NETIF_PPP_PHASE_HOLDOFF:
-            return "NETIF_PPP_PHASE_HOLDOFF";
-        case NETIF_PPP_PHASE_INITIALIZE:
-            return "NETIF_PPP_PHASE_INITIALIZE";
-        case NETIF_PPP_PHASE_SERIALCONN:
-            return "NETIF_PPP_PHASE_SERIALCONN";
-        case NETIF_PPP_PHASE_DORMANT:
-            return "NETIF_PPP_PHASE_DORMANT";
-        case NETIF_PPP_PHASE_ESTABLISH:
-            return "NETIF_PPP_PHASE_ESTABLISH";
-        case NETIF_PPP_PHASE_AUTHENTICATE:
-            return "NETIF_PPP_PHASE_AUTHENTICATE";
-        case NETIF_PPP_PHASE_CALLBACK:
-            return "NETIF_PPP_PHASE_CALLBACK";
-        case NETIF_PPP_PHASE_NETWORK:
-            return "NETIF_PPP_PHASE_NETWORK";
-        case NETIF_PPP_PHASE_RUNNING:
-            return "NETIF_PPP_PHASE_RUNNING";
-        case NETIF_PPP_PHASE_TERMINATE:
-            return "NETIF_PPP_PHASE_TERMINATE";
-        case NETIF_PPP_PHASE_DISCONNECT:
-            return "NETIF_PPP_PHASE_DISCONNECT";
+    case NETIF_PPP_PHASE_DEAD:
+        return "NETIF_PPP_PHASE_DEAD";
+    case NETIF_PPP_PHASE_MASTER:
+        return "NETIF_PPP_PHASE_MASTER";
+    case NETIF_PPP_PHASE_HOLDOFF:
+        return "NETIF_PPP_PHASE_HOLDOFF";
+    case NETIF_PPP_PHASE_INITIALIZE:
+        return "NETIF_PPP_PHASE_INITIALIZE";
+    case NETIF_PPP_PHASE_SERIALCONN:
+        return "NETIF_PPP_PHASE_SERIALCONN";
+    case NETIF_PPP_PHASE_DORMANT:
+        return "NETIF_PPP_PHASE_DORMANT";
+    case NETIF_PPP_PHASE_ESTABLISH:
+        return "NETIF_PPP_PHASE_ESTABLISH";
+    case NETIF_PPP_PHASE_AUTHENTICATE:
+        return "NETIF_PPP_PHASE_AUTHENTICATE";
+    case NETIF_PPP_PHASE_CALLBACK:
+        return "NETIF_PPP_PHASE_CALLBACK";
+    case NETIF_PPP_PHASE_NETWORK:
+        return "NETIF_PPP_PHASE_NETWORK";
+    case NETIF_PPP_PHASE_RUNNING:
+        return "NETIF_PPP_PHASE_RUNNING";
+    case NETIF_PPP_PHASE_TERMINATE:
+        return "NETIF_PPP_PHASE_TERMINATE";
+    case NETIF_PPP_PHASE_DISCONNECT:
+        return "NETIF_PPP_PHASE_DISCONNECT";
     }
     return "unknown";
 }
-
 
 bool Cellular::PowerOn(void)
 {
@@ -333,12 +332,10 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
         ESP_LOGE(tag, "Severe problem, no connection to Modem");
     };
 
-#ifdef CONFIG_LILYGO_TTGO_TPCIE_SIM7600
     if (!Command("ATE0", "OK", nullptr, "Echo off"))
-    { // CONFIG_LILYGO_TTGO_TPCIE_SIM7600
+    {   // CONFIG_LILYGO_TTGO_TPCIE_SIM7600
         ESP_LOGE(tag, "Could not turn off echo.");
     };
-#endif
 
     Command("AT+CGMR", "OK", &response, "Display Firmware info"); // +CGMR: LE11B04SIM7600M21-A\r\nOK"
     if (response.startsWith("+CGMR: "))
@@ -358,19 +355,6 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
         ESP_LOGE(tag, "Error, PIN required: %s", response.c_str());
     }
 
-#ifdef CONFIG_LILYGO_TTGO_TCALL14_SIM800
-    if (Command("AT+IPR=460800", "OK", &response, "Set 460800 baud rate. Default = 115200."))
-    {
-        if (ESP_OK == uart_set_baudrate(muiUartNo, 460800))
-        {
-            ESP_LOGI(tag, "Switched to 460800 baud");
-        }
-        else
-        {
-            ESP_LOGE(tag, "Error switching to 460800 baud");
-        }
-    }
-#elif CONFIG_LILYGO_TTGO_TPCIE_SIM7600
 #if LOG_LOCAL_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG || LOG_DEFAULT_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG
     Command("AT+IPR=?", "OK", &response, "What serial speeds are supported?", UART_INPUT_TIMEOUT_CMDLONG);
     ESP_LOGD(tag, "Baud Rates: %s", response.c_str());
@@ -391,8 +375,6 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
         vTaskDelay(1000 / portTICK_PERIOD_MS); // one second delay seems to be mandatory after changing the baud rate; otherwise next AT command hangs
     }
 
-#endif
-
     // ensure modem connection works properly after switching to high-speed by performing ATtention tests
     int attempts = 10;
     while (attempts--)
@@ -404,25 +386,18 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
         if (attempts)
         {
             ESP_LOGE(tag, "SEVERE, could not enter commandline mode. %s. restarting.", response.c_str());
-        } else {
+        }
+        else
+        {
             ESP_LOGD(tag, "Retrying testing command mode due to %s. Remaining attempts %i", response.c_str(), attempts);
         }
     }
 
-#ifdef CONFIG_LILYGO_TTGO_TCALL14_SIM800
-    int maxWaitForNetworkRegistration = 120;
-    while (maxWaitForNetworkRegistration--)
-    {
-        if (Command("AT+CREG?", "OK", &response, "Network Registration Information States "))
-        { // +CREG: 0,2 // +CREG: 1,5
-            if (response.indexOf("+CREG: ") >= 0 && response.indexOf(",5") >= 0)
-                break;
-        }
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
-    }
-#endif
-
-#ifdef CONFIG_LILYGO_TTGO_TPCIE_SIM7600
+    // this should enable NITZ network time and timezone update. 
+    //if (Command("AT+CTZU=1", "OK", &response, "Enable Automatic time and time zone update"))
+    //{
+    //    ESP_LOGW(tag, "Disable automatic time and time zone update. %s", response.c_str());
+    //}
 
     // only query the list of operators in debug mode or when preferred operator is NOT set
     if (!msPreferredOperator.length() || LOG_LOCAL_LEVEL >= ESP_LOG_VERBOSE)
@@ -490,7 +465,6 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
         ESP_LOGI(tag, "Waiting for network %d", maxWaitForNetworkRegistration);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
-#endif
 
     msNetworkmode = "";
     if (Command("AT+CNSMOD?", "OK", &response, "Current network system mode"))
@@ -537,22 +511,6 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
         msOperator = response.substring(response.indexOf(",\"") + 2, response.lastIndexOf("\""));
     }
     ESP_LOGI(tag, "Operator: %s", msOperator.c_str());
-
-#ifdef CONFIG_LILYGO_TTGO_TCALL14_SIM800
-    Command("AT+CROAMING", "OK", &response, "Roaming State 0=home, 1=intl, 2=other"); // +CROAMING: 2
-    if (response.startsWith("+CROAMING: 0"))
-    {
-        ESP_LOGI(tag, "No roaming.");
-    }
-    else if (response.startsWith("+CROAMING: 1"))
-    {
-        ESP_LOGW(tag, "International roaming.");
-    }
-    else if (response.startsWith("+CROAMING: 2"))
-    {
-        ESP_LOGI(tag, "Roaming into network %s", msOperator.c_str());
-    }
-#endif
 
     // set PDP context 1 to providers APN
     command = "AT+CGDCONT=1,\"IP\",\"";
@@ -601,6 +559,20 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
     { // mode 4 would shut down RF entirely to "flight-mode"; mode 0 still keeps SMS receiption intact
         ESP_LOGI(tag, "Enabled modem to sleep via UART DTR.");
     }
+
+
+    /*
+    if (Command("AT+CCLK?", "OK", &response, "Query modem system time/date"))
+    {
+        // String type value; format is “yy/MM/dd,hh:mm:ss±zz”, where
+        // characters indicate year (two last digits), month, day, hour, minutes, seconds and time zone (indicates the difference, expressed in
+        // quarters of an hour, between the local time and GMT; three last digits
+        // are mandatory, range -47…+48). E.g. 6th of May 2008, 14:28:10 GMT+8 equals to “08/05/06,14:28:10+32”.
+        // NOTE:   1. Time zone is nonvolatile, and the factory value is invalid time zone.
+        //        2. Command +CCLK? will return time zone when time zone is valid, and if time zone is 00, command +CCLK? will return “+00”, but not “-00”
+        ESP_LOGW(tag, "Network time/date: %s", response.c_str());
+    }
+    */
 }
 
 void Cellular::ReadSMS()
@@ -762,7 +734,6 @@ bool Cellular::PppNetifUp()
     return false;
 }
 
-
 bool Cellular::PppNetifStop()
 {
     if (mbCommandMode)
@@ -771,14 +742,13 @@ bool Cellular::PppNetifStop()
     }
 
     int attempts = 3;
-    while(attempts)
+    while (attempts)
     {
         // stop Ppp activity and clear UART
         esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
-        mbCommandMode = true;
-
-        if (xSemaphoreTake(mxPppPhaseDead, 30*1000/portTICK_PERIOD_MS) == pdTRUE)
+        if (xSemaphoreTake(mxPppPhaseDead, 30 * 1000 / portTICK_PERIOD_MS) == pdTRUE)
         {
+            mbCommandMode = true;
             ESP_LOGI(tag, "Netif action stopped");
             return true;
         }
@@ -788,7 +758,6 @@ bool Cellular::PppNetifStop()
     ESP_LOGE(tag, "Netif not DEAD, recreating Netif, which was left in phase %i, %s", miPppPhase, PppPhaseText(miPppPhase));
     return false;
 }
-
 
 bool Cellular::PppNetifStart()
 {
@@ -1093,7 +1062,7 @@ void Cellular::QuerySignalStatus()
 bool Cellular::SwitchToCommandMode()
 {
     ESP_LOGI(tag, "Switching to command mode...");
-    if (!PppNetifStop()) 
+    if (!PppNetifStop())
     {
         PppNetifCreate();
     };
@@ -1107,19 +1076,18 @@ bool Cellular::SwitchToCommandMode()
 
     if (pdTRUE == xQueueSend(mhUartEventQueueHandle, (void *)&uartBreakEvent, 1000 / portTICK_PERIOD_MS))
     {
-/*        ESP_LOGD(tag, "Waiting for UART clearance up to 30 seonds.");
-        if (xSemaphoreTake(mxUartCleared, 30*1000 / portTICK_PERIOD_MS) == pdTRUE)
-        {
-            ESP_LOGI(tag, "Switched to command mode, UART cleared.");
-        } else {
-            ESP_LOGE(tag, "UART clearance timed out.");
-        } */
+        /*        ESP_LOGD(tag, "Waiting for UART clearance up to 30 seonds.");
+                if (xSemaphoreTake(mxUartCleared, 30*1000 / portTICK_PERIOD_MS) == pdTRUE)
+                {
+                    ESP_LOGI(tag, "Switched to command mode, UART cleared.");
+                } else {
+                    ESP_LOGE(tag, "UART clearance timed out.");
+                } */
     }
     else
     {
         ESP_LOGE(tag, "SwitchToCommandMode() could not send send break event.");
     }
-
 
     String response;
     int attempts = 3;
@@ -1162,7 +1130,7 @@ bool Cellular::SwitchToPppMode()
             ESP_LOGE(tag, "SEVERE, could not start network interface.");
             PppNetifStop();
             ESP_LOGW(tag, "IGNORING RENEW PPP");
-            ///PppNetifCreate();
+            /// PppNetifCreate();
             return false;
         };
 
@@ -1179,7 +1147,7 @@ bool Cellular::SwitchToPppMode()
         ESP_LOGE(tag, "Stopped Netif because IP address could not be obtained");
         PppNetifStop();
         ESP_LOGW(tag, "IGNORING RENEW PPP");
-        //PppNetifCreate();
+        // PppNetifCreate();
         return false;
     }
 
@@ -1370,7 +1338,7 @@ void Cellular::OnEvent(esp_event_base_t base, int32_t id, void *event_data)
             {
                 ESP_LOGE(tag, "Unexpected!: event->esp_netif != mpEspNetif");
             }
-        
+
             ESP_LOGI(tag, "PPP Connection established.");
             ESP_LOGI(tag, "~~~~~~~~~~~~~~");
             ESP_LOGI(tag, "IP          : " IPSTR, IP2STR(&event->ip_info.ip));

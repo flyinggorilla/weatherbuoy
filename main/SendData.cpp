@@ -304,7 +304,7 @@ bool SendData::PerformHttpPost()
         mEspHttpClientConfig.method = HTTP_METHOD_POST;
         mEspHttpClientConfig.timeout_ms = 60*1000; // default of 5000ms (5s) is too short
         mhEspHttpClient = esp_http_client_init(&mEspHttpClientConfig);
-        ESP_LOGW(tag, "Http timeout set to: %is", mEspHttpClientConfig.timeout_ms/1000);
+        ESP_LOGD(tag, "Http timeout set to: %is", mEspHttpClientConfig.timeout_ms/1000);
     }
 
 
