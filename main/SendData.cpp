@@ -10,6 +10,7 @@
 #include "esp_tls.h"
 #include "esp_ota_ops.h"
 #include "esp_https_ota.h"
+#include "esp_netif.h"
 #include "esputil.h"
 #include "Maximet.h"
 #include "string.h"
@@ -18,10 +19,46 @@ static const char tag[] = "SendData";
 static const int SENDDATA_QUEUE_SIZE = (3);
 static const unsigned int MAX_ACCEPTABLE_RESPONSE_BODY_LENGTH = 16 * 1024;
 
+#include "lwip/err.h"
+#include "lwip/sockets.h"
+#include "lwip/sys.h"
+#include "lwip/netdb.h"
+
+bool DnsLookup(const char* hostname)
+{
+
+  const struct addrinfo hints = {
+        .ai_family = AF_INET,
+        .ai_socktype = SOCK_STREAM,
+    };
+    struct addrinfo *res = 0;
+    struct in_addr *addr;
+
+    int err = getaddrinfo(hostname, "80", &hints, &res);
+
+    if(err != 0 || res == NULL) {
+        ESP_LOGE(tag, "DNS lookup failed err=%d res=%p %s", err, res, esp_err_to_name(err));
+    }
+
+    /* Code to print the resolved IP.
+        Note: inet_ntoa is non-reentrant, look at ipaddr_ntoa_r for "real" code */
+    addr = &((struct sockaddr_in *)res->ai_addr)->sin_addr;
+    ESP_LOGI(tag, "DNS lookup succeeded. IP=%s", inet_ntoa(*addr));
+    freeaddrinfo(res);
 
 
+    /* convert URL to IP address */
+    ip_addr_t target_addr;
+    struct addrinfo hint = {0};
+    getaddrinfo(hostname, NULL, &hint, &res);
+    struct in_addr addr4 = ((struct sockaddr_in *) (res->ai_addr))->sin_addr;
+    inet_addr_to_ip4addr(ip_2_ip4(&target_addr), &addr4);
+    ESP_LOGI(tag, "Another DNS lookup succeeded. IP=%s", inet_ntoa(addr4));
+    freeaddrinfo(res);
 
 
+    return true;
+}
 
 
 
@@ -52,13 +89,23 @@ esp_err_t http_event_handler(esp_http_client_event_t *evt)
                 gettimeofday(&now, NULL);
                 time_t delta_s = abs(timestamp_ms/1000 - now.tv_sec);
 
-                // adjust system time if more than 10 seconds off
-                if (delta_s > 10)
+                // adjust system time if more than 2 seconds off
+                if (delta_s > 2)
                 {
-                    now.tv_sec = timestamp_ms/1000;
-                    now.tv_usec = (timestamp_ms % 1000) * 1000;
-                    settimeofday(&now, NULL);
-                    ESP_LOGI(tag, "Adjusted system time by %li seconds.", delta_s);
+                    struct timeval delta;        
+                    delta.tv_sec = timestamp_ms/1000 - now.tv_sec;
+                    delta.tv_usec = (timestamp_ms % 1000) * 1000 - now.tv_usec;
+                    if(adjtime(&delta, NULL))
+                    {
+                        // delta too large, setting time absolutely
+                        now.tv_sec = timestamp_ms/1000;
+                        now.tv_usec = (timestamp_ms % 1000) * 1000;
+                        settimeofday(&now, NULL);
+                        ESP_LOGW(tag, "Adjusted system time by %li seconds.", delta_s);
+                    } else {
+                        ESP_LOGW(tag, "Smooth system time adjustment by %li seconds.", delta_s);
+                    }
+
                 }
             }
 
@@ -74,7 +121,8 @@ esp_err_t http_event_handler(esp_http_client_event_t *evt)
             int mbedtls_err = 0;
             esp_err_t err = esp_tls_get_and_clear_last_error((esp_tls_error_handle_t)(evt->data), &mbedtls_err, NULL);
             if (err != 0) {
-                ESP_LOGE(tag, "TLS: esp error code: 0x%x, mbedtls: 0x%x. Error cleared.", err, mbedtls_err);
+                ESP_LOGE(tag, "TLS: esp error code: 0x%x %s, mbedtls: 0x%x. Error cleared.", err, esp_err_to_name(err), mbedtls_err);
+                DnsLookup("atterwind.info");
             }
             break;
         //case HTTP_EVENT_REDIRECT:
@@ -363,6 +411,11 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
 
 bool SendData::PerformHttpPost()
 {
+
+
+    ESP_LOGW(tag, "TESTING DNS LOOKUP.");
+    DnsLookup("atterwind.info");
+
     // Initialize URL and HTTP client
     if (!mhEspHttpClient)
     {
