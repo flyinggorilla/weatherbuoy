@@ -98,6 +98,9 @@ void ParseTime(String &column, Data &data)
     }
 }
 
+inline double msToKnots(double v) { return v*1.9438444924406047516198704103672L; } // 3600L/1852.0L
+inline double KnotsToms(double v) { return v*0.51444444444444444444444444444444L; } // 1852L/3600.0L
+
 void Maximet::MaximetTask()
 {
 
@@ -139,6 +142,20 @@ void Maximet::MaximetTask()
     if (!MaximetConfig()) 
     {
         ESP_LOGE(tag, "Failed to detect an attached and properly configured Maximet Weather station");
+
+        // post continuously error code to display until Stop() is called
+        while (mbRun)
+        {
+            data.cspeed = KnotsToms(99.99);
+            data.cdir = 0;
+            data.cgspeed = KnotsToms(99.99);
+            data.cgdir = 0;
+            data.avgcspeed = KnotsToms(99.99);
+            data.avgcdir = 0;
+             
+            mrDataQueue.PutLatestData(data);
+            vTaskDelay(1000/portTICK_PERIOD_MS);
+        }
         mbRun = false;
         mbStopped = true;
         return;
@@ -153,13 +170,6 @@ void Maximet::MaximetTask()
             continue;
         }
         ESP_LOGD(tag, "THE LINE: %s", line.c_str());
-/*
-// THIS IS FOR DEBUGGING ONLY
-if (mMaximetModel == Model::GMX200GPS)
-{
-    String truncatedLine = line.substring(1, line.length() - 4);
-    ESP_LOGI(tag, "RAWLINE: %s", truncatedLine.c_str());
-} */
 
         int cpos = 0;
         int len = line.length();
@@ -797,7 +807,10 @@ bool Maximet::EnterCommandLine()
 
     String cmd("\r\n*\r\necho off\r\n");
     String line;
-    int attempts = 10;
+
+    // Note, Maximet boots for approx 26 seconds from cold-start, make sure to give it enough time to enter command line mode
+    int attempts = 30; // 30 attempts = approx. 60 seconds due to 2 sec delays;  
+                       
     mpSerial->Flush();
     while (attempts--)
     {

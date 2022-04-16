@@ -14,6 +14,7 @@
 #include "esputil.h"
 #include "Maximet.h"
 #include "string.h"
+#include "assert.h"
 
 static const char tag[] = "SendData";
 static const int SENDDATA_QUEUE_SIZE = (3);
@@ -31,32 +32,24 @@ bool DnsLookup(const char* hostname)
         .ai_family = AF_INET,
         .ai_socktype = SOCK_STREAM,
     };
-    struct addrinfo *res = 0;
-    struct in_addr *addr;
+    struct addrinfo *res = nullptr;
+    struct in_addr addr;
 
-    int err = getaddrinfo(hostname, "80", &hints, &res);
+    int err = getaddrinfo(hostname, NULL, &hints, &res);
 
     if(err != 0 || res == NULL) {
         ESP_LOGE(tag, "DNS lookup failed err=%d res=%p %s", err, res, esp_err_to_name(err));
+    } else {
+        /* Code to print the resolved IP.
+            Note: inet_ntoa is non-reentrant, look at ipaddr_ntoa_r for "real" code */
+        addr = ((struct sockaddr_in *)res->ai_addr)->sin_addr;
+        ESP_LOGI(tag, "DNS lookup succeeded. IP=%s", inet_ntoa(addr));
     }
 
-    /* Code to print the resolved IP.
-        Note: inet_ntoa is non-reentrant, look at ipaddr_ntoa_r for "real" code */
-    addr = &((struct sockaddr_in *)res->ai_addr)->sin_addr;
-    ESP_LOGI(tag, "DNS lookup succeeded. IP=%s", inet_ntoa(*addr));
-    freeaddrinfo(res);
-
-
-    /* convert URL to IP address */
-    ip_addr_t target_addr;
-    struct addrinfo hint = {0};
-    getaddrinfo(hostname, NULL, &hint, &res);
-    struct in_addr addr4 = ((struct sockaddr_in *) (res->ai_addr))->sin_addr;
-    inet_addr_to_ip4addr(ip_2_ip4(&target_addr), &addr4);
-    ESP_LOGI(tag, "Another DNS lookup succeeded. IP=%s", inet_ntoa(addr4));
-    freeaddrinfo(res);
-
-
+    if (res)
+    {
+        freeaddrinfo(res);
+    }
     return true;
 }
 
@@ -425,7 +418,9 @@ bool SendData::PerformHttpPost()
             ESP_LOGE(tag, "No proper target URL in form of'http(s)://server/' defined: url='%s'", CONFIG_WEATHERBUOY_TARGET_URL);
             return false;
         }*/
-        
+
+        static_assert(sizeof(CONFIG_WEATHERBUOY_TARGET_URL) > 4, "http(s) URL to weatherbuoy server must be define in ESP-IDF config.");
+       
         mEspHttpClientConfig = {0}; //memset(&mEspHttpClientConfig, 0, sizeof(esp_http_client_config_t));
         mEspHttpClientConfig.url = CONFIG_WEATHERBUOY_TARGET_URL; // mrConfig.msTargetUrl.c_str();
         mEspHttpClientConfig.method = HTTP_METHOD_POST;

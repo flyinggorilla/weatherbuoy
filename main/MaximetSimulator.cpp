@@ -235,6 +235,7 @@ void MaximetSimulator::MaximetSimulatorTask()
                 break;
             case Maximet::Model::GMX501RAIN:
                 CommandResponse("WIND,PRESS,TEMP,RH,DEWPOINT,VOLT,COMPASS,PRECIP,SOLAR,TILT"); // !!!!! VERIFY!!
+                break;
             default:
                 CommandResponse("");
                 break;
