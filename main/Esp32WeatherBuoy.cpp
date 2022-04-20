@@ -65,7 +65,7 @@ static const char tag[] = "WeatherBuoy";
 #define CONFIG_NMEA_TWAI_TX_PIN GPIO_NUM_21
 #endif
 
-// Optionally drive an Alarm Buzzer at following GPIO (max 30mA)
+// Optionally drive an Alarm Buzzer at following GPIO (max 30mA for standard GPIO, but this one can with proper config drive up to 70mA)
 #define CONFIG_ALARM_BUZZER_PIN GPIO_NUM_19
 
 // Restart ESP32 if there is not data being successfully sent within this period.
