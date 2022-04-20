@@ -146,13 +146,6 @@ void Maximet::MaximetTask()
         // post continuously error code to display until Stop() is called
         while (mbRun)
         {
-            data.cspeed = KnotsToms(99.99);
-            data.cdir = 0;
-            data.cgspeed = KnotsToms(99.99);
-            data.cgdir = 0;
-            data.avgcspeed = KnotsToms(99.99);
-            data.avgcdir = 0;
-             
             mrDataQueue.PutLatestData(data);
             vTaskDelay(1000/portTICK_PERIOD_MS);
         }
