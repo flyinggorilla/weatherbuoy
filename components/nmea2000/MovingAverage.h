@@ -1,3 +1,7 @@
+#ifndef _MovingAverage_h_
+#define _MovingAverage_h_
+
+
 // calculate rolling average
 // https://tttapa.github.io/Pages/Mathematics/Systems-and-Control-Theory/Digital-filters/Simple%20Moving%20Average/C++Implementation.html
 
@@ -48,3 +52,5 @@ class ExponentialMovingAverage {
   private:
     uint_t state = 0;
 };
+
+#endif

@@ -10,6 +10,11 @@ inline double deg2rad(double deg)
   return (deg * M_PI / 180.0);
 }
 
+inline double rad2deg(double rad)
+{
+  return (rad * 180.0 / M_PI );
+}
+
 // Calculate distance of two GPS coordinates (lat/lon in degrees)
 // Equirectangular approximation
 // returns distance in meters

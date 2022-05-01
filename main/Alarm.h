@@ -5,6 +5,9 @@
 #include "Config.h"
 #include "DataQueue.h"
 #include "driver/gpio.h"
+#include "MovingAverage.h"
+
+#define TILT_AVG_SECONDS 3
 
 class Alarm
 {
@@ -42,6 +45,8 @@ private:
     gpio_num_t mGpioBuzzer;
 
     int miTiltThreshold = 80;
+    SimpleMovingAverage<TILT_AVG_SECONDS> movAvgTiltXmm;
+    SimpleMovingAverage<TILT_AVG_SECONDS> movAvgTiltYmm;
 
     bool mbAlarm = false;
     bool mbAlarmConfirmed = false;

@@ -80,7 +80,18 @@ void Alarm::AlarmTask()
 
             countUnplugged = 0;
 
-            absTilt = abs(data.xtilt) + abs(data.ytilt);
+            // calculate tilt movement on 1000mm unit circle
+            int tiltYmm = sin(deg2rad(data.ytilt))*1000.0; 
+            int tiltXmm = sin(deg2rad(data.xtilt))*1000.0;
+
+            float avgTiltXmm = movAvgTiltXmm(tiltXmm);
+            float avgTiltYmm = movAvgTiltYmm(tiltYmm);
+
+            float avgTiltRadiusMm = sqrt(avgTiltXmm*avgTiltXmm + avgTiltYmm*avgTiltYmm);
+
+
+            absTilt = rad2deg(atan(avgTiltRadiusMm/1000.0));
+            ESP_LOGD(tag, "Averaged tilt angle: %d", absTilt);
 
             // if zorient is -1 then maximet is tilted upside down (more than 90° tilt)
             if (data.zorient < 0)
