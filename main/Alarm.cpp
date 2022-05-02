@@ -1,3 +1,5 @@
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+
 #include "Alarm.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -60,7 +62,7 @@ void Alarm::AlarmTask()
     while (true)
     {
         Data data;
-        unsigned short absTilt = 0;
+        unsigned short absAvgTilt = 0;
         unsigned int geoDislocation = 0;
 
         if (mrDataQueue.GetAlarmData(data, 3))
@@ -80,6 +82,7 @@ void Alarm::AlarmTask()
 
             countUnplugged = 0;
 
+            /*
             // calculate tilt movement on 1000mm unit circle
             int tiltYmm = sin(deg2rad(data.ytilt))*1000.0; 
             int tiltXmm = sin(deg2rad(data.xtilt))*1000.0;
@@ -89,9 +92,25 @@ void Alarm::AlarmTask()
 
             float avgTiltRadiusMm = sqrt(avgTiltXmm*avgTiltXmm + avgTiltYmm*avgTiltYmm);
 
+            absAvgTilt = rad2deg(asin(avgTiltRadiusMm/1000.0));
 
-            absTilt = rad2deg(atan(avgTiltRadiusMm/1000.0));
-            ESP_LOGD(tag, "Averaged tilt angle: %d", absTilt);
+            #if LOG_LOCAL_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG || CONFIG_LOG_DEFAULT_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG
+                float tiltRadiusMm = sqrt(tiltXmm*tiltXmm + tiltYmm*tiltYmm);
+                unsigned short absTilt = rad2deg(asin(tiltRadiusMm/1000.0));
+                ESP_LOGD(tag, "Tilt angles: xtilt=%d, ytilt=%d tilt=%d avgtilt=%d", data.xtilt, data.ytilt, absTilt, absAvgTilt);
+            #endif 
+            */
+
+            float avgXTilt = movAvgTiltXmm(data.xtilt);
+            float avgYTilt = movAvgTiltYmm(data.ytilt);
+            absAvgTilt = abs(avgXTilt) + abs(avgYTilt);
+
+            #if LOG_LOCAL_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG || CONFIG_LOG_DEFAULT_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG
+                unsigned short absTilt = abs(data.xtilt) + abs(data.ytilt);
+                ESP_LOGD(tag, "Tilt angles: xtilt=%d, ytilt=%d tilt=%d avgtilt=%d", data.xtilt, data.ytilt, absTilt, absAvgTilt);
+            #endif 
+
+
 
             // if zorient is -1 then maximet is tilted upside down (more than 90° tilt)
             if (data.zorient < 0)
@@ -105,10 +124,10 @@ void Alarm::AlarmTask()
             }
 
             // the sum of both tilts is max 90°
-            if (absTilt > miTiltThreshold)
+            if (absAvgTilt > miTiltThreshold)
             {
                 countTilt++;
-                //ESP_LOGD(tag, "TILT! %d°/%d° (%d°)", data.xtilt, data.ytilt, absTilt);
+                //ESP_LOGD(tag, "TILT! %d°/%d° (%d°)", data.xtilt, data.ytilt, absAvgTilt);
             }
             else
             {
@@ -205,16 +224,16 @@ void Alarm::AlarmTask()
                 }
                 if (alarmTriggers & TILT)
                 {
-                    //ESP_LOGE(tag, "TILT ALARM: %d° (%d°/%d°) %s", absTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
+                    //ESP_LOGE(tag, "TILT ALARM: %d° (%d°/%d°) %s", absAvgTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
                     String info;
-                    info.printf("WEATHERBUOY MAST MANIPULATION!\r\nTILT: %ddeg (%dx/%dy) %s", absTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "UP");
+                    info.printf("WEATHERBUOY MAST MANIPULATION!\r\nTILT: %ddeg (%dx/%dy) %s", absAvgTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "UP");
                     msAlarmInfo += info;
                 }
                 if (alarmTriggers & ORIENT)
                 {
-                    //ESP_LOGE(tag, "ORIENT ALARM: %d° (%d°/%d°) %s", absTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
+                    //ESP_LOGE(tag, "ORIENT ALARM: %d° (%d°/%d°) %s", absAvgTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
                     String info;
-                    info.printf("WEATHERBUOY MAST MANIPULATION!\r\nMAXIMET UPSIDE DOWN: -%ddeg (%dx/%dy)", absTilt, data.xtilt, data.ytilt );
+                    info.printf("WEATHERBUOY MAST MANIPULATION!\r\nMAXIMET UPSIDE DOWN: -%ddeg (%dx/%dy)", absAvgTilt, data.xtilt, data.ytilt );
                     msAlarmInfo += info;
                 }
                 if (alarmTriggers & UNPLUGGED)

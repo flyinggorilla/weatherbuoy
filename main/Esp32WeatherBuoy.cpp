@@ -132,6 +132,7 @@ void Esp32WeatherBuoy::Start()
 #if LOG_LOCAL_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG || CONFIG_LOG_DEFAULT_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG
     esp_log_level_set("Cellular", ESP_LOG_DEBUG);
     esp_log_level_set("Wifi", ESP_LOG_DEBUG);
+    esp_log_level_set("Alarm", ESP_LOG_DEBUG);
     esp_log_level_set("Maximet", ESP_LOG_INFO);
     esp_log_level_set("MaximetSimulator", ESP_LOG_DEBUG);
     esp_log_level_set("Serial", ESP_LOG_DEBUG);

@@ -1,4 +1,4 @@
-//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -203,7 +203,7 @@ void Maximet::MaximetTask()
                 if (c == ETX || c == ',')
                 {
                     col++;
-                    ESP_LOGD(tag, "Column %d: '%s'", col, column.c_str());
+                    ESP_LOGV(tag, "Column %d: '%s'", col, column.c_str());
 
                     if (col == 1)
                     {
@@ -484,7 +484,7 @@ void Maximet::MaximetTask()
 
             case CHECKSUM:
                 column += c;
-                ESP_LOGD(tag, "Checksum control area: '%s' =? %02X", column.c_str(), checksum);
+                ESP_LOGV(tag, "Checksum control area: '%s' =? %02X", column.c_str(), checksum);
                 if (column.length() == 2)
                 {
                     int check = strtol(column.c_str(), 0, 16); // convert hex string like "FF" to integer
@@ -496,7 +496,7 @@ void Maximet::MaximetTask()
                     else
                     {
                         parsingState = VALIDDATA;
-                        ESP_LOGD(tag, "Checksum validated");
+                        ESP_LOGV(tag, "Checksum validated");
                     }
                 }
                 break;
