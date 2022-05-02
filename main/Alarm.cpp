@@ -1,4 +1,4 @@
-#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 
 #include "Alarm.h"
 #include "freertos/FreeRTOS.h"
@@ -82,25 +82,8 @@ void Alarm::AlarmTask()
 
             countUnplugged = 0;
 
-            /*
-            // calculate tilt movement on 1000mm unit circle
-            int tiltYmm = sin(deg2rad(data.ytilt))*1000.0; 
-            int tiltXmm = sin(deg2rad(data.xtilt))*1000.0;
-
-            float avgTiltXmm = movAvgTiltXmm(tiltXmm);
-            float avgTiltYmm = movAvgTiltYmm(tiltYmm);
-
-            float avgTiltRadiusMm = sqrt(avgTiltXmm*avgTiltXmm + avgTiltYmm*avgTiltYmm);
-
-            absAvgTilt = rad2deg(asin(avgTiltRadiusMm/1000.0));
-
-            #if LOG_LOCAL_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG || CONFIG_LOG_DEFAULT_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG
-                float tiltRadiusMm = sqrt(tiltXmm*tiltXmm + tiltYmm*tiltYmm);
-                unsigned short absTilt = rad2deg(asin(tiltRadiusMm/1000.0));
-                ESP_LOGD(tag, "Tilt angles: xtilt=%d, ytilt=%d tilt=%d avgtilt=%d", data.xtilt, data.ytilt, absTilt, absAvgTilt);
-            #endif 
-            */
-
+            // average the individual angles, so that a rocking buoy is averaging upright
+            // however, when a malicious activity happens, the tilt is likely to happen steady in one direction
             float avgXTilt = movAvgTiltXmm(data.xtilt);
             float avgYTilt = movAvgTiltYmm(data.ytilt);
             absAvgTilt = abs(avgXTilt) + abs(avgYTilt);
@@ -156,7 +139,7 @@ void Alarm::AlarmTask()
                 }
             }
 
-            if (countTilt >= 5)
+            if (countTilt >= 1)
             {
                 alarmTriggers |= TILT;
             }
