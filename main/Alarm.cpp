@@ -142,7 +142,7 @@ void Alarm::AlarmTask()
                 alarmTriggers |= TILT;
             }
 
-            if (countOrient >= 2)
+            if (countOrient >= 3)
             {
                 alarmTriggers |= ORIENT;
             }
