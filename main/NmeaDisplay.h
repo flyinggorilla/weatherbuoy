@@ -5,7 +5,6 @@
 #include "Config.h"
 #include "NMEA2000_esp32.h"
 #include "N2kStream_esp32.h"
-#include "MovingAverage.h"
 #include "DataQueue.h"
 
 

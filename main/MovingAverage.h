@@ -9,19 +9,21 @@
 template <uint16_t N, class input_t = uint32_t, class sum_t = uint64_t>
 class SimpleMovingAverage {
   public:
-    input_t operator()(input_t input) {
+    float operator()(input_t input) {
+    //input_t operator()(input_t input) {
         sum -= previousInputs[index];
         sum += input;
         previousInputs[index] = input;
         if (++index == N)
             index = 0;
-        return (sum + (N / 2)) / N;
+        //return (sum + (N / 2)) / N;
+        return (float)sum / (float)N; // performance penalty in favor of also handling signed numbers
     }
 
-    static_assert(
-        sum_t(0) < sum_t(-1),  // Check that `sum_t` is an unsigned type
-        "Error: sum data type should be an unsigned integer, otherwise, "
-        "the rounding operation in the return statement is invalid.");
+    // static_assert(
+    //     sum_t(0) < sum_t(-1),  // Check that `sum_t` is an unsigned type
+    //     "Error: sum data type should be an unsigned integer, otherwise, "
+    //     "the rounding operation in the return statement is invalid.");
 
   private:
     uint16_t index             = 0;
