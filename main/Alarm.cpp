@@ -217,7 +217,7 @@ void Alarm::AlarmTask()
                 {
                     //ESP_LOGE(tag, "ORIENT ALARM: %d° (%d°/%d°) %s", absAvgTilt, data.xtilt, data.ytilt, data.zorient < 0 ? "UPSIDE DOWN!!" : "");
                     String info;
-                    info.printf("WEATHERBUOY MAST MANIPULATION!\r\nMAXIMET UPSIDE DOWN %s READINGS: -%ddeg (%dx/%dy)", countOrient, absAvgTilt, data.xtilt, data.ytilt );
+                    info.printf("WEATHERBUOY MAST MANIPULATION!\r\nMAXIMET UPSIDE DOWN %d READINGS: -%ddeg (%dx/%dy)", countOrient, absAvgTilt, data.xtilt, data.ytilt );
                     msAlarmInfo += info;
                 }
                 if (alarmTriggers & UNPLUGGED)
