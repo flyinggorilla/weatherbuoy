@@ -373,6 +373,11 @@ void Maximet::MaximetTask()
                             break;
                         case 23:
                             ParseGPSStatus(column, data);
+                            //********************************************
+                            // FIXING WRONG AVGCDIR WHEN GPS is not available
+                            if (!data.gpsfix) {
+                                data.avgcdir = data.cdir;
+                            }
                             break;
                         case 24:
                             ParseTime(column, data);
