@@ -133,9 +133,11 @@ void Maximet::MaximetTask()
 
     Data data;
     String column;
-    int lastUptime = 0;
+    int lastShortAvgUptime = 0;
+    int lastLongAvgUptime = 0;
 
     VelocityVector shortAvgCSpeedVector;
+    VelocityVector longAvgCSpeedVector;
 
     // esp_log_level_set(tag, ESP_LOG_DEBUG);
     // esp_log_level_set("Serial", ESP_LOG_DEBUG);
@@ -376,7 +378,9 @@ void Maximet::MaximetTask()
                             //********************************************
                             // FIXING WRONG AVGCDIR WHEN GPS is not available
                             if (!data.gpsfix) {
-                                data.avgcdir = data.cdir;
+                                data.avgcdir = nans();
+                                data.cdir = nans();
+                                data.cgdir = nans();
                             }
                             break;
                         case 24:
@@ -539,6 +543,7 @@ void Maximet::MaximetTask()
 
                 if (isnans(data.avgcdir))
                 {
+                    // this doesnt make much sense as avgcdir is average of last 5minutes while compass iss current
                     data.avgcdir = (maximetAvgDir + data.compassh) % 360; // as avgcdir is not populated when GNSS is not available, lets do the math with compass
                 }
 
@@ -563,11 +568,31 @@ void Maximet::MaximetTask()
                              data.speed, data.dir, data.compassh, data.cspeed, data.cdir, data.cgspeed, data.cgdir, maximetAvgSpeed, maximetAvgDir, data.avgcspeed, data.avgcdir);
                 }
 
+/*                if (model == Model::GMX501GPS) 
+                {
+                    MOVING AVERAGE OF SHORT INTERVALS!!!!!
+
+                    longAvgCSpeedVector.add(data.cspeed, data.cdir);
+                    
+                    if (data.uptime >= lastLongAvgUptime)
+                    {
+                        //ESP_LOGW(tag, "Last records data.cspeed: %0.2f data.cdir: %d", data.cspeed, data.cdir);
+                        data.cspeed = longAvgCSpeedVector.getSpeed();
+                        data.cdir = longAvgCSpeedVector.getDir();
+                        shortAvgCSpeedVector.clear();
+                        //ESP_LOGW(tag, "Averaged data.cspeed: %0.2f data.cdir: %d", data.cspeed, data.cdir);
+                    }
+
+
+                    lastLongAvgUptime = data.uptime + mMaximetConfig.iAvgLong * 60; // typically 5 or 10 minutes
+                }
+*/
+
                 // USERINF,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,AVGCDIR,COMPASSH,PASL,PSTN,RH,AH,TEMP,SOLARRAD,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,GPSLOCATION,GPSSTATUS,TIME,CHECK
                 // REPORT USERINF SPEED GSPEED AVGSPEED DIR GDIR AVGDIR CDIR AVGCDIR COMPASSH PASL PSTN RH AH TEMP SOLARRAD XTILT YTILT ZORIENT STATUS WINDSTAT GPSLOCATION GPSSTATUS TIME
                 /// SOMETHING WRONG HERE ... WHEN QUEUE FULL EVERY SECOND IS PUSHED
                 // Put data not more frequent than every 30 seconds into queue
-                if (data.uptime >= (lastUptime + 60) || !is1HzOutput)
+                if (data.uptime >= lastShortAvgUptime || !is1HzOutput)
                 {
                     if (is1HzOutput)
                     {
@@ -576,6 +601,15 @@ void Maximet::MaximetTask()
                         data.cdir = shortAvgCSpeedVector.getDir();
                         shortAvgCSpeedVector.clear();
                         //ESP_LOGW(tag, "Averaged data.cspeed: %0.2f data.cdir: %d", data.cspeed, data.cdir);
+
+                        //############### TEMPORARY FIX FOR GPS ISSUE ###############################
+                        #pragma message ("Temporary fix for GPS issue")
+                        if ((model == Model::GMX501GPS) && !data.gpsfix) 
+                        {
+                            data.avgcdir = data.cdir;
+                            data.avgcspeed = data.cspeed;
+                        }                          
+
                     }
 
                     ESP_LOGI(tag, "Pushing measurement data to queue: '%s', %d seconds since start (%d..%d)", line.c_str(cposDataStart), data.uptime, cposDataStart, cposDataEnd);
@@ -592,7 +626,7 @@ void Maximet::MaximetTask()
                         ESP_LOGE(tag, "Queue is full. We should never be here.");
                     }
 
-                    lastUptime = data.uptime;
+                    lastShortAvgUptime = data.uptime + 60; // every 60 seconds!
                 }
 
                 break;
