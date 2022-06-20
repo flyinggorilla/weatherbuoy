@@ -134,10 +134,6 @@ void Maximet::MaximetTask()
     Data data;
     String column;
     int lastShortAvgUptime = 0;
-    int lastLongAvgUptime = 0;
-
-    VelocityVector shortAvgCSpeedVector;
-    VelocityVector longAvgCSpeedVector;
 
     // esp_log_level_set(tag, ESP_LOG_DEBUG);
     // esp_log_level_set("Serial", ESP_LOG_DEBUG);
@@ -155,6 +151,9 @@ void Maximet::MaximetTask()
         mbStopped = true;
         return;
     }
+
+    VelocityVector shortAvgCSpeedVector;
+    VelocityVectorMovingAverage longAvgCSpeedVector(mMaximetConfig.iAvgLong);
 
     ESP_LOGI(tag, "Maximet task started and ready to receive data.");
     mbStopped = false;
@@ -568,6 +567,8 @@ void Maximet::MaximetTask()
                              data.speed, data.dir, data.compassh, data.cspeed, data.cdir, data.cgspeed, data.cgdir, maximetAvgSpeed, maximetAvgDir, data.avgcspeed, data.avgcdir);
                 }
 
+
+
 /*                if (model == Model::GMX501GPS) 
                 {
                     MOVING AVERAGE OF SHORT INTERVALS!!!!!
@@ -599,6 +600,9 @@ void Maximet::MaximetTask()
                         //ESP_LOGW(tag, "Last records data.cspeed: %0.2f data.cdir: %d", data.cspeed, data.cdir);
                         data.cspeed = shortAvgCSpeedVector.getSpeed();
                         data.cdir = shortAvgCSpeedVector.getDir();
+                        longAvgCSpeedVector.add(shortAvgCSpeedVector);
+                        data.xavgcspeed = longAvgCSpeedVector.getSpeed();
+                        data.xavgcdir = longAvgCSpeedVector.getDir();
                         shortAvgCSpeedVector.clear();
                         //ESP_LOGW(tag, "Averaged data.cspeed: %0.2f data.cdir: %d", data.cspeed, data.cdir);
 

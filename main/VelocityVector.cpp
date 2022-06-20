@@ -22,6 +22,18 @@ void VelocityVector::add(float speed, short direction)
     muiCount++;
 };
 
+void VelocityVector::operator= (const VelocityVector& v) {
+    mfSumU = v.mfSumU;
+    mfSumV = v.mfSumV;
+    muiCount = v.muiCount;
+}
+
+void VelocityVector::operator+= (const VelocityVector& v) {
+    mfSumU += v.mfSumU;
+    mfSumV += v.mfSumV;
+    muiCount += v.muiCount;
+}
+
 short VelocityVector::getDir()
 {
     if (!muiCount) 
@@ -40,3 +52,57 @@ float VelocityVector::getSpeed()
     float avgV = mfSumV / muiCount;
     return sqrt(avgU * avgU + avgV * avgV);
 };
+
+
+// matches AvgLong intervals from Maximet
+
+VelocityVectorMovingAverage::VelocityVectorMovingAverage(unsigned short intervals) {
+    musIntervals= intervals;
+    mpVelocityVectorArray = new VelocityVector[musIntervals];
+
+    /*mpuiCounts = { new unsigned int[musIntervals]{} };
+    mpSumsU = { new float[musIntervals]{} };
+    mpSumsV = { new float[musIntervals]{} }; */
+}; 
+
+short VelocityVectorMovingAverage::getDir()
+{
+    return mVelocityVectorAvg.getDir();
+};
+
+float VelocityVectorMovingAverage::getSpeed()
+{
+    return mVelocityVectorAvg.getSpeed();
+};
+
+
+// this is moving average calculation is intended for very small arrays 
+// it intentionally iterates over all entries, to avoid floating point rounding issues
+void VelocityVectorMovingAverage::add(VelocityVector& velocityVector) {
+    if (musEntryPos >= musIntervals) {
+        musEntryPos = 0;
+    }
+    /*mpSumsU[musEntryPos] = velocityVector.mfSumU;
+    mpSumsV[musEntryPos] = velocityVector.mfSumV;
+    mpuiCounts[musEntryPos] = velocityVector.muiCount; */
+    mpVelocityVectorArray[musEntryPos] = velocityVector;
+
+    if (musEntries < musIntervals) {
+        musEntries++;
+    }
+
+    mVelocityVectorAvg.clear();
+    for (unsigned short i = 0; i < musEntries; i++) {
+        /*mVelocityVectorAvg.mfSumU += mpSumsU[i];
+        mVelocityVectorAvg.mfSumV += mpSumsV[i];
+        mVelocityVectorAvg.muiCount += mpuiCounts[i]; */
+        mVelocityVectorAvg += mpVelocityVectorArray[i];
+    }
+
+    musEntryPos++;
+};
+
+
+VelocityVectorMovingAverage::~VelocityVectorMovingAverage() {
+    delete[] mpVelocityVectorArray;
+}

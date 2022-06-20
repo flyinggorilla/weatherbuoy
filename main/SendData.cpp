@@ -172,6 +172,42 @@ void SendData::Cleanup()
     mhEspHttpClient = nullptr;
 }
 
+void PostDataAddFloat(String& rPostData, const char* prefix, const char* key, float val)
+{
+    rPostData += prefix;
+    rPostData += "\"";
+    rPostData += key;
+    rPostData += "\":";
+    if (isnanf(val)) {
+       rPostData += "null";
+    } else {
+        rPostData += val;
+    }
+}
+
+void PostDataAddShort(String& rPostData, const char* prefix, const char* key, short val)
+{
+    rPostData += prefix;
+    rPostData += "\"";
+    rPostData += key;
+    rPostData += "\":";
+    if (isnans(val)) {
+       rPostData += "null";
+    } else {
+        rPostData += val;
+    }
+}
+
+void PostDataAddInt(String& rPostData, const char* prefix, const char* key, int val)
+{
+    rPostData += prefix;
+    rPostData += "\"";
+    rPostData += key;
+    rPostData += "\":";
+    rPostData += val;
+}
+
+
 bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics, OnlineMode onlineMode)
 {
     bSendDiagnostics = bSendDiagnostics || mbSendDiagnostics;
@@ -199,20 +235,45 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += maximetData.gdir;
         mPostData += ",\"avgdir\":";
         mPostData += maximetData.avgdir;*/
-        mPostData += ",\"cspeed\":";
-        mPostData += maximetData.cspeed;
-        mPostData += ",\"cgspeed\":";
-        mPostData += maximetData.cgspeed;
-        mPostData += ",\"avgcspeed\":";
-        mPostData += maximetData.avgcspeed;
-        mPostData += ",\"cdir\":";
-        mPostData += maximetData.cdir;
-        mPostData += ",\"cgdir\":";
-        mPostData += maximetData.cgdir;
-        mPostData += ",\"avgcdir\":";
-        mPostData += maximetData.avgcdir;
-        mPostData += ",\"compassh\":";
-        mPostData += maximetData.compassh;
+
+        //mPostData += ",\"cspeed\":";
+        //mPostData += maximetData.cspeed;
+        PostDataAddFloat(mPostData, ",", "cspeed", maximetData.cspeed);
+        //mPostData += ",\"cgspeed\":";
+        //mPostData += maximetData.cgspeed;   /// ADD ISNAN CHECKS !!!!!!
+        PostDataAddFloat(mPostData, ",", "cgspeed", maximetData.cgspeed);
+        //mPostData += ",\"avgcspeed\":";
+        //mPostData += maximetData.avgcspeed;
+        PostDataAddFloat(mPostData, ",", "avgcspeed", maximetData.avgcspeed);
+        //mPostData += ",\"cdir\":";
+        //mPostData += maximetData.cdir;
+        PostDataAddShort(mPostData, ",", "cdir", maximetData.cdir);
+        //mPostData += ",\"cgdir\":";
+        //mPostData += maximetData.cgdir;
+        PostDataAddShort(mPostData, ",", "cgdir", maximetData.cgdir);
+        //mPostData += ",\"avgcdir\":";
+        //mPostData += maximetData.avgcdir;
+        PostDataAddShort(mPostData, ",", "avgcdir", maximetData.avgcdir);
+        PostDataAddShort(mPostData, ",", "dir", maximetData.dir);
+        //mPostData += ",\"compassh\":";
+        //mPostData += maximetData.compassh;
+        PostDataAddShort(mPostData, ",", "compassh", maximetData.compassh);
+        //mPostData += ",\"xavgcspeed\":";
+        //mPostData += maximetData.xavgcspeed;
+        PostDataAddFloat(mPostData, ",", "xavgcspeed", maximetData.xavgcspeed);
+        //mPostData += ",\"xavgcdir\":";
+        //mPostData += maximetData.xavgcdir;
+        PostDataAddShort(mPostData, ",", "xavgcdir", maximetData.xavgcdir);
+
+        maximetData.xavgcspeed = nanf();
+        maximetData.xavgcdir = nans();
+        /*mPostData += ",\"nanavgcspeed\":";
+        mPostData += maximetData.xavgcspeed;
+        mPostData += ",\"nanavgcdir\":";
+        mPostData += maximetData.xavgcdir; */
+        PostDataAddFloat(mPostData, ",", "nanavgcspeed", maximetData.xavgcspeed);
+        PostDataAddShort(mPostData, ",", "nanavgcdir", maximetData.xavgcdir);
+
         if (mrMaximetConfig.model == Maximet::Model::GMX501 || mrMaximetConfig.model == Maximet::Model::GMX501GPS)
         {
             mPostData += ",\"pasl\":";

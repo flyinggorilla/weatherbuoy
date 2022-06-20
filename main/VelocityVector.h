@@ -11,12 +11,34 @@ public:
     short getDir();
     float getSpeed();
     unsigned int getCount() { return muiCount; };
+    void operator= (const VelocityVector& v);
+    void operator+= (const VelocityVector& v);
 
 protected:
     unsigned int muiCount;
     float mfSumU;
     float mfSumV;
+    friend class VelocityVectorMovingAverage;
 };
 
+class VelocityVectorMovingAverage
+{
+public:
+    VelocityVectorMovingAverage(unsigned short intervals); // matches AvgLong intervals from Maximet
+    virtual ~VelocityVectorMovingAverage();
+    void add(VelocityVector& rVelocityVector);
+    short getDir();
+    float getSpeed();
+
+private:
+    short unsigned int musEntryPos = 0;
+    short unsigned int musEntries = 0;
+    short unsigned int musIntervals = 0;
+    /*unsigned int *mpuiCounts = nullptr;
+    float* mpSumsU = nullptr;
+    float* mpSumsV = nullptr;*/
+    VelocityVector* mpVelocityVectorArray = nullptr;
+    VelocityVector mVelocityVectorAvg;
+};
 
 #endif

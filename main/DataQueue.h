@@ -17,21 +17,24 @@ class Data
 public:
     int uptime;
 
-    float speed; // required for NmeaDisplay
+    float speed; // can be nanf(); required for NmeaDisplay
     // float gspeed;
     // float avgspeed;
-    short dir; // required for NmeaDisplay
+    short dir; // can be nans(); required for NmeaDisplay
     // short gdir;
     // short avgdir;
 
     // wind
-    float cspeed;    // only avail if GPS, or derived
-    float cgspeed;   // only avail if GPS, or derived
-    float avgcspeed; // only avail if GPS, or derived
-    short compassh;
-    short cdir;    // corrected through compass
-    short cgdir;   // avail if GPS .... otherwise it is CALCULATED!!!  (maximet["GDIR"]+maximet["COMPASSH"]) % 360;
-    short avgcdir; //
+    float cspeed;    // only avail if GPS, or derived; can be nanf()
+    float cgspeed;   // only avail if GPS, or derived; can be nanf()
+    float avgcspeed; // only avail if GPS, or derived; can be nanf()
+    short compassh; // can be nans()
+    short cdir;    // can be nans(); corrected through compass
+    short cgdir;   // can be nans() avail if GPS .... otherwise it is CALCULATED!!!  (maximet["GDIR"]+maximet["COMPASSH"]) % 360;
+    short avgcdir; // can be nans()
+
+    float xavgcspeed; // TEST own implementation of WMO; can be nanf()
+    short xavgcdir; // TEST own implementation of WMO; can be nanf()
 
     // weather
     float temp;
@@ -70,18 +73,21 @@ public:
         speed = nanf();
         // gspeed = nanf();
         // avgspeed = nanf();
-        dir = 0;
+        dir = nans();
         // gdir = 0;
         // avgdir = 0;
 
         // wind
-        cspeed = 0;
-        cgspeed = 0;
-        avgcspeed = 0;
-        cdir = 0;
-        cgdir = 0; // CALCULATED!!!  (maximet["GDIR"]+maximet["COMPASSH"]) % 360;
-        avgcdir = 0;
-        compassh = 0;
+        cspeed = nanf();
+        cgspeed = nanf();
+        avgcspeed = nanf();
+        cdir = nans();
+        cgdir = nans(); // CALCULATED!!!  (maximet["GDIR"]+maximet["COMPASSH"]) % 360;
+        avgcdir = nans();
+        compassh = nans();
+    
+        xavgcspeed = nanf(); // TEST own implementation of WMO
+        xavgcdir = nans(); // TEST own implementation of WMO
 
         // weather
         temp = 0;
