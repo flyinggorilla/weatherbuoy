@@ -55,8 +55,8 @@ public:
     // GPS data
     double lat;       // only avail if GPS
     double lon;       // only avail if GPS
-    float gpsspeed;   // only avail if GPS
-    short gpsheading; // only avila if GPS
+    float gpsspeed;   // only avail if GPS, can be nanf()
+    short gpsheading; // only avila if GPS, can be nans()
     unsigned char gpsfix;
     unsigned char gpssat;
     time_t time; // only avail if GPS -- 2022-01-21T22:43:11.4
@@ -109,8 +109,8 @@ public:
         gpssat = 0;
         lat = 0;
         lon = 0;
-        gpsspeed = 0;
-        gpsheading = 0;
+        gpsspeed = nanf();
+        gpsheading = nans();
         time = 0;
     }
 };

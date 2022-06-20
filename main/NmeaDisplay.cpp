@@ -117,9 +117,9 @@ void NmeaDisplay::DisplayTask()
         int avgTwd = data.avgcdir;
         int awa = data.dir; // > 180 ? data.dir - 360 : data.dir;
         double aws = data.speed;
-        double heading = data.compassh;
-        double sog = data.gpsspeed;
-        double cog = data.gpsheading;
+        double heading = isnans(data.compassh) ? 0 : data.compassh;
+        double sog = isnanf(data.gpsspeed) ? 0 : data.gpsspeed;
+        double cog = isnans(data.gpsheading) ? 0 : data.gpsheading;
 
         /*if (isnanf(data.lat) || isnanf(data.lon) || data.lat == 0 || data.lon == 0) {
             latitude = defaultLatitude;
