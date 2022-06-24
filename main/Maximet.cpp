@@ -610,8 +610,8 @@ void Maximet::MaximetTask()
                         #pragma message ("Temporary fix for GPS issue")
                         if ((model == Model::GMX501GPS) && !data.gpsfix) 
                         {
-                            data.avgcdir = data.cdir;
-                            data.avgcspeed = data.cspeed;
+                            data.avgcdir = data.xavgcdir;
+                            data.avgcspeed = data.xavgcspeed;
                         }                          
 
                     }
@@ -798,8 +798,6 @@ bool Maximet::MaximetConfig()
     }
 
     ESP_LOGI(tag, "Detected Maximet model (SENSORS): %s", GetModelName(mMaximetConfig.model));
-
-
 
 
     // ESP_LOGI(tag, "Check config %d, %d", msReport.length(), msUserinfo.length());
