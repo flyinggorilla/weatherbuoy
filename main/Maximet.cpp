@@ -200,6 +200,14 @@ void Maximet::MaximetTask()
                     maximetAvgDir = nans();
 #if DEBUG_MAXIMET
 line.getBytes((unsigned char*)data.line, DEBUG_MAXIMET_LINEBUFLEN-1, cposDataStart);
+// remove control characters that confuses JSON
+int dlpos = 0;
+while(data.line[dlpos]) {
+    if (data.line[dlpos] < 0x20 || data.line[dlpos] > 0x7E) {
+        data.line[dlpos] = 0x2A; // asterisk
+    }
+    dlpos++;
+}
 #endif                
                 }
                 break;
