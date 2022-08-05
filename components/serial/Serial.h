@@ -21,6 +21,9 @@ public:
     // attach serial
     bool Attach();
 
+    // switch baud rate on the fly (e.g. to upgrade speed)
+    bool SwitchBaudRate(int baudRate);
+
     // release serial
     bool Release();
     
@@ -29,6 +32,8 @@ public:
 
     // write text or binary data to serial
     bool Write(const String& buffer);
+
+    void dump();
 
 private:
     bool ReadIntoBuffer(unsigned int timeoutms); // timeout 0 = try forever by default

@@ -198,6 +198,9 @@ void Maximet::MaximetTask()
                     maximetAvgSpeed = nanf();
                     maximetGDir = nans();
                     maximetAvgDir = nans();
+#if DEBUG_MAXIMET
+line.getBytes((unsigned char*)data.line, DEBUG_MAXIMET_LINEBUFLEN-1, cposDataStart);
+#endif                
                 }
                 break;
             case READCOLUMN:

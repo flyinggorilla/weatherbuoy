@@ -5,6 +5,10 @@
 #include "EspString.h"
 #include <math.h>
 
+// set DEBUG_MAXIMET only temporary to 1 to capture ACTUAL maximet string from serial for debug purposes
+#define DEBUG_MAXIMET true
+#define DEBUG_MAXIMET_LINEBUFLEN 256
+
 short nans();
 unsigned char nanuc();
 float nanf();
@@ -61,6 +65,10 @@ public:
     unsigned char gpssat;
     time_t time; // only avail if GPS -- 2022-01-21T22:43:11.4
 
+#if DEBUG_MAXIMET
+    char line[DEBUG_MAXIMET_LINEBUFLEN];
+#endif
+
 public:
     Data()
     {
@@ -112,6 +120,11 @@ public:
         gpsspeed = nanf();
         gpsheading = nans();
         time = 0;
+
+#if DEBUG_MAXIMET
+        line[DEBUG_MAXIMET_LINEBUFLEN] = {0};
+#endif
+
     }
 };
 

@@ -25,10 +25,10 @@ static const unsigned int MAX_ACCEPTABLE_RESPONSE_BODY_LENGTH = 16 * 1024;
 #include "lwip/sys.h"
 #include "lwip/netdb.h"
 
-bool DnsLookup(const char* hostname)
+bool DnsLookup(const char *hostname)
 {
 
-  const struct addrinfo hints = {
+    const struct addrinfo hints = {
         .ai_family = AF_INET,
         .ai_socktype = SOCK_STREAM,
     };
@@ -37,9 +37,12 @@ bool DnsLookup(const char* hostname)
 
     int err = getaddrinfo(hostname, NULL, &hints, &res);
 
-    if(err != 0 || res == NULL) {
+    if (err != 0 || res == NULL)
+    {
         ESP_LOGE(tag, "DNS lookup failed err=%d res=%p %s", err, res, esp_err_to_name(err));
-    } else {
+    }
+    else
+    {
         /* Code to print the resolved IP.
             Note: inet_ntoa is non-reentrant, look at ipaddr_ntoa_r for "real" code */
         addr = ((struct sockaddr_in *)res->ai_addr)->sin_addr;
@@ -53,83 +56,80 @@ bool DnsLookup(const char* hostname)
     return true;
 }
 
-
-
 esp_err_t http_event_handler(esp_http_client_event_t *evt)
 {
-    switch(evt->event_id) {
-        case HTTP_EVENT_ERROR:
-            ESP_LOGD(tag, "HTTP_EVENT_ERROR");
-            break;
-        case HTTP_EVENT_ON_CONNECTED:
-            ESP_LOGD(tag, "HTTP_EVENT_ON_CONNECTED");
-            break;
-        case HTTP_EVENT_HEADER_SENT:
-            ESP_LOGD(tag, "HTTP_EVENT_HEADER_SENT");
-            break;
-        case HTTP_EVENT_ON_HEADER:
-            ESP_LOGD(tag, "HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
+    switch (evt->event_id)
+    {
+    case HTTP_EVENT_ERROR:
+        ESP_LOGD(tag, "HTTP_EVENT_ERROR");
+        break;
+    case HTTP_EVENT_ON_CONNECTED:
+        ESP_LOGD(tag, "HTTP_EVENT_ON_CONNECTED");
+        break;
+    case HTTP_EVENT_HEADER_SENT:
+        ESP_LOGD(tag, "HTTP_EVENT_HEADER_SENT");
+        break;
+    case HTTP_EVENT_ON_HEADER:
+        ESP_LOGD(tag, "HTTP_EVENT_ON_HEADER, key=%s, value=%s", evt->header_key, evt->header_value);
 
-            // retreive UTC timestamp in milliseconds from HTTP response header and update system time if needed
-            if (strcmp("Timestamp", evt->header_key) == 0 && evt->header_value)
+        // retreive UTC timestamp in milliseconds from HTTP response header and update system time if needed
+        if (strcmp("Timestamp", evt->header_key) == 0 && evt->header_value)
+        {
+            char *endptr = nullptr;
+            long long timestamp_ms = strtoll(evt->header_value, &endptr, 10);
+
+            ESP_LOGD(tag, "HTTP response header Timestamp: %s, %lli", evt->header_value, timestamp_ms);
+
+            struct timeval now;
+            gettimeofday(&now, NULL);
+            time_t delta_s = abs(timestamp_ms / 1000 - now.tv_sec);
+
+            // adjust system time if more than 2 seconds off
+            if (delta_s > 2)
             {
-                char* endptr = nullptr;
-                long long timestamp_ms = strtoll(evt->header_value, &endptr, 10);
-
-                ESP_LOGD(tag, "HTTP response header Timestamp: %s, %lli", evt->header_value, timestamp_ms);
-
-                struct timeval now;        
-                gettimeofday(&now, NULL);
-                time_t delta_s = abs(timestamp_ms/1000 - now.tv_sec);
-
-                // adjust system time if more than 2 seconds off
-                if (delta_s > 2)
+                struct timeval delta;
+                delta.tv_sec = timestamp_ms / 1000 - now.tv_sec;
+                delta.tv_usec = (timestamp_ms % 1000) * 1000 - now.tv_usec;
+                if (adjtime(&delta, NULL))
                 {
-                    struct timeval delta;        
-                    delta.tv_sec = timestamp_ms/1000 - now.tv_sec;
-                    delta.tv_usec = (timestamp_ms % 1000) * 1000 - now.tv_usec;
-                    if(adjtime(&delta, NULL))
-                    {
-                        // delta too large, setting time absolutely
-                        now.tv_sec = timestamp_ms/1000;
-                        now.tv_usec = (timestamp_ms % 1000) * 1000;
-                        settimeofday(&now, NULL);
-                        ESP_LOGW(tag, "Adjusted system time by %li seconds.", delta_s);
-                    } else {
-                        ESP_LOGW(tag, "Smooth system time adjustment by %li seconds.", delta_s);
-                    }
-
+                    // delta too large, setting time absolutely
+                    now.tv_sec = timestamp_ms / 1000;
+                    now.tv_usec = (timestamp_ms % 1000) * 1000;
+                    settimeofday(&now, NULL);
+                    ESP_LOGW(tag, "Adjusted system time by %li seconds.", delta_s);
+                }
+                else
+                {
+                    ESP_LOGW(tag, "Smooth system time adjustment by %li seconds.", delta_s);
                 }
             }
+        }
 
-            break;
-        case HTTP_EVENT_ON_DATA:
-            ESP_LOGD(tag, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
-            break;
-        case HTTP_EVENT_ON_FINISH:
-            ESP_LOGD(tag, "HTTP_EVENT_ON_FINISH");
-            break;
-        case HTTP_EVENT_DISCONNECTED:
-            ESP_LOGD(tag, "HTTP_EVENT_DISCONNECTED");
-            int mbedtls_err = 0;
-            esp_err_t err = esp_tls_get_and_clear_last_error((esp_tls_error_handle_t)(evt->data), &mbedtls_err, NULL);
-            if (err != 0) {
-                ESP_LOGE(tag, "TLS: esp error code: 0x%x %s, mbedtls: 0x%x. Error cleared.", err, esp_err_to_name(err), mbedtls_err);
-                DnsLookup("atterwind.info");
-            }
-            break;
-        //case HTTP_EVENT_REDIRECT:
-        //    ESP_LOGD(tag, "HTTP_EVENT_REDIRECT");
-        //    esp_http_client_set_header(evt->client, "From", "user@example.com");
-        //    esp_http_client_set_header(evt->client, "Accept", "text/html");
-        //    break;
+        break;
+    case HTTP_EVENT_ON_DATA:
+        ESP_LOGD(tag, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+        break;
+    case HTTP_EVENT_ON_FINISH:
+        ESP_LOGD(tag, "HTTP_EVENT_ON_FINISH");
+        break;
+    case HTTP_EVENT_DISCONNECTED:
+        ESP_LOGD(tag, "HTTP_EVENT_DISCONNECTED");
+        int mbedtls_err = 0;
+        esp_err_t err = esp_tls_get_and_clear_last_error((esp_tls_error_handle_t)(evt->data), &mbedtls_err, NULL);
+        if (err != 0)
+        {
+            ESP_LOGE(tag, "TLS: esp error code: 0x%x %s, mbedtls: 0x%x. Error cleared.", err, esp_err_to_name(err), mbedtls_err);
+            DnsLookup("atterwind.info");
+        }
+        break;
+        // case HTTP_EVENT_REDIRECT:
+        //     ESP_LOGD(tag, "HTTP_EVENT_REDIRECT");
+        //     esp_http_client_set_header(evt->client, "From", "user@example.com");
+        //     esp_http_client_set_header(evt->client, "Accept", "text/html");
+        //     break;
     }
     return ESP_OK;
 }
-
-
-
-
 
 String SendData::ReadMessageValue(const char *key)
 {
@@ -172,50 +172,59 @@ void SendData::Cleanup()
     mhEspHttpClient = nullptr;
 }
 
-void PostDataAddFloat(String& rPostData, const char* key, float val, bool comma = true)
+void PostDataAddFloat(String &rPostData, const char *key, float val, bool comma = true)
 {
-    if (comma) rPostData += ",";
+    if (comma)
+        rPostData += ",";
     rPostData += "\"";
     rPostData += key;
     rPostData += "\":";
-    if (isnanf(val)) {
-       rPostData += "null";
-    } else {
+    if (isnanf(val))
+    {
+        rPostData += "null";
+    }
+    else
+    {
         rPostData += val;
     }
 }
 
-void PostDataAddShort(String& rPostData, const char* key, short val, bool comma = true)
+void PostDataAddShort(String &rPostData, const char *key, short val, bool comma = true)
 {
-    if (comma) rPostData += ",";
+    if (comma)
+        rPostData += ",";
     rPostData += "\"";
     rPostData += key;
     rPostData += "\":";
-    if (isnans(val)) {
-       rPostData += "null";
-    } else {
+    if (isnans(val))
+    {
+        rPostData += "null";
+    }
+    else
+    {
         rPostData += val;
     }
 }
 
-void PostDataAddInt(String& rPostData, const char* key, int val, bool comma = true)
+void PostDataAddInt(String &rPostData, const char *key, int val, bool comma = true)
 {
-    if (comma) rPostData += ",";
+    if (comma)
+        rPostData += ",";
     rPostData += "\"";
     rPostData += key;
     rPostData += "\":";
     rPostData += val;
 }
 
-void PostDataAddString(String& rPostData, const char* key, String& val, bool comma = true)
+void PostDataAddString(String &rPostData, const char *key, String &val, bool comma = true)
 {
-    if (comma) rPostData += ",";
+    if (comma)
+        rPostData += ",";
     rPostData += "\"";
     rPostData += key;
     rPostData += "\":";
     rPostData += val;
 }
-
 
 bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics, OnlineMode onlineMode)
 {
@@ -280,11 +289,11 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
                 mPostData += String(maximetData.lat, 6);
                 mPostData += ",\"lon\":";
                 mPostData += String(maximetData.lon, 6);
-                //mPostData += ",\"sog\":";
-                //mPostData += maximetData.gpsspeed;
+                // mPostData += ",\"sog\":";
+                // mPostData += maximetData.gpsspeed;
                 PostDataAddFloat(mPostData, "sog", maximetData.gpsspeed);
-                //mPostData += ",\"cog\":";
-                //mPostData += maximetData.gpsheading;
+                // mPostData += ",\"cog\":";
+                // mPostData += maximetData.gpsheading;
                 PostDataAddShort(mPostData, "cog", maximetData.gpsheading);
             }
             mPostData += ",\"fix\":";
@@ -293,6 +302,12 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
             mPostData += maximetData.gpssat;
             mPostData += "}";
         }
+#if DEBUG_MAXIMET
+#pragma message "RAW MAXIMET DATA CONSUMES EXTRA MEMORY - USE ONLY FOR DEBUGGING"
+        mPostData += ",\"raw\":\"";
+        mPostData += maximetData.line;
+        mPostData += "\"";
+#endif
         mPostData += "}";
         bComma = true;
     }
@@ -326,7 +341,7 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += "\", \"esp-idf-version\": \"";
         mPostData += esp_ota_get_app_description()->idf_ver;
         mPostData += "\",\"targeturl\": \"";
-        mPostData += CONFIG_WEATHERBUOY_TARGET_URL; //mrConfig.msTargetUrl;
+        mPostData += CONFIG_WEATHERBUOY_TARGET_URL; // mrConfig.msTargetUrl;
         mPostData += "\",\"apssid\": \"";
         mPostData += mrConfig.msAPSsid;
         mPostData += "\",\"appass\": \"";
@@ -343,7 +358,8 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
         mPostData += mrConfig.miIntervalLowbattery;
         mPostData += ", \"intervaldiag\": ";
         mPostData += mrConfig.miIntervalDiagnostics;
-        if (onlineMode == MODE_CELLULAR) {
+        if (onlineMode == MODE_CELLULAR)
+        {
             mPostData += ",\"cellular\": {\"datasent\":";
             mPostData += (unsigned long)(mrCellular.getDataSent() / 1024); // convert to kB
             mPostData += ",\"datareceived\":";
@@ -368,15 +384,17 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
             mPostData += mrConfig.msCellularOperator;
             mPostData += "\"}";
         }
-        if (mrConfig.mbNmeaDisplay) {
+        if (mrConfig.mbNmeaDisplay)
+        {
             mPostData += ",\"display\": \"NMEA2000\"";
         }
-        if (mrConfig.mbAlarmSound || mrConfig.msAlarmSms.length()) {
+        if (mrConfig.mbAlarmSound || mrConfig.msAlarmSms.length())
+        {
             mPostData += ",\"alarm\": ";
             mPostData += "{\"sound\": ";
-            mPostData += mrConfig.mbAlarmSound ? "true": "false";
+            mPostData += mrConfig.mbAlarmSound ? "true" : "false";
             mPostData += ",\"sms\": \"";
-        	mPostData += mrConfig.msAlarmSms;
+            mPostData += mrConfig.msAlarmSms;
             mPostData += "\", \"radius\": ";
             mPostData += mrConfig.miAlarmRadius;
             mPostData += ",\"lat\":";
@@ -391,7 +409,8 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
             mPostData += mrConfig.miSimulator / 10;
             mPostData += mrConfig.miSimulator % 10 ? "GPS\"" : "\"";
         }
-        if (mrMaximetConfig.model) {
+        if (mrMaximetConfig.model)
+        {
             mPostData += ", \"maximet\": {";
             mPostData += "\"avglong\": ";
             mPostData += mrMaximetConfig.iAvgLong;
@@ -437,7 +456,6 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
 bool SendData::PerformHttpPost()
 {
 
-
     ESP_LOGW(tag, "TESTING DNS LOOKUP.");
     DnsLookup("atterwind.info");
 
@@ -452,16 +470,15 @@ bool SendData::PerformHttpPost()
         }*/
 
         static_assert(sizeof(CONFIG_WEATHERBUOY_TARGET_URL) > 4, "http(s) URL to weatherbuoy server must be define in ESP-IDF config.");
-       
-        mEspHttpClientConfig = {0}; //memset(&mEspHttpClientConfig, 0, sizeof(esp_http_client_config_t));
+
+        mEspHttpClientConfig = {0};                               // memset(&mEspHttpClientConfig, 0, sizeof(esp_http_client_config_t));
         mEspHttpClientConfig.url = CONFIG_WEATHERBUOY_TARGET_URL; // mrConfig.msTargetUrl.c_str();
         mEspHttpClientConfig.method = HTTP_METHOD_POST;
-        mEspHttpClientConfig.timeout_ms = 60*1000; // default of 5000ms (5s) is too short
+        mEspHttpClientConfig.timeout_ms = 60 * 1000; // default of 5000ms (5s) is too short
         mEspHttpClientConfig.event_handler = http_event_handler;
         mhEspHttpClient = esp_http_client_init(&mEspHttpClientConfig);
-        ESP_LOGD(tag, "Http timeout set to: %is", mEspHttpClientConfig.timeout_ms/1000);
+        ESP_LOGD(tag, "Http timeout set to: %is", mEspHttpClientConfig.timeout_ms / 1000);
     }
-
 
     // prepare and send HTTP headers and content length
     ESP_LOGI(tag, "Sending %d bytes to '%s'", mPostData.length(), mEspHttpClientConfig.url);
@@ -511,7 +528,6 @@ bool SendData::PerformHttpPost()
         Cleanup();
         return false;
     }
-
 
     // Prevent overly memory allocation
     if (iContentLength > MAX_ACCEPTABLE_RESPONSE_BODY_LENGTH)
@@ -577,12 +593,12 @@ bool SendData::PerformHttpPost()
                 updateConfig = true;
             };
 
-            //value = ReadMessageValue("set-targeturl:");
-            //if (value.length())
+            // value = ReadMessageValue("set-targeturl:");
+            // if (value.length())
             //{
-            //    mrConfig.msTargetUrl = value;
-            //    updateConfig = true;
-            //};
+            //     mrConfig.msTargetUrl = value;
+            //     updateConfig = true;
+            // };
 
             value = ReadMessageValue("set-apssid:");
             if (value.length())
@@ -637,7 +653,8 @@ bool SendData::PerformHttpPost()
                     int latPos = value.indexOf(':', 0);
                     double lat = value.substring(0, latPos).toFloat();
                     double lon = value.substring(latPos + 1).toFloat();
-                    if (!isnan(lat) && !isnan(lon)) {
+                    if (!isnan(lat) && !isnan(lon))
+                    {
                         mrConfig.mdAlarmLatitude = lat;
                         mrConfig.mdAlarmLongitude = lon;
                         updateConfig = true;
@@ -710,7 +727,7 @@ bool SendData::PerformHttpPost()
                 mrMaximet.WriteHastn(value.toFloat());
                 updateConfig = true;
             };
-            
+
             value = ReadMessageValue("set-position:");
             if (value.indexOf(':') > 0)
             {
@@ -718,7 +735,8 @@ bool SendData::PerformHttpPost()
                 int latPos = value.indexOf(':', 0);
                 double lat = value.substring(0, latPos).toFloat();
                 double lon = value.substring(latPos + 1).toFloat();
-                if (!isnan(lat) && !isnan(lon)) {
+                if (!isnan(lat) && !isnan(lon))
+                {
                     mrMaximet.WriteLat(lat);
                     mrMaximet.WriteLong(lon);
                     updateConfig = true;
@@ -843,5 +861,3 @@ SendData::~SendData()
     esp_http_client_cleanup(mhEspHttpClient);
     mhEspHttpClient = nullptr;
 }
-
-
