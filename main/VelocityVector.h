@@ -10,8 +10,8 @@ public:
     void add(float speed, short direction);
     short getDir();
     float getSpeed();
-    float getSumU() { return mfSumU; };
-    float getSumV() { return mfSumV; };
+    float getU() { return mfSumU; };
+    float getV() { return mfSumV; };
     unsigned int getCount() { return muiCount; };
     void operator= (const VelocityVector& v);
     void operator+= (const VelocityVector& v);
