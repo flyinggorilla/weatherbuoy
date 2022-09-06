@@ -76,11 +76,11 @@ float VelocityVectorMovingAverage::getSpeed()
 };
 
 float VelocityVectorMovingAverage::getU() {
-    return mVelocityVectorAvg.getSumU();
+    return mVelocityVectorAvg.getU();
 }
 
 float VelocityVectorMovingAverage::getV() {
-    return mVelocityVectorAvg.getSumV();
+    return mVelocityVectorAvg.getV();
 };
 unsigned int VelocityVectorMovingAverage::getCount() {
     return mVelocityVectorAvg.getCount();
