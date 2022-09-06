@@ -75,6 +75,17 @@ float VelocityVectorMovingAverage::getSpeed()
     return mVelocityVectorAvg.getSpeed();
 };
 
+float VelocityVectorMovingAverage::getU() {
+    return mVelocityVectorAvg.getSumU();
+}
+
+float VelocityVectorMovingAverage::getV() {
+    return mVelocityVectorAvg.getSumV();
+};
+unsigned int VelocityVectorMovingAverage::getCount() {
+    return mVelocityVectorAvg.getCount();
+}
+
 
 // this is moving average calculation is intended for very small arrays 
 // it intentionally iterates over all entries, to avoid floating point rounding issues

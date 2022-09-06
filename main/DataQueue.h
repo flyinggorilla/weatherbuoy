@@ -6,7 +6,7 @@
 #include <math.h>
 
 // set DEBUG_MAXIMET only temporary to 1 to capture ACTUAL maximet string from serial for debug purposes
-#define DEBUG_MAXIMET true
+#define DEBUG_MAXIMET false
 #define DEBUG_MAXIMET_LINEBUFLEN 256
 
 short nans();

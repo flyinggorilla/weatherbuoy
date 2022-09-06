@@ -10,6 +10,8 @@ public:
     void add(float speed, short direction);
     short getDir();
     float getSpeed();
+    float getSumU() { return mfSumU; };
+    float getSumV() { return mfSumV; };
     unsigned int getCount() { return muiCount; };
     void operator= (const VelocityVector& v);
     void operator+= (const VelocityVector& v);
@@ -29,6 +31,9 @@ public:
     void add(VelocityVector& rVelocityVector);
     short getDir();
     float getSpeed();
+    float getU();
+    float getV();
+    unsigned int getCount();
 
 private:
     short unsigned int musEntryPos = 0;
