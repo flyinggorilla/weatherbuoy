@@ -1,7 +1,7 @@
 /*
 N2kGroupFunctionDefaultHandlers.cpp
 
-Copyright (c) 2015-2021 Timo Lappalainen, Kave Oy, www.kave.fi
+Copyright (c) 2015-2022 Timo Lappalainen, Kave Oy, www.kave.fi
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -43,10 +43,10 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 // For requirements for handling Group function request for PGN 60928
 bool tN2kGroupFunctionHandlerForPGN60928::HandleRequest(const tN2kMsg &N2kMsg,
                                uint32_t TransmissionInterval,
-                               uint16_t /*TransmissionIntervalOffset*/,
+                               uint16_t TransmissionIntervalOffset,
                                uint8_t  NumberOfParameterPairs,
                                int iDev) {
-  tN2kGroupFunctionTransmissionOrPriorityErrorCode pec=GetRequestGroupFunctionTransmissionOrPriorityErrorCode(TransmissionInterval);
+  tN2kGroupFunctionTransmissionOrPriorityErrorCode pec=GetRequestGroupFunctionTransmissionOrPriorityErrorCode(TransmissionInterval,TransmissionIntervalOffset);
   bool MatchFilter=true;
   tN2kMsg N2kRMsg;
 
@@ -72,7 +72,7 @@ bool tN2kGroupFunctionHandlerForPGN60928::HandleRequest(const tN2kMsg &N2kMsg,
         field=N2kMsg.GetByte(Index);
         switch (field) {
           case N2kPGN60928_UniqueNumber_field:
-            MatchRequestField(N2kMsg.Get4ByteUInt(Index),(uint32_t)DI.GetUniqueNumber(),(uint32_t)0x001fffff,MatchFilter,FieldErrorCode);
+            MatchRequestField(N2kMsg.Get3ByteUInt(Index),(uint32_t)DI.GetUniqueNumber(),(uint32_t)0x001fffff,MatchFilter,FieldErrorCode);
             break;
           case N2kPGN60928_ManufacturerCode_field:
             MatchRequestField(N2kMsg.Get2ByteUInt(Index),DI.GetManufacturerCode(),(uint16_t)0x07ff,MatchFilter,FieldErrorCode);
@@ -117,14 +117,13 @@ bool tN2kGroupFunctionHandlerForPGN60928::HandleRequest(const tN2kMsg &N2kMsg,
     }
   }
 
-  // Send Acknowledge, if request was not broadcast and it did not match
-  if ( (!MatchFilter || pec!=N2kgfTPec_Acknowledge) && !tNMEA2000::IsBroadcast(N2kMsg.Destination)) {
-    pNMEA2000->SendMsg(N2kRMsg,iDev);
-  }
+  bool RequestOK=(MatchFilter && pec==N2kgfTPec_Acknowledge);
 
-  if (MatchFilter) {
-    // SendAcknowledge(pNMEA2000,N2kMsg.Source,iDev,PGN,N2kgfPGNec_Acknowledge,pec); // It was not clear should we also respond with acknowledge
-    // Send delayed so that ack will be sent first.
+  // Send Acknowledge, if request was not broadcast and it did not match
+  if ( !RequestOK ) {
+    if ( !tNMEA2000::IsBroadcast(N2kMsg.Destination) ) pNMEA2000->SendMsg(N2kRMsg,iDev);
+  } else {
+    // Send delayed - there was problems with test tool with too fast response.
     pNMEA2000->SendIsoAddressClaim(0xff,iDev,2);
   }
 
@@ -184,10 +183,10 @@ bool tN2kGroupFunctionHandlerForPGN60928::HandleCommand(const tN2kMsg &N2kMsg, u
 // For requirements for handling Group function request for PGN 60928
 bool tN2kGroupFunctionHandlerForPGN126464::HandleRequest(const tN2kMsg &N2kMsg,
                                uint32_t TransmissionInterval,
-                               uint16_t /*TransmissionIntervalOffset*/,
+                               uint16_t TransmissionIntervalOffset,
                                uint8_t  NumberOfParameterPairs,
                                int iDev) {
-  tN2kGroupFunctionTransmissionOrPriorityErrorCode pec=GetRequestGroupFunctionTransmissionOrPriorityErrorCode(TransmissionInterval);
+  tN2kGroupFunctionTransmissionOrPriorityErrorCode pec=GetRequestGroupFunctionTransmissionOrPriorityErrorCode(TransmissionInterval,TransmissionIntervalOffset);
   bool MatchFilter=true;
   uint8_t RespondTxRx=0xff;
   tN2kMsg N2kRMsg;
@@ -235,12 +234,12 @@ bool tN2kGroupFunctionHandlerForPGN126464::HandleRequest(const tN2kMsg &N2kMsg,
     }
   }
 
-  // Send Acknowledge, if request was not broadcast and it did not match
-  if ( (!MatchFilter || pec!=N2kgfTPec_Acknowledge) && !tNMEA2000::IsBroadcast(N2kMsg.Destination)) {
-    pNMEA2000->SendMsg(N2kRMsg,iDev);
-  }
+  bool RequestOK=(MatchFilter && pec==N2kgfTPec_Acknowledge);
 
-  if (MatchFilter) {
+  // Send Acknowledge, if request was not broadcast and it did not match
+  if ( !RequestOK ) {
+    if ( !tNMEA2000::IsBroadcast(N2kMsg.Destination) ) pNMEA2000->SendMsg(N2kRMsg,iDev);
+  } else {
 #if !defined(N2K_NO_ISO_MULTI_PACKET_SUPPORT)
     unsigned char dest=N2kMsg.Source;
     if ( N2kMsg.IsTPMessage() && tNMEA2000::IsBroadcast(N2kMsg.Destination) ) dest=N2kMsg.Destination;
@@ -269,10 +268,10 @@ bool tN2kGroupFunctionHandlerForPGN126464::HandleRequest(const tN2kMsg &N2kMsg,
 // For requirements for handling Group function request for PGN 60928
 bool tN2kGroupFunctionHandlerForPGN126996::HandleRequest(const tN2kMsg &N2kMsg,
                                uint32_t TransmissionInterval,
-                               uint16_t /*TransmissionIntervalOffset*/,
+                               uint16_t TransmissionIntervalOffset,
                                uint8_t  NumberOfParameterPairs,
                                int iDev) {
-  tN2kGroupFunctionTransmissionOrPriorityErrorCode pec=GetRequestGroupFunctionTransmissionOrPriorityErrorCode(TransmissionInterval);
+  tN2kGroupFunctionTransmissionOrPriorityErrorCode pec=GetRequestGroupFunctionTransmissionOrPriorityErrorCode(TransmissionInterval,TransmissionIntervalOffset);
   bool MatchFilter=true;
   tN2kMsg N2kRMsg;
 
@@ -345,12 +344,12 @@ bool tN2kGroupFunctionHandlerForPGN126996::HandleRequest(const tN2kMsg &N2kMsg,
     }
   }
 
-  // Send Acknowledge, if request was not broadcast and it did not match
-  if ( (!MatchFilter || pec!=N2kgfTPec_Acknowledge) && !tNMEA2000::IsBroadcast(N2kMsg.Destination)) {
-    pNMEA2000->SendMsg(N2kRMsg,iDev);
-  }
+  bool RequestOK=(MatchFilter && pec==N2kgfTPec_Acknowledge);
 
-  if (MatchFilter) {
+  // Send Acknowledge, if request was not broadcast and it did not match
+  if ( !RequestOK ) {
+    if ( !tNMEA2000::IsBroadcast(N2kMsg.Destination) ) pNMEA2000->SendMsg(N2kRMsg,iDev);
+  } else {
 #if !defined(N2K_NO_ISO_MULTI_PACKET_SUPPORT)
     unsigned char dest=N2kMsg.Source;
     if ( N2kMsg.IsTPMessage() && tNMEA2000::IsBroadcast(N2kMsg.Destination) ) dest=N2kMsg.Destination;
@@ -372,10 +371,10 @@ bool tN2kGroupFunctionHandlerForPGN126996::HandleRequest(const tN2kMsg &N2kMsg,
 // For requirements for handling Group function request for PGN 60928
 bool tN2kGroupFunctionHandlerForPGN126998::HandleRequest(const tN2kMsg &N2kMsg,
                                uint32_t TransmissionInterval,
-                               uint16_t /*TransmissionIntervalOffset*/,
+                               uint16_t TransmissionIntervalOffset,
                                uint8_t  NumberOfParameterPairs,
                                int iDev) {
-  tN2kGroupFunctionTransmissionOrPriorityErrorCode pec=GetRequestGroupFunctionTransmissionOrPriorityErrorCode(TransmissionInterval);
+  tN2kGroupFunctionTransmissionOrPriorityErrorCode pec=GetRequestGroupFunctionTransmissionOrPriorityErrorCode(TransmissionInterval,TransmissionIntervalOffset);
   bool MatchFilter=true;
   tN2kMsg N2kRMsg;
 
@@ -435,12 +434,12 @@ bool tN2kGroupFunctionHandlerForPGN126998::HandleRequest(const tN2kMsg &N2kMsg,
 
   }
 
-  // Send Acknowledge, if request was not broadcast and it did not match
-  if ( (!MatchFilter || pec!=N2kgfTPec_Acknowledge) && !tNMEA2000::IsBroadcast(N2kMsg.Destination)) {
-    pNMEA2000->SendMsg(N2kRMsg,iDev);
-  }
+  bool RequestOK=(MatchFilter && pec==N2kgfTPec_Acknowledge);
 
-  if (MatchFilter) {
+  // Send Acknowledge, if request was not broadcast and it did not match
+  if ( !RequestOK ) {
+    if ( !tNMEA2000::IsBroadcast(N2kMsg.Destination) ) pNMEA2000->SendMsg(N2kRMsg,iDev);
+  } else {
 #if !defined(N2K_NO_ISO_MULTI_PACKET_SUPPORT)
     unsigned char dest=N2kMsg.Source;
     if ( N2kMsg.IsTPMessage() && tNMEA2000::IsBroadcast(N2kMsg.Destination) ) dest=N2kMsg.Destination;
@@ -507,25 +506,30 @@ bool tN2kGroupFunctionHandlerForPGN126993::HandleRequest(const tN2kMsg &N2kMsg,
                                uint16_t TransmissionIntervalOffset,
                                uint8_t  NumberOfParameterPairs,
                                int iDev) {
-	tN2kGroupFunctionTransmissionOrPriorityErrorCode pec = GetRequestGroupFunctionTransmissionOrPriorityErrorCode(TransmissionInterval);
-	if ( TransmissionInterval >= 1000 && TransmissionInterval <= 60000 ) pec = N2kgfTPec_Acknowledge;
+  tN2kGroupFunctionTransmissionOrPriorityErrorCode pec = GetRequestGroupFunctionTransmissionOrPriorityErrorCode(TransmissionInterval,TransmissionIntervalOffset,true,60000U,1000U,true,6000U);
+  // Turn off is not allowed for heartbeat.
+  if ( TransmissionInterval==0 ) pec=N2kgfTPec_TransmitIntervalOrPriorityNotSupported;
+  
   if ( NumberOfParameterPairs==0 ) { // According to doc, there should not be any parameter pairs defined
     if ( TransmissionInterval==0xffffffff && TransmissionIntervalOffset==0xffff ) {
+      // Request for 126993 with 0xffffffff and 0xffff is prohibited so use default reponse.
       return tN2kGroupFunctionHandler::HandleRequest(N2kMsg,TransmissionInterval,TransmissionIntervalOffset,NumberOfParameterPairs,iDev);
     }
     if ( pec==N2kgfTPec_Acknowledge ) {
-      pNMEA2000->SetHeartbeatInterval(TransmissionInterval,false,iDev);
+      // Request specification with offset is confusing and there is no clear explanation. So to keep
+      // test tool happy, we respond always immediately and set offset, if it is >0
+      uint32_t Offset=TransmissionIntervalOffset;
+      Offset=(Offset==0xffff || Offset==0?0xffffffff:Offset*10); // Offset comes in 10 ms, convert to ms.
+      pNMEA2000->SetHeartbeatIntervalAndOffset(TransmissionInterval,Offset,iDev);
       pNMEA2000->SendHeartbeat(iDev);
-    } else {
-			if (!tNMEA2000::IsBroadcast(N2kMsg.Destination)) {
-				SendAcknowledge(pNMEA2000, N2kMsg.Source, iDev, PGN, N2kgfPGNec_Acknowledge, pec);
-			}
+    } else if (!tNMEA2000::IsBroadcast(N2kMsg.Destination)) {
+      SendAcknowledge(pNMEA2000, N2kMsg.Source, iDev, PGN, N2kgfPGNec_Acknowledge, pec);
     }
   } else {
     if ( !tNMEA2000::IsBroadcast(N2kMsg.Destination) ) {
       SendAcknowledge(pNMEA2000,N2kMsg.Source,iDev,PGN,
                       N2kgfPGNec_Acknowledge,
-                      N2kgfTPec_TransmitIntervalOrPriorityNotSupported,
+                      pec, //N2kgfTPec_TransmitIntervalOrPriorityNotSupported,
                       NumberOfParameterPairs, N2kgfpec_RequestOrCommandNotSupported);
     }
   }

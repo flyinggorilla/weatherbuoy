@@ -63,6 +63,7 @@ static const char tag[] = "WeatherBuoy";
 // I2C Pins used for TWAI (NMEA over CAN bus)
 #define CONFIG_NMEA_TWAI_RX_PIN GPIO_NUM_22
 #define CONFIG_NMEA_TWAI_TX_PIN GPIO_NUM_21
+#define CONFIG_NMEA_TWAI_POWER_PIN GPIO_NUM_23 // power the chip through GPIO, so CAN BUS chip stays powered down during boot
 #endif
 
 // Optionally drive an Alarm Buzzer at following GPIO (max 30mA for standard GPIO, but this one can with proper config drive up to 70mA)
@@ -187,8 +188,15 @@ void Esp32WeatherBuoy::Start()
     // allocate NMEA2000 display output on heap as moving averages require some memory
     if (mConfig.mbNmeaDisplay)
     {
-        mpDisplay = new NmeaDisplay(CONFIG_NMEA_TWAI_TX_PIN, CONFIG_NMEA_TWAI_RX_PIN, dataQueue);
+        mpDisplay = new NmeaDisplay(CONFIG_NMEA_TWAI_TX_PIN, CONFIG_NMEA_TWAI_RX_PIN, CONFIG_NMEA_TWAI_POWER_PIN ,dataQueue);
         mpDisplay->Start();
+
+        tempSensors.Read();  // note, this causes approx 700ms delay
+        unsigned int voltage = max471Meter.Voltage();
+        unsigned int current = max471Meter.Current();
+        float boardtemp = tempSensors.GetBoardTemp();
+        float watertemp = tempSensors.GetWaterTemp();
+        mpDisplay->SetSystemInfo(voltage, current, boardtemp);
     }
 
     // start Maximet wind/weather data reading
@@ -223,7 +231,7 @@ void Esp32WeatherBuoy::Start()
             // config.msSTAPass = "";
             // config.msTargetUrl = "http://10.10.14.195:3000/weatherbuoy";
             // config.Save();
-            ESP_LOGI(tag, "sssi %s pass %s host %s", mConfig.msSTASsid.c_str(), mConfig.msSTAPass.c_str(), mConfig.msHostname.c_str());
+            ESP_LOGI(tag, "sssi %s, pass %d characters, host %s", mConfig.msSTASsid.c_str(), mConfig.msSTAPass.length(), mConfig.msHostname.c_str());
             mWifi.StartSTAMode(mConfig.msSTASsid, mConfig.msSTAPass, mConfig.msHostname);
             mWifi.StartTimeSync(mConfig.msNtpServer);
             ESP_LOGI(tag, "NTP Time Syncronization enabled: %s", mConfig.msNtpServer.c_str());
@@ -383,6 +391,10 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
         unsigned int current = max471Meter.Current();
         float boardtemp = tempSensors.GetBoardTemp();
         float watertemp = tempSensors.GetWaterTemp();
+
+        if (mpDisplay) {
+            mpDisplay->SetSystemInfo(voltage, current, boardtemp);
+        }
 
         if (mOnlineMode == MODE_CELLULAR)
         {

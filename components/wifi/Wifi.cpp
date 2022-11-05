@@ -115,7 +115,11 @@ void Wifi::Init() {
 
 void Wifi::Connect()
 {
-	ESP_LOGD(tag, "  Connect(<%s><%s><%s><%d>)", msSsid.c_str(), msUser.c_str(), msPass.c_str(), msCA.length());
+	String pwd(msPass);
+	for (int i = 0; i < pwd.length(); i++) {
+		pwd.setCharAt(i, '*');
+	}
+	ESP_LOGD(tag, "  Connect(<%s><%s><%s><%d>)", msSsid.c_str(), msUser.c_str(), pwd.c_str(), msCA.length());
 	ESP_LOGD(tag, "-----------------------");
 	ESP_LOGD(tag, "%s", msCA.c_str());
 	ESP_LOGD(tag, "-----------------------");

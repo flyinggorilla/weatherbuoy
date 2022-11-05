@@ -1,7 +1,7 @@
 /*
 N2kMsg.cpp
 
-Copyright (c) 2015-2021 Timo Lappalainen, Kave Oy, www.kave.fi
+Copyright (c) 2015-2022 Timo Lappalainen, Kave Oy, www.kave.fi
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -22,6 +22,7 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
 #include "N2kMsg.h"
+#include "N2kTimer.h"
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -59,14 +60,14 @@ tN2kMsg::tN2kMsg(unsigned char _Source, unsigned char _Priority, unsigned long _
   Init(_Priority,_PGN,_Source,255);
   if ( _DataLen>0 && _DataLen<MaxDataLen ) DataLen=_DataLen;
   ResetData();
-  if ( PGN!=0 ) MsgTime=millis();
+  if ( PGN!=0 ) MsgTime=N2kMillis();
 }
 
 //*****************************************************************************
 void tN2kMsg::SetPGN(unsigned long _PGN) {
   Clear();
   if ( PGN==0 ) PGN=_PGN;
-  MsgTime=millis();
+  MsgTime=N2kMillis();
 }
 
 //*****************************************************************************
@@ -584,23 +585,23 @@ void SetBuf8ByteDouble(double v, double precision, int &index, unsigned char *bu
 
 //*****************************************************************************
 void SetBuf4ByteDouble(double v, double precision, int &index, unsigned char *buf) {
-  double vd=round(v/precision);
+  double vd=round((v/precision));
   int32_t vi = (vd>=N2kInt32Min && vd<N2kInt32OR)?(int32_t)vd:N2kInt32OR;
   SetBuf<int32_t>(vi, 4, index, buf);
 }
 
 //*****************************************************************************
 void SetBuf4ByteUDouble(double v, double precision, int &index, unsigned char *buf) {
-  double vd=round(v/precision);
+  double vd=round((v/precision));
   uint32_t vi = (vd>=0 && vd<N2kUInt32OR)?(uint32_t)vd:N2kUInt32OR;
   SetBuf<uint32_t>(vi, 4, index, buf);
 }
 
 //*****************************************************************************
 void SetBuf3ByteDouble(double v, double precision, int &index, unsigned char *buf) {
-  double vd=round(v/precision);
+  double vd=round((v/precision));
   int32_t vi = (vd>=N2kInt24Min && vd<N2kInt24OR)?(int32_t)vd:N2kInt24OR;
-  SetBuf<int32_t>(vi, 4, index, buf);
+  SetBuf<int32_t>(vi, 3, index, buf);
 }
 
 //*****************************************************************************
@@ -721,28 +722,28 @@ double GetBuf4ByteUDouble(double precision, int &index, const unsigned char *buf
 
 //*****************************************************************************
 void SetBuf2ByteDouble(double v, double precision, int &index, unsigned char *buf) {
-  double vd=round(v/precision);
+  double vd=round((v/precision));
   int16_t vi = (vd>=N2kInt16Min && vd<N2kInt16OR)?(int16_t)vd:N2kInt16OR;
   SetBuf(vi, 2, index, buf);
 }
 
 //*****************************************************************************
 void SetBuf2ByteUDouble(double v, double precision, int &index, unsigned char *buf) {
-  double vd=round(v/precision);
+  double vd=round((v/precision));
   uint16_t vi = (vd>=0 && vd<N2kUInt16OR)?(uint16_t)vd:N2kUInt16OR;
   SetBuf(vi, 2, index, buf);
 }
 
 //*****************************************************************************
 void SetBuf1ByteDouble(double v, double precision, int &index, unsigned char *buf) {
-  double vd=round(v/precision);
+  double vd=round((v/precision));
   int8_t vi = (vd>=N2kInt8Min && vd<N2kInt8OR)?(int8_t)vd:N2kInt8OR;
   SetBuf(vi, 1, index, buf);
 }
 
 //*****************************************************************************
 void SetBuf1ByteUDouble(double v, double precision, int &index, unsigned char *buf) {
-  double vd=round(v/precision);
+  double vd=round((v/precision));
   uint8_t vi = (vd>=0 && vd<N2kUInt8OR)?(uint8_t)vd:N2kUInt8OR;
   SetBuf(vi, 1, index, buf);
 }
@@ -805,7 +806,7 @@ void PrintBuf(N2kStream *port, unsigned char len, const unsigned char *pData, bo
 //*****************************************************************************
 void tN2kMsg::Print(N2kStream *port, bool NoData) const {
   if (port==0 || !IsValid()) return;
-  port->print(millis()); port->print(F(" : "));
+  port->print(N2kMillis()); port->print(F(" : "));
   port->print(F("Pri:")); port->print(Priority);
   port->print(F(" PGN:")); port->print(PGN);
   port->print(F(" Source:")); port->print(Source);

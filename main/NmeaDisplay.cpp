@@ -5,6 +5,7 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esputil.h"
+#include "driver/gpio.h"
 #include "math.h"
 
 static const char tag[] = "NmeaDisplay";
@@ -50,6 +51,10 @@ void fDisplayTask(void *pvParameter)
 
 void NmeaDisplay::Start()
 {
+
+    gpio_set_direction(mGpioPower, GPIO_MODE_OUTPUT);
+    gpio_set_level(mGpioPower, 1);
+
     /// PGNS
     // https://static.garmin.com/pumac/Tech_Ref_for_Garmin_NMEA2k_EN.pdf
     // https://continuouswave.com/whaler/reference/PGN.html
@@ -94,13 +99,31 @@ int cnt = 0;
 
 void NmeaDisplay::DisplayTask()
 {
+    mNmea.ParseMessages();
+    delay(500); // give the CAN bus and devices  time to initialize
+    mNmea.ParseMessages();
     while (true)
     {
         Data data;
-        if (!mrDataQueue.GetLatestData(data, 90)) {
-            mNmea.ParseMessages();
-            delay(500);
-            continue;
+        if (mrDataQueue.GetLatestData(data, 2)) {
+            //mNmea.ParseMessages();
+            //ESP_LOGD(tag, "send DATA to display");
+            //delay(500);
+            //continue;
+        } else {
+            //mNmea.ParseMessages();
+            //delay(500);
+            data.avgcdir = 0;
+            data.avgcspeed = KnotsToms(0);
+            data.compassh = 0;
+            data.gpsspeed = KnotsToms(0);
+            data.gpsheading = 0;
+            data.dir = 0;
+            data.speed = KnotsToms(0);
+            data.lat = 47.940703;
+            data.lon = 13.595386;
+            data.time = 0;
+            //ESP_LOGD(tag, "send 0 to display");
         }
 
 
@@ -166,7 +189,7 @@ void NmeaDisplay::DisplayTask()
         //SetN2kMagneticHeading(n2kMsg1, 1, DegToRad(heading), 0);  
         SetN2kTrueHeading(n2kMsg1, 1, DegToRad(heading));  
         if(!mNmea.SendMsg(n2kMsg1)) {
-            ESP_LOGW(tag, "NMEA SendMsg failed");
+            ESP_LOGW(tag, "NMEA SendMsg failed - PGN127250");
         } 
 
         // PGN130306
@@ -174,7 +197,7 @@ void NmeaDisplay::DisplayTask()
         SetN2kWindSpeed(n2kMsg1, 1, aws, DegToRad(awa), N2kWind_Apparent);
         if (!mNmea.SendMsg(n2kMsg1))
         {
-            ESP_LOGW(tag, "NMEA SendMsg failed");
+            ESP_LOGW(tag, "NMEA SendMsg failed - PGN130306");
         }
 
       
@@ -196,13 +219,51 @@ void NmeaDisplay::DisplayTask()
         // PGN126992 --- requires 129026 SOG/COG and 129029 GNSS
         // System Time is set via GNSS updates
 
+        // PNG127489 --- Engine data
+        if (cnt >= 1000) {
+            cnt = 0;
+        }
+        double rpm = cnt++;
+
+        taskENTER_CRITICAL(&mCriticalSection);
+        double voltage = mfVoltage / 1000.0; // mV to V
+        double fuelRate = mfCurrent / 1000.0; // mA to A
+        double engineTemperature = CToKelvin(mfBoardTemp);
+        taskEXIT_CRITICAL(&mCriticalSection);
+
+
+        //SetN2kEngineDynamicParam(n2kMsg1, 0, 0, 0, 0, voltage, fuelRate, rpm, N2kDoubleNA, N2kDoubleNA, N2kInt8NA, N2kInt8NA, 0, 0);
+        SetN2kEngineDynamicParam(n2kMsg1, 0, 0, 0, engineTemperature, voltage, fuelRate, 500.0, N2kDoubleNA, N2kDoubleNA,  N2kInt8NA, N2kInt8NA, 0, 0);
+        if (!mNmea.SendMsg(n2kMsg1))
+        {
+            ESP_LOGW(tag, "NMEA SendMsg failed");
+        }
+
+        // PNG127488 --- Engine data
+        SetN2kEngineParamRapid(n2kMsg1, 0, rpm, N2kDoubleNA, N2kInt8NA);
+        if (!mNmea.SendMsg(n2kMsg1))
+        {
+            ESP_LOGW(tag, "NMEA SendMsg failed");
+        }
+
+        //     SetN2kEngineParamRapid(N2kMsg, 0, RPM, N2kDoubleNA, N2kInt8NA);
+
         mNmea.ParseMessages();
     } 
 }
 
-NmeaDisplay::NmeaDisplay(gpio_num_t canTX, gpio_num_t canRX, DataQueue &dataQueue) : mrDataQueue(dataQueue), mNmea(canTX, canRX)
+NmeaDisplay::NmeaDisplay(gpio_num_t canTX, gpio_num_t canRX, gpio_num_t canPower, DataQueue &dataQueue) : mrDataQueue(dataQueue), mNmea(canTX, canRX), mGpioPower(canPower)
 {
+    gpio_set_direction(mGpioPower, GPIO_MODE_OUTPUT);
+    gpio_set_level(mGpioPower, 0);
 }
 
+void NmeaDisplay::SetSystemInfo(float voltage, float current, float boardtemp) {
+    taskENTER_CRITICAL(&mCriticalSection);
+    mfVoltage = voltage;
+    mfCurrent = current;
+    mfBoardTemp = boardtemp;
+    taskEXIT_CRITICAL(&mCriticalSection);
+}
 
 

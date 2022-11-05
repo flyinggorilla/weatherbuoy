@@ -4,8 +4,9 @@
         "cmath": "cpp"
     },
     "idf.adapterTargetName": "esp32",
-    "idf.portWin": "COM5",
+    "idf.portWin": "COM16",
     "git.ignoredRepositories": [
         "c:\\users\\bernd\\esp\\esp-idf"
-    ]
+    ],
+    "idf.flashType": "UART"
 }
