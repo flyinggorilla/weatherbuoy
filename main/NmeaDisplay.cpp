@@ -102,17 +102,11 @@ void NmeaDisplay::DisplayTask()
     mNmea.ParseMessages();
     delay(500); // give the CAN bus and devices  time to initialize
     mNmea.ParseMessages();
+    
     while (true)
     {
         Data data;
-        if (mrDataQueue.GetLatestData(data, 2)) {
-            //mNmea.ParseMessages();
-            //ESP_LOGD(tag, "send DATA to display");
-            //delay(500);
-            //continue;
-        } else {
-            //mNmea.ParseMessages();
-            //delay(500);
+        if (!mrDataQueue.GetLatestData(data, 2)) {
             data.avgcdir = 0;
             data.avgcspeed = KnotsToms(0);
             data.compassh = 0;
@@ -123,7 +117,6 @@ void NmeaDisplay::DisplayTask()
             data.lat = 47.940703;
             data.lon = 13.595386;
             data.time = 0;
-            //ESP_LOGD(tag, "send 0 to display");
         }
 
 
