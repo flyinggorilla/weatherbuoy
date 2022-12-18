@@ -36,6 +36,7 @@ class NmeaDisplay {
         float mfCurrent = 0.0;
         float mfBoardTemp = 0.0;
         portMUX_TYPE mCriticalSection = portMUX_INITIALIZER_UNLOCKED;
+        int mNmeaErrors = 0;
 
 };
 

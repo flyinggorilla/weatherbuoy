@@ -4,7 +4,7 @@
     "private": true,
     "main": "testreceiver.js",
     "engines": {
-        "node": "14.x.x"
+        "node": "18.x.x"
     },
     "scripts": {
         "start": "node testreceiver.js"
@@ -14,7 +14,7 @@
         "double-ended-queue": "^2.1.0-0",
         "express": "^4.17.1",
         "https": "^1.0.0",
-        "openssl": "^1.1.0",
+        "openssl": "^2.0.0",
         "pem": "^1.14.4",
         "zlib": "^1.0.5"
     }

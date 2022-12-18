@@ -4,7 +4,7 @@
         "cmath": "cpp"
     },
     "idf.adapterTargetName": "esp32",
-    "idf.portWin": "COM16",
+    "idf.portWin": "COM3",
     "git.ignoredRepositories": [
         "c:\\users\\bernd\\esp\\esp-idf"
     ],

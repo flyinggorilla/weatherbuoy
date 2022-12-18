@@ -102,7 +102,8 @@ void NmeaDisplay::DisplayTask()
     mNmea.ParseMessages();
     delay(500); // give the CAN bus and devices  time to initialize
     mNmea.ParseMessages();
-    
+
+   
     while (true)
     {
         Data data;
@@ -175,6 +176,7 @@ void NmeaDisplay::DisplayTask()
         SetN2kGNSS(n2kMsg1, 1, systemDate, systemTime, latitude, longitude, altitude, N2kGNSSt_GPS, N2kGNSSm_GNSSfix, 10, hdop);
         if (!mNmea.SendMsg(n2kMsg1))
         {
+            mNmeaErrors++;
             ESP_LOGW(tag, "NMEA SendMsg failed");
         }
 
@@ -182,6 +184,7 @@ void NmeaDisplay::DisplayTask()
         //SetN2kMagneticHeading(n2kMsg1, 1, DegToRad(heading), 0);  
         SetN2kTrueHeading(n2kMsg1, 1, DegToRad(heading));  
         if(!mNmea.SendMsg(n2kMsg1)) {
+            mNmeaErrors++;
             ESP_LOGW(tag, "NMEA SendMsg failed - PGN127250");
         } 
 
@@ -190,6 +193,7 @@ void NmeaDisplay::DisplayTask()
         SetN2kWindSpeed(n2kMsg1, 1, aws, DegToRad(awa), N2kWind_Apparent);
         if (!mNmea.SendMsg(n2kMsg1))
         {
+            mNmeaErrors++;
             ESP_LOGW(tag, "NMEA SendMsg failed - PGN130306");
         }
 
@@ -198,6 +202,7 @@ void NmeaDisplay::DisplayTask()
         SetN2kCOGSOGRapid(n2kMsg1, 1, N2khr_true, DegToRad(cog), sog);
         if (!mNmea.SendMsg(n2kMsg1))
         {
+            mNmeaErrors++;
             ESP_LOGW(tag, "NMEA SendMsg failed");
         }
 
@@ -206,6 +211,7 @@ void NmeaDisplay::DisplayTask()
         SetN2kWindSpeed(n2kMsg1, 1, avgTws, DegToRad(avgTwd), N2kWind_True_North);
         if (!mNmea.SendMsg(n2kMsg1))
         {
+            mNmeaErrors++;
             ESP_LOGW(tag, "NMEA SendMsg failed");
         }
 
@@ -229,6 +235,7 @@ void NmeaDisplay::DisplayTask()
         SetN2kEngineDynamicParam(n2kMsg1, 0, 0, 0, engineTemperature, voltage, fuelRate, 500.0, N2kDoubleNA, N2kDoubleNA,  N2kInt8NA, N2kInt8NA, 0, 0);
         if (!mNmea.SendMsg(n2kMsg1))
         {
+            mNmeaErrors++;
             ESP_LOGW(tag, "NMEA SendMsg failed");
         }
 
@@ -236,6 +243,7 @@ void NmeaDisplay::DisplayTask()
         SetN2kEngineParamRapid(n2kMsg1, 0, rpm, N2kDoubleNA, N2kInt8NA);
         if (!mNmea.SendMsg(n2kMsg1))
         {
+            mNmeaErrors++;
             ESP_LOGW(tag, "NMEA SendMsg failed");
         }
 
