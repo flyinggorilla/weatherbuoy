@@ -78,30 +78,30 @@ esp_err_t http_event_handler(esp_http_client_event_t *evt)
             char *endptr = nullptr;
             long long timestamp_ms = strtoll(evt->header_value, &endptr, 10);
 
-            ESP_LOGD(tag, "HTTP response header Timestamp: %s, %lli", evt->header_value, timestamp_ms);
-
             struct timeval now;
             gettimeofday(&now, NULL);
             time_t delta_s = abs(timestamp_ms / 1000 - now.tv_sec);
 
+            ESP_LOGI(tag, "HTTP response header Timestamp: %s, %lli Delta: %lis", evt->header_value, timestamp_ms, delta_s);
+
             // adjust system time if more than 2 seconds off
             if (delta_s > 2)
             {
-                struct timeval delta;
-                delta.tv_sec = timestamp_ms / 1000 - now.tv_sec;
-                delta.tv_usec = (timestamp_ms % 1000) * 1000 - now.tv_usec;
-                if (adjtime(&delta, NULL))
-                {
+                //struct timeval delta;
+                //delta.tv_sec = timestamp_ms / 1000 - now.tv_sec;
+                //delta.tv_usec = (timestamp_ms % 1000) * 1000 - now.tv_usec;
+                //if (adjtime(&delta, NULL))
+                //{
                     // delta too large, setting time absolutely
                     now.tv_sec = timestamp_ms / 1000;
                     now.tv_usec = (timestamp_ms % 1000) * 1000;
                     settimeofday(&now, NULL);
                     ESP_LOGW(tag, "Adjusted system time by %li seconds.", delta_s);
-                }
-                else
-                {
-                    ESP_LOGW(tag, "Smooth system time adjustment by %li seconds.", delta_s);
-                }
+                //}
+                //else
+                //{
+                //    ESP_LOGW(tag, "Smooth system time adjustment by %li seconds.", delta_s);
+                //}
             }
         }
 
@@ -116,10 +116,10 @@ esp_err_t http_event_handler(esp_http_client_event_t *evt)
         ESP_LOGD(tag, "HTTP_EVENT_DISCONNECTED");
         int mbedtls_err = 0;
         esp_err_t err = esp_tls_get_and_clear_last_error((esp_tls_error_handle_t)(evt->data), &mbedtls_err, NULL);
-        if (err != 0)
+        if (err != ESP_OK)
         {
             ESP_LOGE(tag, "TLS: esp error code: 0x%x %s, mbedtls: 0x%x. Error cleared.", err, esp_err_to_name(err), mbedtls_err);
-            DnsLookup("atterwind.info");
+            //*****************DnsLookup("atterwind.info");
         }
         break;
         // case HTTP_EVENT_REDIRECT:
@@ -456,8 +456,8 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
 bool SendData::PerformHttpPost()
 {
 
-    ESP_LOGW(tag, "TESTING DNS LOOKUP.");
-    DnsLookup("atterwind.info");
+    //*******************ESP_LOGW(tag, "TESTING DNS LOOKUP.");
+    //*******************DnsLookup("atterwind.info");
 
     // Initialize URL and HTTP client
     if (!mhEspHttpClient)

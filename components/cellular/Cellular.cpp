@@ -14,8 +14,25 @@
 static const char tag[] = "Cellular";
 
 #if CONFIG_UART_ISR_IN_IRAM == 0
-#error UART function must be configured into IRAM, otherwise OTA will fail.
+#error UART function must be configured into IRAM, otherwise OTA will fail. (CONFIG_UART_ISR_IN_IRAM=y)
 #endif
+
+#if CONFIG_LWIP_IP4_REASSEMBLY == 0
+#error Config LWIP IP Reassembly must be enabled for proper TCP/IP communication over the Modem connection (CONFIG_LWIP_IP4_REASSEMBLY=y).
+#endif
+
+#ifdef CONFIG_LWIP_DHCP_DOES_ARP_CHECK
+#error No need to perform ARP checks when connected as only device on the local network to Mobile provider (#undefined CONFIG_LWIP_DHCP_DOES_ARP_CHECK).
+#endif
+
+//#if DHCP_DOES_ARP_CHECK == 1
+//#warning Config LWIP IP Reassembly must be enabled for proper TCP/IP communication over the Modem connection (CONFIG_LWIP_IP4_REASSEMBLY=y).
+//#endif
+
+//#if IP_REASSEMBLY == 0
+//#error Config LWIP IP Reassembly must be enabled for proper TCP/IP communication over the Modem connection (CONFIG_LWIP_IP4_REASSEMBLY=y).
+//#endif
+
 
 // ------------------------------------------
 // change device in Menuconfig->Cellular
