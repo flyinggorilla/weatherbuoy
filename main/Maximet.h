@@ -77,6 +77,8 @@ public:
     // * 999 if no solar sensor is available, or no measurement has been taken
     unsigned int SolarRadiation() { return muiSolarradiation; };
 
+    unsigned int GarbledDataStat() { return muiGarbledData; };
+
     Config &GetConfig() { return mMaximetConfig; };
 
 
@@ -177,6 +179,9 @@ private:
 
     // cached data
     unsigned int muiSolarradiation = 999;
+
+    // statistics
+    unsigned int muiGarbledData = 0;
 };
 
 #endif

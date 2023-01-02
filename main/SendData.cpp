@@ -438,6 +438,8 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
             mPostData += String(mrMaximetConfig.fLat, 6);
             mPostData += ",\"lon\": ";
             mPostData += String(mrMaximetConfig.fLong, 6);
+            mPostData += ",\"garbled\": ";
+            mPostData += mrMaximet.GarbledDataStat(); // NOTE: this is not threadsafe implemented
             mPostData += "}";
         }
         mPostData += "}";

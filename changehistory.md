@@ -3,9 +3,10 @@
 * Enabled IPv4 & IPv6 fragmented IP reassembly (finally eliminated http/lwip client sock=54 errors)
 * disable: DHCP: Perform ARP check on any offered address
 
+## 2023-01-02:
+* disabled gratituous ARP sending on LWIP
+* no longer smooth time upates, as that caused problems after restart
+* reset UART receive buffer after netif action stops, and wait for TX fifo clearance
 
 
-# TODO:
-* smooth time adjustment not working. is there a UTC / local time mismatch problem?? 
-  Or conflict with GPS??
-  Set non-smooth after start, and only later smooth?
+

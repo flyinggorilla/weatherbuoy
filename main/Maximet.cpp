@@ -19,7 +19,7 @@
 // AVGCDIR only calculated when GPS available
 
 static const char tag[] = "Maximet";
-#define SERIAL_BUFFER_SIZE (2048)
+#define SERIAL_BUFFER_SIZE (1024)
 #define SERIAL_BAUD_RATE (19200)
 
 void fMaximetTask(void *pvParameter)
@@ -186,6 +186,10 @@ void Maximet::MaximetTask()
             switch (parsingState)
             {
             case START:
+                if (c > 0x80 || c < 0) {
+                    // skip non-ascii char
+                    break;
+                }
                 if (c == STX)
                 {
                     parsingState = READCOLUMN;
@@ -223,6 +227,7 @@ while(data.line[dlpos]) {
                         if (!model) 
                         {
                             parsingState = GARBLED;
+                            ESP_LOGE(tag, "Garbled data, invalid Maximet model: %s", column.c_str());
                             continue;
                         }
                     }
@@ -644,6 +649,14 @@ while(data.line[dlpos]) {
                     lastShortAvgUptime = data.uptime + 60; // every 60 seconds!
                 }
 
+                break;
+            }
+
+            // check if garbled data detected
+            if (parsingState == GARBLED) {
+                muiGarbledData++;
+                ESP_LOGW(tag, "GARBLED data: %i bytes, parsing stage: %i", line.length(), parsingState);
+                ESP_LOG_BUFFER_HEXDUMP(tag, line.c_str(), line.length(), ESP_LOG_VERBOSE);
                 break;
             }
         }

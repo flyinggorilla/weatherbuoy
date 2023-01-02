@@ -12,12 +12,12 @@ Serial::Serial(unsigned int uartNo, unsigned int gpioRx, unsigned int gpioTx, in
 {
     miBaudRate = baudRate;
     muiUartNo = uartNo;
-    muiBufferSize = bufferSize;
+    muiRxBufferSize = bufferSize;
     muiBufferPos = 0;
     muiBufferLen = 0;
     mGpioRx = gpioRx;
     mGpioTx = gpioTx;
-    mpBuffer = (uint8_t *)malloc(muiBufferSize);
+    mpBuffer = (uint8_t *)malloc(muiRxBufferSize);
 }
 
 bool Serial::Attach()
@@ -30,8 +30,8 @@ bool Serial::Attach()
         .stop_bits = UART_STOP_BITS_1,
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .rx_flow_ctrl_thresh = 0,
-        .source_clk = UART_SCLK_APB
-        //.source_clk = UART_SCLK_REF_TICK // this should still work even when reducing power consumption with lowering clock speed (see power management docu)
+        .source_clk = UART_SCLK_APB // CPU clock 
+        //.source_clk = UART_SCLK_REF_TICK  //  only 1MHz!! this should still work even when reducing power consumption with lowering clock speed (see power management docu)
     };
 
     // defaults are....
@@ -48,7 +48,10 @@ bool Serial::Attach()
         ESP_LOGD(tag, "UART1 is used by flash memory. Be aware that you cannot use flash memory at the same time.");
         // https://www.lucadentella.it/en/2017/11/06/esp32-26-uart/
     }
-    ESP_ERROR_CHECK(uart_driver_install(muiUartNo, muiBufferSize, 0, 0, NULL, ESP_INTR_FLAG_IRAM));
+
+    // keep TX buffer size 0, so uart_write will always block till data had been sent
+    // Note UART RX buffer is twice as large as Serial class buffer
+    ESP_ERROR_CHECK(uart_driver_install(muiUartNo, muiRxBufferSize*2, 0, 0, NULL, ESP_INTR_FLAG_IRAM));
     ESP_ERROR_CHECK(uart_param_config(muiUartNo, &uart_config));
     ESP_ERROR_CHECK(uart_set_pin(muiUartNo, mGpioTx, mGpioRx, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
     mbAttached = true;
@@ -92,7 +95,7 @@ bool Serial::ReadIntoBuffer()
     muiBufferLen = 0;
     while (!muiBufferLen)
     {
-        int len = uart_read_bytes(muiUartNo, mpBuffer, muiBufferSize, 250 / portTICK_RATE_MS);
+        int len = uart_read_bytes(muiUartNo, mpBuffer, muiRxBufferSize, 250 / portTICK_RATE_MS);
         if (len < 0)
         {
             ESP_LOGE(tag, "Error reading from serial interface #%d", muiUartNo);
@@ -122,9 +125,9 @@ bool Serial::ReadIntoBuffer(unsigned int timeoutms)
     {
         maxBytesToRead = 1; // at least 1 character is expected to be read
     }
-    else if (maxBytesToRead > muiBufferSize)
+    else if (maxBytesToRead > muiRxBufferSize)
     {
-        maxBytesToRead = muiBufferSize;
+        maxBytesToRead = muiRxBufferSize;
     }
 
     int len = uart_read_bytes(muiUartNo, mpBuffer, maxBytesToRead, timeoutms / portTICK_RATE_MS);
@@ -196,7 +199,7 @@ bool Serial::ReadLine(String &line, unsigned int timeoutms)
         }
         else if (muiBufferPos > muiBufferLen)
         {
-            ESP_LOGE(tag, "SEVERE ERROR WITH BUFFER MANAGEMENT %u, %u, %u", muiBufferPos, muiBufferLen, muiBufferSize);
+            ESP_LOGE(tag, "SEVERE ERROR WITH BUFFER MANAGEMENT %u, %u, %u", muiBufferPos, muiBufferLen, muiRxBufferSize);
         }
     } while (line.length() < 4096); //  ######################################################################
     ESP_LOGE(tag, "No end of line found. Incorrect data or buffer too small.");
@@ -214,7 +217,7 @@ bool Serial::ReadLine2(String& line, unsigned int timeoutms) {
     line = "";
     bool cr = false;
     bool crlf = true;
-    int maxLineLength = muiBufferSize;
+    int maxLineLength = muiRxBufferSize;
     while(maxLineLength) {
         if (muiBufferPos == muiBufferLen) {
             if (!ReadIntoBuffer(timeoutms)) // false, only on serial error
@@ -254,11 +257,11 @@ void Serial::dump()
 {
 
     String buf;
-    buf.prepare(muiBufferSize);
+    buf.prepare(muiRxBufferSize);
     void *p = (void *)(buf.c_str());
     memcpy(p, mpBuffer, muiBufferLen);
     buf.setlength(muiBufferLen);
-    ESP_LOGW(tag, "POS %u LEN %u SIZE %u BUF \"%s\"", muiBufferPos, muiBufferLen, muiBufferSize, buf.c_str());
+    ESP_LOGW(tag, "POS %u LEN %u SIZE %u BUF \"%s\"", muiBufferPos, muiBufferLen, muiRxBufferSize, buf.c_str());
 }
 
 bool Serial::Write(const String &buffer)

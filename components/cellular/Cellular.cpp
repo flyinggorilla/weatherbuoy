@@ -25,6 +25,10 @@ static const char tag[] = "Cellular";
 #error No need to perform ARP checks when connected as only device on the local network to Mobile provider (#undefined CONFIG_LWIP_DHCP_DOES_ARP_CHECK).
 #endif
 
+#ifdef CONFIG_LWIP_ESP_GRATUITOUS_ARP
+#error No need to perform gratituitous ARP sends every 60 seconds for modem connection (#undefined CONFIG_LWIP_DHCP_DOES_ARP_CHECK).
+#endif
+
 //#if DHCP_DOES_ARP_CHECK == 1
 //#warning Config LWIP IP Reassembly must be enabled for proper TCP/IP communication over the Modem connection (CONFIG_LWIP_IP4_REASSEMBLY=y).
 //#endif
@@ -724,8 +728,8 @@ bool Cellular::PppNetifCreate()
     }
 
     // Init netif object
-    esp_netif_config_t cfg = ESP_NETIF_DEFAULT_PPP();
-    mpEspNetif = esp_netif_new(&cfg);
+    esp_netif_config_t espNetifConfig = ESP_NETIF_DEFAULT_PPP();
+    mpEspNetif = esp_netif_new(&espNetifConfig);
     assert(mpEspNetif);
 
     mModemNetifDriver.base.post_attach = esp_cellular_post_attach_start;
@@ -759,7 +763,7 @@ bool Cellular::PppNetifStop()
     }
 
     int attempts = 3;
-    while (attempts)
+    while (attempts--)
     {
         // stop Ppp activity and clear UART
         esp_netif_action_stop(mpEspNetif, 0, 0, nullptr);
@@ -767,6 +771,7 @@ bool Cellular::PppNetifStop()
         {
             mbCommandMode = true;
             ESP_LOGI(tag, "Netif action stopped");
+            ResetSerialBuffers();
             return true;
         }
         ESP_LOGW(tag, "Netif not DEAD after 30 seconds, which was left in phase %i %s, remaining attempts: %i", miPppPhase, PppPhaseText(miPppPhase), attempts);
@@ -794,10 +799,11 @@ bool Cellular::PppNetifStart()
     return true;
 }
 
-void Cellular::ResetInputBuffers()
+void Cellular::ResetSerialBuffers()
 {
-    ESP_LOGW(tag, "ResetInputbuffers(Mode=%s)", mbCommandMode ? "CMD" : "DATA");
+    ESP_LOGD(tag, "ResetInputbuffers(Mode=%s)", mbCommandMode ? "CMD" : "DATA");
     uart_flush_input(muiUartNo);
+    uart_wait_tx_done(muiUartNo, 1000/portTICK_PERIOD_MS);
     muiBufferLen = 0;
     muiBufferPos = 0;
 }
@@ -847,7 +853,7 @@ bool Cellular::ReadIntoBuffer(TickType_t timeout)
         // If fifo overflow happened, you should consider adding flow control for your application.
         // The ISR has already reset the rx FIFO,
         // As an example, we directly flush the rx buffer here in order to read more data.
-        ResetInputBuffers();
+        ResetSerialBuffers();
         ESP_LOGE(tag, "uart hw fifo overflow");
         return false;
     // Event of UART ring buffer full
@@ -855,7 +861,7 @@ bool Cellular::ReadIntoBuffer(TickType_t timeout)
         // If buffer full happened, you should consider increasing your buffer size
         // As an example, we directly flush the rx buffer here in order to read more data.
         ESP_LOGE(tag, "uart ring buffer full");
-        ResetInputBuffers();
+        ResetSerialBuffers();
         return false;
     case UART_BREAK:
         ESP_LOGD(tag, "uart break event.");
@@ -866,11 +872,11 @@ bool Cellular::ReadIntoBuffer(TickType_t timeout)
         return true; // important to return TRUE, as this event only indicates end of PPP, but no data corruption!!
     case UART_PARITY_ERR:
         ESP_LOGE(tag, "uart parity error");
-        ResetInputBuffers();
+        ResetSerialBuffers();
         return false;
     case UART_FRAME_ERR:
         ESP_LOGE(tag, "uart frame error");
-        ResetInputBuffers();
+        ResetSerialBuffers();
         return false;
     case UART_PATTERN_DET:
         break;

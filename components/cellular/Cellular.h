@@ -94,7 +94,7 @@ private:
     friend void esp_cellular_free_rx_buffer(void *h, void *buffer);
 
     bool ReadIntoBuffer(TickType_t timeout);
-    void ResetInputBuffers();
+    void ResetSerialBuffers();
     unsigned char *mpBuffer;
     unsigned int muiBufferSize;
     unsigned int muiBufferPos;
