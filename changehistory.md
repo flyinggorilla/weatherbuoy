@@ -8,5 +8,11 @@
 * no longer smooth time upates, as that caused problems after restart
 * reset UART receive buffer after netif action stops, and wait for TX fifo clearance
 
+## 20230104.1923:
+* set UART send buffer to 0 for blocking send calls. to ensure this isnt causing TCP/IP connect issues. at least it frees memory
+
+## 20230105.1306:
+* added quick HTTP client connect failure retry without restarting Modem
+
 
 
