@@ -423,7 +423,18 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
                     prepared = true;
                 }
 
-                if (sendData.PerformHttpPost())
+                bool httpPostSucceeded = false;
+                int httpAttempts = 3;
+                do {
+                    if(sendData.PerformHttpPost()) {
+                        httpPostSucceeded = true;
+                        break;
+                    } else {
+                        ESP_LOGE(tag, "HTTP Post request failed. Retrying HTTP request. Remaining attempts: %i", httpAttempts);
+                    }
+                } while (--httpAttempts);
+
+                if (httpPostSucceeded)
                 {
                     ESP_LOGI(tag, "Posting data succeeded. Switching to low power mode...");
                     mCellular.SwitchToLowPowerMode();
