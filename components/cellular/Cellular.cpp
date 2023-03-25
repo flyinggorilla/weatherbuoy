@@ -843,7 +843,7 @@ bool Cellular::ReadIntoBuffer(TickType_t timeout)
         if (len)
         {
             mullReceivedTotal += len;
-            ESP_LOGD(tag, "UART %s received: %d", mbCommandMode ? "RESPONSE" : "DATA", len);
+            ESP_LOGV(tag, "UART %s received: %d", mbCommandMode ? "RESPONSE" : "DATA", len);
             ESP_LOG_BUFFER_HEXDUMP(tag, mpBuffer, len, ESP_LOG_VERBOSE);
         }
         return true;
@@ -1233,7 +1233,7 @@ int Cellular::ModemWriteData(const char *data, int len)
     int iWriteLen = uart_write_bytes(muiUartNo, data, len);
     if (iWriteLen == len)
     {
-        ESP_LOGD(tag, "UART DATA bytes sent %d", len);
+        ESP_LOGV(tag, "UART DATA bytes sent %d", len);
         ESP_LOG_BUFFER_HEXDUMP(tag, data, len, ESP_LOG_VERBOSE);
         // ESP_LOGI(tag, "ModemWriteData(): %d bytes", len);
         mullSentTotal += len;

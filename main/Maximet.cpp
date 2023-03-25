@@ -1,4 +1,4 @@
-//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+// #define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -19,8 +19,6 @@
 // AVGCDIR only calculated when GPS available
 
 static const char tag[] = "Maximet";
-#define SERIAL_BUFFER_SIZE (1024)
-#define SERIAL_BAUD_RATE (19200)
 
 void fMaximetTask(void *pvParameter)
 {
@@ -186,8 +184,8 @@ void Maximet::MaximetTask()
             switch (parsingState)
             {
             case START:
-                if (c > 0x80 || c < 0) {
-                    // skip non-ascii char
+                if (c > 0x80) {
+                    // skip non-ascii char ... note that char is treated as unsigned by default (see CHAR_MIN)
                     break;
                 }
                 if (c == STX)
@@ -863,7 +861,9 @@ bool Maximet::EnterCommandLine()
     }
 
 
-    String cmd("\r\n*\r\necho off\r\n");
+    // sending % twice will print Maximet model info and serial number: "ID:2669 "MAXIMET GMX501-3B-0011" 2.00.23 [Q] PV=4" 
+    // sending * will enter commandline mode: "SETUP MODE"
+    String cmd("\r\nEXIT\r\n%%%%*\r\necho off\r\n");
     String line;
 
     // Note, Maximet boots for approx 26 seconds from cold-start, make sure to give it enough time to enter command line mode
@@ -873,12 +873,26 @@ bool Maximet::EnterCommandLine()
     while (attempts--)
     {
         mpSerial->Write(cmd);
+        ESP_LOGD(tag, "writing: %s", cmd.c_str());
+
         if (mpSerial->ReadLine(line, COMMANDLINE_TIMEOUT_MS))
         {
             ESP_LOGD(tag, "Switch Maximet to commandline...  ReadLine: %s", line.c_str());
         } 
         else {
             ESP_LOGW(tag, "Timeout switching Maximet to commandline... ");
+        }
+
+        if (line.charAt(0) == STX) {
+            ESP_LOGD(tag, "skipping data line");
+            mpSerial->ReadLine(line, COMMANDLINE_TIMEOUT_MS);
+        }
+        
+        if (line.startsWith("ID:"))
+        {
+            ESP_LOGI(tag, "%s", line.c_str());
+            mpSerial->ReadLine(line, COMMANDLINE_TIMEOUT_MS);
+
         }
         if (line.startsWith("SETUP MODE"))
         {
@@ -890,7 +904,7 @@ bool Maximet::EnterCommandLine()
             ESP_LOGI(tag, "Already in commandline mode.");
             return mbCommandline = true;
         }
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
+        vTaskDelay(1200 / portTICK_PERIOD_MS);
         ESP_LOGD(tag, "Remaining attempts switching Maximet to commandline: %i", attempts);
     }
 

@@ -195,7 +195,6 @@ void Esp32WeatherBuoy::Start()
         unsigned int voltage = max471Meter.Voltage();
         unsigned int current = max471Meter.Current();
         float boardtemp = tempSensors.GetBoardTemp();
-        float watertemp = tempSensors.GetWaterTemp();
         mpDisplay->SetSystemInfo(voltage, current, boardtemp);
     }
 
@@ -461,7 +460,7 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
         // Power Managment
         // -----------------------------------------------------------
         // determine nighttime by low solar radiation
-        ESP_LOGI(tag, "Solarradiation: %d W/m²  Voltage: %.02fV", maximet.SolarRadiation(), voltage / 1000.0);
+        ESP_LOGI(tag, "Solarradiation: %d W/m2  Voltage: %.02fV", maximet.SolarRadiation(), voltage / 1000.0);
         if (maximet.SolarRadiation() > CONFIG_SOLARRADIATIONMIN_DAYTIME && voltage > 13100)
         {
             secondsToSleep = mConfig.miIntervalDay; // s;
