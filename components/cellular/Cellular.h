@@ -12,7 +12,8 @@
 static const TickType_t UART_INPUT_TIMEOUT_CMDSHORT = 1* 1000 / portTICK_PERIOD_MS;  // 1s only used for quickly pinging
 static const TickType_t UART_INPUT_TIMEOUT_CMDNORMAL = 30 * 1000 / portTICK_PERIOD_MS;
 static const TickType_t UART_INPUT_TIMEOUT_CMDLONG = 120 * 1000 / portTICK_PERIOD_MS; // 120s is defined in spec as max response time for such long running queries
-static const TickType_t UART_INPUT_TIMEOUT_PPP = 30 * 1000 / portTICK_PERIOD_MS;
+#pragma message "PPP TIMEOUT PROBABLY TO SMALL 60s for testing use 300s for PROD???"
+static const TickType_t UART_INPUT_TIMEOUT_PPP = 60 * 1000 / portTICK_PERIOD_MS;
 
 class Cellular;
 
@@ -22,13 +23,29 @@ typedef struct esp_cellular_netif_driver_s {
     Cellular               *pCellular;        /*!< ptr to the esp_modem objects (DTE) */
 } esp_cellular_netif_driver_t;
 
+enum PowerMode {
+    POWER_OFF,
+    POWER_SLEEP,
+    POWER_ON
+};
 
 class Cellular {
 public:
     Cellular();
-	bool InitModem(); // call before Start()
+
+	/// @brief  Initialize. Only needed once. Starts the worker thread.
+	/// @return true if successful
+	bool Init(String apn, String user, String pass, String preferredOperator, int preferredNetwork); // call before Start()
+
+    /// @brief Power up the Simcom modem
+    /// @return true if successful
+    bool PowerUp();
+
+    /// @brief  Power down the Simcom modem
+    /// @return true if successful
+    bool PowerDown();
+
 	virtual ~Cellular();
-    void Start(String apn, String user, String pass, String preferredOperator, int preferredNetwork); // call after Init()
     void ReadSMS();
 
     // send SMS message
@@ -39,7 +56,7 @@ public:
     bool Command(const char *sCommand,const char *sSuccess, String *sResponse = nullptr, const char *sInfo = nullptr, unsigned short maxLines = 100, TickType_t timeout = UART_INPUT_TIMEOUT_CMDNORMAL);
     bool SwitchToCommandMode(); // todo, move to private
     bool SwitchToPppMode(); // can be moved to private
-    bool SwitchToLowPowerMode();
+    bool SwitchToSleepMode();
     bool SwitchToFullPowerMode();
     void QuerySignalStatus();
 
@@ -56,20 +73,35 @@ public:
     int    miSignalQuality = -1;
 
 private:
-    bool PowerOn();
+
+    /// @brief configures Simcom modem
+    /// @return true if config worked 
+    bool ModemConfigure(); // call after Init()
+
+    /// @brief runs hardware Simcom power ON sequence
+    /// @return true if Modem is powered ON
+    bool ModemPowerOnSequence();
+
+    /// @brief runs hardware Simcom power ON sequence
+    /// @return true if Modem is powered ON
+    bool ModemPowerOffSequence();
+
+    /// @brief initialize network drivers to work with PPP. call only once!
+    /// @return true if successful
     bool InitNetwork();
 
 
-    // establish network connection on top of every successful modem CONNECT
+    /// @brief establish network connection on top of every successful modem CONNECT
+    /// @return true if successful
     bool PppNetifStart();
 
-    // make sure to destroy the netif after use.
+    /// @brief make sure to destroy the netif after use.
     bool PppNetifStop();
 
-    // creates a new PPP network interface; destroys the old one if exists.
+    /// @brief creates a new PPP network interface; destroys the old one if exists.
     bool PppNetifCreate();
 
-    // check if Ppp netif interface and Ppp mode is enabled, and ready for data communication
+    /// @brief check if Ppp netif interface and Ppp mode is enabled, and ready for data communication
     bool PppNetifUp();
 
 
@@ -110,7 +142,8 @@ private:
     String msPass;
 
     bool mbCommandMode = true;
-    bool mbPowerSaverActive = false;
+    //bool mbPowerSaverActive = false;
+    PowerMode mPowerMode = POWER_OFF;
     int miPppPhase = NETIF_PPP_PHASE_DEAD;
 
     SemaphoreHandle_t mxPppConnected;

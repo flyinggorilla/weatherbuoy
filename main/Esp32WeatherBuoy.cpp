@@ -211,12 +211,11 @@ void Esp32WeatherBuoy::Start()
     //ESP_LOGE(tag, "remove http client logging!");
 
     //ESP_LOGE(tag, "remove simulator check!");
-    //if (!mConfig.miSimulator && mCellular.InitModem())
+    //if (!mConfig.miSimulator && mCellular.Init())
 
     // detect available Simcom 7600E Modem, such as on Lillygo PCI board
-    if (mCellular.InitModem())
+    if (mCellular.Init(mConfig.msCellularApn, mConfig.msCellularUser, mConfig.msCellularPass, mConfig.msCellularOperator, mConfig.miCellularNetwork) && mCellular.PowerUp())
     {
-        mCellular.Start(mConfig.msCellularApn, mConfig.msCellularUser, mConfig.msCellularPass, mConfig.msCellularOperator, mConfig.miCellularNetwork);
         mOnlineMode = MODE_CELLULAR;
 
         // mCellular.ReadSMS(); // use only during firmware setup to receive a SIM based code
@@ -435,8 +434,15 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
 
                 if (httpPostSucceeded)
                 {
+//#define TEST_POWERDOWN
+#ifdef TEST_POWERDOWN                    
+                    ESP_LOGE(tag, "Posting data succeeded. *************POWERING DOWN FOR TEST PURPOSE************");
+                    mCellular.PowerDown();
+#else
                     ESP_LOGI(tag, "Posting data succeeded. Switching to low power mode...");
-                    mCellular.SwitchToLowPowerMode();
+                    mCellular.SwitchToSleepMode();
+
+#endif
                     int duration = (unsigned int)(esp_timer_get_time() / 1000000) - uptimeSeconds;
                     ESP_LOGI(tag, "Total data send duration %is.", duration);
                     break;
@@ -444,7 +450,8 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
                 else
                 {
                     ESP_LOGE(tag, "Failed to perform HTTP Post. Shutting down modem. Remaining attempts: %i", attempts);
-                    mCellular.SwitchToLowPowerMode();
+                    //mCellular.SwitchToSleepMode();
+                    mCellular.PowerDown();
                 }
 
             } while (--attempts);
