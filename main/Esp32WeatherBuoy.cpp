@@ -73,12 +73,16 @@ static const char tag[] = "WeatherBuoy";
 #define CONFIG_WATCHDOG_SECONDS 60 * 65   // 65min - if hourly send including retries fail,then lets restart
 #define CONFIG_SOLARRADIATIONMIN_DAYTIME 2 // >2W/m2 solar radiation to declare DAYTIME
 
+
+
 Esp32WeatherBuoy::Esp32WeatherBuoy()
 {
 }
 Esp32WeatherBuoy::~Esp32WeatherBuoy()
 {
 }
+
+
 
 extern "C"
 {
@@ -114,20 +118,19 @@ __NOINIT_ATTR unsigned int cellularNetifPppConnects;
 #define CELLULAR_RESTART_NONE 4
 ***/
 
+// these variables survive software restarts
+// those must be initialized explicitly by checking reset reason power-up 
+RTC_NOINIT_ATTR int rtcVarModemRestarts;
+
+
 void Esp32WeatherBuoy::Start()
 {
-    /***
     // reset diagnostics variables, if not soft-restart
-    if (esp_reset_reason() != ESP_RST_SW || cellularInit != 0)
+    if (esp_reset_reason() == ESP_RST_POWERON || esp_reset_reason() == ESP_RST_BROWNOUT)
     {
         ESP_LOGI(tag, "Resetting diagnostics variables");
-        cellularInit = 0;
-        cellularNetifPppConnects = 0;
-        cellularRestarts = 0;
-        cellularNetifRecreates = 0;
-        cellularRestartReason = 0;
+        rtcVarModemRestarts = 0;
     }
-    ***/
 
 
 #if LOG_LOCAL_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG || CONFIG_LOG_DEFAULT_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG

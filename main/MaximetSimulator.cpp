@@ -159,7 +159,7 @@ void MaximetSimulator::MaximetSimulatorTask()
         }
 
         // enter commandline mode
-        if (msInputLine.startsWith("*"))
+        if (msInputLine.contains("*"))
         {
             ESP_LOGI(tag, "Requested commandline mode with *.");
             if (mbCommandline)

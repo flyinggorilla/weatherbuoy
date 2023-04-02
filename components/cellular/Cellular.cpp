@@ -29,6 +29,11 @@ static const char tag[] = "Cellular";
 #error No need to perform gratituitous ARP sends every 60 seconds for modem connection (#undefined CONFIG_LWIP_DHCP_DOES_ARP_CHECK).
 #endif
 
+#ifdef CONFIG_LWIP_PPP_ENABLE_IPV6
+#error Avoid receiving an IPv6 IP address via PPP
+#endif
+
+
 //#if DHCP_DOES_ARP_CHECK == 1
 //#warning Config LWIP IP Reassembly must be enabled for proper TCP/IP communication over the Modem connection (CONFIG_LWIP_IP4_REASSEMBLY=y).
 //#endif
@@ -754,7 +759,7 @@ void Cellular::ReceiverTask()
 bool Cellular::InitNetwork()
 {
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_event_loop_create_default());
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, cellularEventHandler, this, nullptr));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, cellularEventHandler, this, nullptr));
 
