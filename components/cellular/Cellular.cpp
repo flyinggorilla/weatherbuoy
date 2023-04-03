@@ -749,9 +749,9 @@ void Cellular::ReceiverTask()
         }
         else
         {
-            ESP_LOGD(tag, "ReceiverTask(%s) %i min timeout ReadIntoBuffer returned false. Stopping PPP network interface.", 
-                    mbCommandMode ? "CMD" : "DATA", (int)(UART_INPUT_TIMEOUT_PPP * portTICK_PERIOD_MS / 1000));
             PppNetifStop();
+            ESP_LOGD(tag, "ReceiverTask(%s) %is timeout ReadIntoBuffer returned false. Stopped PPP network interface.", 
+                    mbCommandMode ? "CMD" : "DATA", (int)(UART_INPUT_TIMEOUT_PPP * portTICK_PERIOD_MS / 1000));
         }
     }
 }
@@ -870,7 +870,7 @@ bool Cellular::ReadIntoBuffer(TickType_t timeout)
     // Waiting for UART event.
     if (pdTRUE != xQueueReceive(mhUartEventQueueHandle, (void *)&event, timeout))
     {
-        ESP_LOGD(tag, "ReadIntoBuffer timeout at xQueueReceive. Mode=%s", mbCommandMode ? "CMD" : "DATA");
+        ESP_LOGW(tag, "ReadIntoBuffer timeout at xQueueReceive. Mode=%s", mbCommandMode ? "CMD" : "DATA");
         return false;
     }
 

@@ -4,6 +4,8 @@
 #include "esp_system.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "RtcVariables.h"
+
 
 static const char tag[] = "Watchdog";
 
@@ -30,6 +32,7 @@ void Watchdog::WatchdogTask() {
             ESP_LOGW(tag, "Watchdog cleared.");
         } else {
             ESP_LOGW(tag, "Watchdog triggered. restarting.");
+            RtcVariables::SetExtendedResetReason(RtcVariables::EXTENDED_RESETREASON_WATCHDOG);
             esp_restart();
         }
     }

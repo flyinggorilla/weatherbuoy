@@ -17,6 +17,7 @@
 #include "esp_ota_ops.h"
 #include "NmeaDisplay.h"
 #include "Alarm.h"
+#include "RtcVariables.h"
 
 static const char tag[] = "WeatherBuoy";
 
@@ -104,33 +105,11 @@ void TestATCommands(Cellular &cellular);
 void TestVelocityVector();
 
 
-/****
-// these variables survive soft-restarts; dont initialize
-__NOINIT_ATTR unsigned int cellularInit;
-__NOINIT_ATTR unsigned int cellularRestarts;
-__NOINIT_ATTR unsigned int cellularRestartReason;
-__NOINIT_ATTR unsigned int cellularNetifRecreates;
-__NOINIT_ATTR unsigned int cellularNetifPppConnects;
-#define CELLULAR_RESTART_NONE 0
-#define CELLULAR_RESTART_NETIFATTACHFAILED 1
-#define CELLULAR_RESTART_ENTERCMDFAILED 2
-#define CELLULAR_RESTART_TURNONMODEMFAILED 3
-#define CELLULAR_RESTART_NONE 4
-***/
-
-// these variables survive software restarts
-// those must be initialized explicitly by checking reset reason power-up 
-RTC_NOINIT_ATTR int rtcVarModemRestarts;
-
 
 void Esp32WeatherBuoy::Start()
 {
-    // reset diagnostics variables, if not soft-restart
-    if (esp_reset_reason() == ESP_RST_POWERON || esp_reset_reason() == ESP_RST_BROWNOUT)
-    {
-        ESP_LOGI(tag, "Resetting diagnostics variables");
-        rtcVarModemRestarts = 0;
-    }
+    RtcVariables::Init();
+    ESP_LOGI(tag, "*********** RTC VARIABLE MODEM POWER DOWNS ==> %i", RtcVariables::GetModemRestarts());
 
 
 #if LOG_LOCAL_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG || CONFIG_LOG_DEFAULT_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG
@@ -284,6 +263,7 @@ void Esp32WeatherBuoy::HandleAlarm(Alarm *pAlarm)
     if (!mCellular.SwitchToFullPowerMode())
     {
         ESP_LOGE(tag, "SEVERE, Switching to full power mode failed. Restarting.");
+        RtcVariables::SetExtendedResetReason(RtcVariables::EXTENDED_RESETREASON_MODEMFULLPOWERFAILED);
         esp_restart();
         return;
     }
@@ -432,6 +412,7 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
                         break;
                     } else {
                         ESP_LOGE(tag, "HTTP Post request failed. Retrying HTTP request. Remaining attempts: %i", httpAttempts);
+                        vTaskDelay(1000/portTICK_PERIOD_MS); // wait one second
                     }
                 } while (--httpAttempts);
 
@@ -454,10 +435,18 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
                 {
                     ESP_LOGE(tag, "Failed to perform HTTP Post. Shutting down modem. Remaining attempts: %i", attempts);
                     //mCellular.SwitchToSleepMode();
+                    RtcVariables::IncModemRestarts();
                     mCellular.PowerDown();
                 }
 
             } while (--attempts);
+
+            if (attempts == 0) {
+                RtcVariables::SetExtendedResetReason(RtcVariables::EXTENDED_RESETREASON_CONNECTIONRETRIES);
+            }
+
+            ESP_LOGI(tag, "*********** RTC VARIABLE MODEM POWER DOWNS ==> %i", RtcVariables::GetModemRestarts());
+
         }
 
         // display runs on power, so no worries about power management

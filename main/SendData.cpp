@@ -15,6 +15,7 @@
 #include "Maximet.h"
 #include "string.h"
 #include "assert.h"
+#include "RtcVariables.h"
 
 static const char tag[] = "SendData";
 static const int SENDDATA_QUEUE_SIZE = (3);
@@ -337,7 +338,7 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
     {
         mPostData += ",\"diagnostics\": {";
         mPostData += "\"resetreason\": \"";
-        mPostData += esp32_getresetreasontext(esp_reset_reason());
+        mPostData += RtcVariables::GetExtendedResetReasonText(); //esp32_getresetreasontext(esp_reset_reason());
         mPostData += "\", \"esp-idf-version\": \"";
         mPostData += esp_ota_get_app_description()->idf_ver;
         mPostData += "\",\"targeturl\": \"";
@@ -382,7 +383,9 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
             mPostData += mrConfig.miCellularNetwork;
             mPostData += ", \"prefoperator\": \"";
             mPostData += mrConfig.msCellularOperator;
-            mPostData += "\"}";
+            mPostData += "\", \"restarts\": ";
+            mPostData += RtcVariables::GetModemRestarts();
+            mPostData += "}";
         }
         if (mrConfig.mbNmeaDisplay)
         {
@@ -778,7 +781,7 @@ bool SendData::PerformHttpPost()
             };
 
             mbRestart = false;
-            if (command.equals("restart") || command.equals("config") || command.equals("udpate"))
+            if (command.equals("restart") || command.equals("config") || command.equals("update"))
             {
                 if (updateConfig)
                 {
@@ -786,6 +789,17 @@ bool SendData::PerformHttpPost()
                     ESP_LOGI(tag, "New configuration received and SAVED.");
                 }
                 mbRestart = true;
+
+                // reset RTC static variables
+                RtcVariables::Reset();
+                if(command.equals("restart")) {
+                    RtcVariables::SetExtendedResetReason(RtcVariables::EXTENDED_RESETREASON_USER);
+                }
+
+                if(command.equals("config")) {
+                    RtcVariables::SetExtendedResetReason(RtcVariables::EXTENDED_RESETREASON_CONFIG);
+                }
+
             }
             else if (command.equals("diagnose"))
             {
@@ -795,6 +809,8 @@ bool SendData::PerformHttpPost()
             // Optionally Execute OTA Update command
             if (command.equals("update"))
             {
+                RtcVariables::SetExtendedResetReason(RtcVariables::EXTENDED_RESETREASON_FIRMWAREUPDATE);
+
                 mbRestart = true;
                 Cleanup();
                 memset(&mEspHttpClientConfig, 0, sizeof(esp_http_client_config_t));

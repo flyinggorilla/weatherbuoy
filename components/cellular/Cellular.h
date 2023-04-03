@@ -9,11 +9,10 @@
 #include "esp_netif_ppp.h"
 
 
-static const TickType_t UART_INPUT_TIMEOUT_CMDSHORT = 1* 1000 / portTICK_PERIOD_MS;  // 1s only used for quickly pinging
-static const TickType_t UART_INPUT_TIMEOUT_CMDNORMAL = 30 * 1000 / portTICK_PERIOD_MS;
-static const TickType_t UART_INPUT_TIMEOUT_CMDLONG = 120 * 1000 / portTICK_PERIOD_MS; // 120s is defined in spec as max response time for such long running queries
-#pragma message "PPP TIMEOUT PROBABLY TO SMALL 60s for testing use 300s for PROD???"
-static const TickType_t UART_INPUT_TIMEOUT_PPP = 60 * 1000 / portTICK_PERIOD_MS;
+static const TickType_t UART_INPUT_TIMEOUT_CMDSHORT  =      1 * 1000 / portTICK_PERIOD_MS;  // 1s only used for quickly pinging
+static const TickType_t UART_INPUT_TIMEOUT_CMDNORMAL =     30 * 1000 / portTICK_PERIOD_MS;
+static const TickType_t UART_INPUT_TIMEOUT_CMDLONG   = 60 * 2 * 1000 / portTICK_PERIOD_MS; // 120s is defined in spec as max response time for such long running queries
+static const TickType_t UART_INPUT_TIMEOUT_PPP       = 60 * 2 * 1000 / portTICK_PERIOD_MS;
 
 class Cellular;
 

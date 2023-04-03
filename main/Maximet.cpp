@@ -11,6 +11,7 @@
 #include "Serial.h"
 #include "EspString.h"
 #include "VelocityVector.h"
+#include "RtcVariables.h"
 
 //====================================================================================
 // Maximet Notes:
@@ -738,6 +739,7 @@ void Maximet::Stop()
         if (secondsToStop > 60 * 3)
         {
             ESP_LOGE(tag, "could not stop Maximet task, rebooting");
+            RtcVariables::SetExtendedResetReason(RtcVariables::EXTENDED_RESETREASON_ERROR);
             esp_restart();
         }
     }
