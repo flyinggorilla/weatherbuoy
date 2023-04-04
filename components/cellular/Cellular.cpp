@@ -1,4 +1,4 @@
-// #define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "sdkconfig.h"
 #include "Cellular.h"
 #include "EspString.h"
@@ -600,17 +600,22 @@ bool Cellular::ModemConfigure()
     }
 #endif
 
-    if (Command("AT+CSQ", "OK", &response, "Signal Quality Report"))
-    { // +CSQ: 13,0
-        String sq;
-        sq = response.substring(6, response.indexOf(","));
-        miSignalQuality = sq.toInt();
-        ESP_LOGI(tag, "Signal Quality: %i, (%s)", miSignalQuality, sq.c_str());
+    // retrieve Signal quality only when it hasnt been set yet. 
+    // In other cases it is better to retrieve signal quality at end of data transfer
+    if (miSignalQuality < 0) {
+        if (Command("AT+CSQ", "OK", &response, "Signal Quality Report"))
+        { // +CSQ: 13,0
+            String sq;
+            sq = response.substring(6, response.indexOf(","));
+            miSignalQuality = sq.toInt();
+            ESP_LOGI(tag, "Signal Quality: %i, (%s)", miSignalQuality, sq.c_str());
+        }
+        else
+        {
+            miSignalQuality = -1;
+        }        
     }
-    else
-    {
-        miSignalQuality = -1;
-    }
+
 
     Command("AT+CNUM", "OK", &response, "Subscriber Number"); // +CNUM: "","+43681207*****",145,0,4
     msSubscriber = "";
@@ -944,6 +949,8 @@ bool Cellular::SwitchToSleepMode()
         return false;
     }
 
+    QuerySignalStatus();
+
     String response;
     if (Command("AT+CFUN=0", "OK", &response, "Set modem to minimum functionality."))
     { // mode 4 would shut down RF entirely to "flight-mode"; mode 0 still keeps SMS receiption intact
@@ -1078,8 +1085,6 @@ bool Cellular::SwitchToFullPowerMode()
 
     ESP_LOGI(tag, "Switching to full power mode completed.");
 
-    QuerySignalStatus();
-
     return true;
 }
 
@@ -1122,14 +1127,6 @@ void Cellular::QuerySignalStatus()
         }
     }
     ESP_LOGI(tag, "Network mode: %s", msNetworkmode.c_str());
-
-    Command("AT+COPS?", "OK", &response, "Operator Selection"); // +COPS: 0,0,"A1" // CONFIG_LILYGO_TTGO_TCALL14_SIM800
-                                                                // +COPS: 0,0,"yesss!",2 // SIM7600
-    if (response.startsWith("+COPS: "))
-    {
-        msOperator = response.substring(response.indexOf(",\"") + 2, response.lastIndexOf("\""));
-    }
-    ESP_LOGI(tag, "Operator: %s", msOperator.c_str());
 
     if (Command("AT+CSQ", "OK", &response, "Signal Quality Report"))
     { // +CSQ: 13,0
@@ -1361,8 +1358,9 @@ bool Cellular::ModemReadResponse(String &sResponse, const char *expectedLastLine
         }
         else if (sLine.startsWith("+PPPD: DISCONNECTED")) // Sent by ESP-IDF PPP Layer, without OK
         {
+            // unsolicited response, ensure to read next line
             ESP_LOGI(tag, "PPP Daemon disconnected.");
-            return false;
+            continue;
         }
         else if (sLine.startsWith("ERROR") || sLine.startsWith("NO CARRIER") || sLine.startsWith("+CME ERROR") || sLine.startsWith("+CMS ERROR"))
         {
