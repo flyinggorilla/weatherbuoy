@@ -809,8 +809,6 @@ bool SendData::PerformHttpPost()
             // Optionally Execute OTA Update command
             if (command.equals("update"))
             {
-                RtcVariables::SetExtendedResetReason(RtcVariables::EXTENDED_RESETREASON_FIRMWAREUPDATE);
-
                 mbRestart = true;
                 Cleanup();
                 memset(&mEspHttpClientConfig, 0, sizeof(esp_http_client_config_t));
@@ -834,10 +832,12 @@ bool SendData::PerformHttpPost()
                 err = esp_https_ota(&mEspHttpClientConfig);
                 if (err == ESP_OK)
                 {
+                    RtcVariables::SetExtendedResetReason(RtcVariables::EXTENDED_RESETREASON_FIRMWAREUPDATE);
                     ESP_LOGI(tag, "Successful OTA update");
                 }
                 else
                 {
+                    RtcVariables::SetExtendedResetReason(RtcVariables::EXTENDED_RESETREASON_ERROR);
                     ESP_LOGE(tag, "Error reading response %s", esp_err_to_name(err));
                 }
             }

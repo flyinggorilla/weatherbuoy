@@ -377,7 +377,8 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
 
         if (mOnlineMode == MODE_CELLULAR)
         {
-            int attempts = 5;
+            const int MAX_ATTEMPTS = 5;
+            int attempts = MAX_ATTEMPTS;
             bool prepared = false;
             do
             {
@@ -385,6 +386,10 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
                 if (!mCellular.SwitchToFullPowerMode())
                 {
                     ESP_LOGE(tag, "SEVERE, Switching to full power mode failed. Remaining attempts: %i", attempts);
+                    if (attempts < MAX_ATTEMPTS) {
+                        RtcVariables::IncModemRestarts();
+                        mCellular.PowerDown();
+                    }
                     continue;
                 }
 
@@ -392,6 +397,10 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
                 if (!mCellular.SwitchToPppMode())
                 {
                     ESP_LOGE(tag, "SEVERE, Failed to switch to PPP mode. Remaining attempts: %i", attempts);
+                    if (attempts < MAX_ATTEMPTS) {
+                        RtcVariables::IncModemRestarts();
+                        mCellular.PowerDown();
+                    }
                     continue;
                 };
 
@@ -434,6 +443,8 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
 
             if (attempts == 0) {
                 RtcVariables::SetExtendedResetReason(RtcVariables::EXTENDED_RESETREASON_CONNECTIONRETRIES);
+                ESP_LOGE(tag, "SEVERE, Too many attempts to connect to server failed. Restarting.");
+                esp_restart();
             }
         }
 

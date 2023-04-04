@@ -24,3 +24,8 @@
 
 * added Maximet %% command and print to log for exact model number
 * updated to ESP-IDF v4.4.4
+
+## 20230404.0823
+
+* added Modem power cycling after too many HTTP connectivity issues
+* added extended Software restart reason, for diagnostics
