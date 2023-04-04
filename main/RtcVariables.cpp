@@ -27,7 +27,7 @@ void RtcVariables::Init() {
 void RtcVariables::Reset() {
     rtcVarModemRestarts = 0;
     rtcVarResetReason = ExtendedResetReason::EXTENDED_RESETREASON_NONE;
-    ESP_LOGW(tag, "Resetting RTC Variables!!");
+    ESP_LOGI(tag, "Resetting RTC Variables.");
 }
 
 void RtcVariables::IncModemRestarts() {

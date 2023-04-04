@@ -1,4 +1,4 @@
-#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+// #define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "sdkconfig.h"
 #include "esp_system.h"
 #include "esp_log.h"
@@ -109,8 +109,6 @@ void TestVelocityVector();
 void Esp32WeatherBuoy::Start()
 {
     RtcVariables::Init();
-    ESP_LOGI(tag, "*********** RTC VARIABLE MODEM POWER DOWNS ==> %i", RtcVariables::GetModemRestarts());
-
 
 #if LOG_LOCAL_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG || CONFIG_LOG_DEFAULT_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG
     esp_log_level_set("Cellular", ESP_LOG_DEBUG);
@@ -418,23 +416,16 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
 
                 if (httpPostSucceeded)
                 {
-//#define TEST_POWERDOWN
-#ifdef TEST_POWERDOWN                    
-                    ESP_LOGE(tag, "Posting data succeeded. *************POWERING DOWN FOR TEST PURPOSE************");
-                    mCellular.PowerDown();
-#else
                     ESP_LOGI(tag, "Posting data succeeded. Switching to low power mode...");
                     mCellular.SwitchToSleepMode();
 
-#endif
                     int duration = (unsigned int)(esp_timer_get_time() / 1000000) - uptimeSeconds;
                     ESP_LOGI(tag, "Total data send duration %is.", duration);
                     break;
                 }
                 else
                 {
-                    ESP_LOGE(tag, "Failed to perform HTTP Post. Shutting down modem. Remaining attempts: %i", attempts);
-                    //mCellular.SwitchToSleepMode();
+                    ESP_LOGE(tag, "Failed to perform HTTP Post. Power cycling modem. Remaining attempts: %i", attempts);
                     RtcVariables::IncModemRestarts();
                     mCellular.PowerDown();
                 }
@@ -444,9 +435,6 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
             if (attempts == 0) {
                 RtcVariables::SetExtendedResetReason(RtcVariables::EXTENDED_RESETREASON_CONNECTIONRETRIES);
             }
-
-            ESP_LOGI(tag, "*********** RTC VARIABLE MODEM POWER DOWNS ==> %i", RtcVariables::GetModemRestarts());
-
         }
 
         // display runs on power, so no worries about power management
@@ -471,7 +459,7 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
             ESP_LOGI(tag, "Sending data at nighttime interval every %d minutes", secondsToSleep / 60);
         }
         else
-        { // got into low battery mode if voltage is below 12.5V
+        { // got into low battery mode if voltage is below 12.75V
             secondsToSleep = mConfig.miIntervalLowbattery;
             ESP_LOGI(tag, "Sending data in low-battery mode every %d minutes", secondsToSleep / 60);
         }

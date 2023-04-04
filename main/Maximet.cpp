@@ -865,7 +865,7 @@ bool Maximet::EnterCommandLine()
 
     // sending % twice will print Maximet model info and serial number: "ID:2669 "MAXIMET GMX501-3B-0011" 2.00.23 [Q] PV=4" 
     // sending * will enter commandline mode: "SETUP MODE"
-    String cmd("\r\nEXIT\r\n%%%%*\r\necho off\r\n");
+    String cmd("\r\nEXIT\r\n%%%%*\r\nECHO OFF\r\n");
     String line;
 
     // Note, Maximet boots for approx 26 seconds from cold-start, make sure to give it enough time to enter command line mode

@@ -158,6 +158,14 @@ void MaximetSimulator::MaximetSimulatorTask()
             continue;
         }
 
+        if (msInputLine.contains("%%%%"))
+        {
+            // ID:2669 "MAXIMET GMX501-3B-0011" 2.00.23 [Q] PV=4
+            String response;
+            response.printf("ID:0007 \"MAXIMETSIMULATOR %s\" 2.00.23 [Q] PV=4",  Maximet::GetModelName(mMaximetModel));
+            SendLine(response);
+        }
+
         // enter commandline mode
         if (msInputLine.contains("*"))
         {
@@ -185,7 +193,9 @@ void MaximetSimulator::MaximetSimulatorTask()
         {
             SendLine("");
             mbCommandline = false;
+            continue;
         }
+
         if (msInputLine.equalsIgnoreCase("CONFIG"))
         {
             SendLine("NOT IMPLEMENTED");
