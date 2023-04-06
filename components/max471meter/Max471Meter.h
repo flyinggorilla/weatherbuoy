@@ -2,8 +2,9 @@
 #define _MAX471METER_H_
 
 #include "esp_system.h"
-#include "driver/adc.h"
-#include "esp_adc_cal.h"
+#include "esp_adc/adc_continuous.h"
+#include "esp_adc/adc_cali.h"
+#include "esp_adc/adc_cali_scheme.h"
 #include "esp_task.h"
 
     //example GPIO34 if ADC1, GPIO14 if ADC2
@@ -29,8 +30,8 @@ class ADC {
     private:
         esp_adc_cal_characteristics_t *mpAdcCharsNormal = nullptr;
         esp_adc_cal_characteristics_t *mpAdcCharsSensitive = nullptr;
-        adc1_channel_t mChannel;
-        adc1_channel_t GpioToChannel(gpio_num_t gpio);
+        adc_channel_t mChannel;
+        adc_channel_t GpioToChannel(gpio_num_t gpio);
 };
 
 class Max471Meter {

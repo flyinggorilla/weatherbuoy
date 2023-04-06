@@ -1,6 +1,8 @@
 #include "Max471Meter.h"
-#include "driver/adc.h"
-#include "esp_adc_cal.h"
+#include "esp_adc/adc_continuous.h"
+#include "esp_adc/adc_oneshot.h"
+#include "esp_adc/adc_cali_scheme.h"
+#include "esp_adc/adc_cali.h"
 #include "esp_system.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
@@ -26,6 +28,9 @@ static char tag[] = "Max471Meter";
 
 #define DEFAULT_VREF    1100        //Use adc2_vref_to_gpio() to obtain a better estimate
 
+#ifndef CONFIG_ADC_ONESHOT_CTRL_FUNC_IN_IRAM
+#error ADC should be placed into IRAM
+#endif
 
 void fMeterTask(void *pvParameter) {
 	((Max471Meter*) pvParameter)->Max471MeterTask();
@@ -59,7 +64,29 @@ void Max471Meter::Max471MeterTask() {
 }
 
 ADC::ADC(gpio_num_t gpio) {
-    mpAdcCharsNormal = (esp_adc_cal_characteristics_t*) calloc(1, sizeof(esp_adc_cal_characteristics_t));
+
+  //-------------ADC1 Init---------------//
+    adc_oneshot_unit_handle_t adc1_handle;
+    adc_oneshot_unit_init_cfg_t init_config1 = {
+        .unit_id = ADC_UNIT_1,
+    };
+    ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config1, &adc1_handle));
+
+    //-------------ADC1 Config---------------//
+    adc_oneshot_chan_cfg_t config = {
+        .atten = ADC_ATTEN_DB_11,
+        .bitwidth = ADC_BITWIDTH_12
+    };
+
+    mChannel = GpioToChannel(gpio);
+
+    ESP_ERROR_CHECK_WITHOUT_ABORT(adc_oneshot_config_channel(adc1_handle, mChannel, &config));
+
+    //-------------ADC1 Calibration Init---------------//
+    adc_cali_handle_t adc1_cali_handle = NULL;
+    bool do_calibration1 = example_adc_calibration_init(ADC_UNIT_1, EXAMPLE_ADC_ATTEN, &adc1_cali_handle);
+
+/*    mpAdcCharsNormal = (esp_adc_cal_characteristics_t*) calloc(1, sizeof(esp_adc_cal_characteristics_t));
     mpAdcCharsSensitive = (esp_adc_cal_characteristics_t*) calloc(1, sizeof(esp_adc_cal_characteristics_t));
     adc_bits_width_t bits = ADC_WIDTH_BIT_12;
     adc_atten_t attenuation = ADC_ATTEN_DB_11;
@@ -82,10 +109,10 @@ ADC::ADC(gpio_num_t gpio) {
 
     mChannel = GpioToChannel(gpio);
     adc1_config_width(bits);
-    adc1_config_channel_atten(mChannel, attenuation);
+    adc1_config_channel_atten(mChannel, attenuation); */
 };
 
-adc1_channel_t ADC::GpioToChannel(gpio_num_t gpio) {
+adc_channel_t ADC::GpioToChannel(gpio_num_t gpio) {
     // GPIO32 = ADC1_CH4
     // GPIO33 = ADC1_CH5
     // GPIO34 = ADC1_CH6
@@ -95,20 +122,20 @@ adc1_channel_t ADC::GpioToChannel(gpio_num_t gpio) {
 
     switch (gpio) {
         case GPIO_NUM_32:
-            return ADC1_CHANNEL_4; 
+            return ADC_CHANNEL_4; 
         case GPIO_NUM_33:
-            return ADC1_CHANNEL_5;
+            return ADC_CHANNEL_5;
         case GPIO_NUM_34:
-            return ADC1_CHANNEL_6;
+            return ADC_CHANNEL_6;
         case GPIO_NUM_35:
-            return ADC1_CHANNEL_7;
+            return ADC_CHANNEL_7;
         case GPIO_NUM_36:
-            return ADC1_CHANNEL_0;
+            return ADC_CHANNEL_0;
         case GPIO_NUM_39:
-            return ADC1_CHANNEL_3;
+            return ADC_CHANNEL_3;
         default:
             ESP_LOGE(tag, "Invalid GPIO for ADC1");
-            return ADC1_CHANNEL_MAX;
+            return ADC_CHANNEL_0;
     }
 }
 
@@ -116,7 +143,7 @@ unsigned int ADC::Measure(unsigned int samples) {
     uint32_t adc_reading = 0;
     //Multisampling
     for (int i = 0; i < samples; i++) {
-        adc_reading += adc1_get_raw(mChannel);
+        adc_reading += adc_get_raw(mChannel);
     }
     adc_reading /= samples;
     //Convert adc_reading to voltage in mV

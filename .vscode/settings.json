@@ -10,13 +10,14 @@
         "c:\\users\\bernd\\esp\\esp-idf"
     ],
     "idf.flashType": "UART",
-    "idf.espIdfPathWin": "C:\\Users\\bernd\\esp4\\esp-idf",
-    "idf.pythonBinPathWin": "C:\\Users\\bernd\\.espressif4\\python_env\\idf4.4_py3.8_env\\Scripts\\python.exe",
-    "idf.toolsPathWin": "C:\\Users\\bernd\\.espressif4",
-    "idf.customExtraPaths": "C:\\Users\\bernd\\.espressif4\\tools\\xtensa-esp-elf-gdb\\11.2_20220823\\xtensa-esp-elf-gdb\\bin;C:\\Users\\bernd\\.espressif4\\tools\\riscv32-esp-elf-gdb\\11.2_20220823\\riscv32-esp-elf-gdb\\bin;C:\\Users\\bernd\\.espressif4\\tools\\xtensa-esp32-elf\\esp-2021r2-patch5-8.4.0\\xtensa-esp32-elf\\bin;C:\\Users\\bernd\\.espressif4\\tools\\xtensa-esp32s2-elf\\esp-2021r2-patch5-8.4.0\\xtensa-esp32s2-elf\\bin;C:\\Users\\bernd\\.espressif4\\tools\\xtensa-esp32s3-elf\\esp-2021r2-patch5-8.4.0\\xtensa-esp32s3-elf\\bin;C:\\Users\\bernd\\.espressif4\\tools\\riscv32-esp-elf\\esp-2021r2-patch5-8.4.0\\riscv32-esp-elf\\bin;C:\\Users\\bernd\\.espressif4\\tools\\esp32ulp-elf\\2.35_20220830\\esp32ulp-elf\\bin;C:\\Users\\bernd\\.espressif4\\tools\\cmake\\3.23.1\\bin;C:\\Users\\bernd\\.espressif4\\tools\\openocd-esp32\\v0.11.0-esp32-20221026\\openocd-esp32\\bin;C:\\Users\\bernd\\.espressif4\\tools\\ninja\\1.10.2;C:\\Users\\bernd\\.espressif4\\tools\\idf-exe\\1.0.3;C:\\Users\\bernd\\.espressif4\\tools\\ccache\\4.3\\ccache-4.3-windows-64;C:\\Users\\bernd\\.espressif4\\tools\\dfu-util\\0.9\\dfu-util-0.9-win64",
+    "idf.espIdfPathWin": "C:\\Users\\bernd\\esp501\\esp-idf",
+    "idf.pythonBinPathWin": "C:\\Users\\bernd\\.espressif501\\python_env\\idf5.0_py3.8_env\\Scripts\\python.exe",
+    "idf.toolsPathWin": "C:\\Users\\bernd\\.espressif501",
+    "idf.customExtraPaths": "C:\\Users\\bernd\\.espressif501\\tools\\xtensa-esp-elf-gdb\\11.2_20220823\\xtensa-esp-elf-gdb\\bin;C:\\Users\\bernd\\.espressif501\\tools\\riscv32-esp-elf-gdb\\11.2_20220823\\riscv32-esp-elf-gdb\\bin;C:\\Users\\bernd\\.espressif501\\tools\\xtensa-esp32-elf\\esp-2022r1-11.2.0\\xtensa-esp32-elf\\bin;C:\\Users\\bernd\\.espressif501\\tools\\xtensa-esp32s2-elf\\esp-2022r1-11.2.0\\xtensa-esp32s2-elf\\bin;C:\\Users\\bernd\\.espressif501\\tools\\xtensa-esp32s3-elf\\esp-2022r1-11.2.0\\xtensa-esp32s3-elf\\bin;C:\\Users\\bernd\\.espressif501\\tools\\riscv32-esp-elf\\esp-2022r1-11.2.0\\riscv32-esp-elf\\bin;C:\\Users\\bernd\\.espressif501\\tools\\esp32ulp-elf\\2.35_20220830\\esp32ulp-elf\\bin;C:\\Users\\bernd\\.espressif501\\tools\\cmake\\3.24.0\\bin;C:\\Users\\bernd\\.espressif501\\tools\\openocd-esp32\\v0.11.0-esp32-20221026\\openocd-esp32\\bin;C:\\Users\\bernd\\.espressif501\\tools\\ninja\\1.10.2;C:\\Users\\bernd\\.espressif501\\tools\\idf-exe\\1.0.3;C:\\Users\\bernd\\.espressif501\\tools\\ccache\\4.6.2\\ccache-4.6.2-windows-x86_64;C:\\Users\\bernd\\.espressif501\\tools\\dfu-util\\0.9\\dfu-util-0.9-win64;C:\\Users\\bernd\\.espressif501\\tools\\esp-rom-elfs\\20220823",
     "idf.customExtraVars": {
-        "OPENOCD_SCRIPTS": "C:\\Users\\bernd\\.espressif4\\tools\\openocd-esp32\\v0.11.0-esp32-20221026/openocd-esp32/share/openocd/scripts",
-        "IDF_CCACHE_ENABLE": "1"
+        "OPENOCD_SCRIPTS": "C:\\Users\\bernd\\.espressif501\\tools\\openocd-esp32\\v0.11.0-esp32-20221026/openocd-esp32/share/openocd/scripts",
+        "IDF_CCACHE_ENABLE": "1",
+        "ESP_ROM_ELF_DIR": "C:\\Users\\bernd\\.espressif501\\tools\\esp-rom-elfs\\20220823/"
     },
     "idf.gitPathWin": "C:\\Users\\bernd\\.espressif\\tools\\idf-git\\2.30.1\\cmd\\git.exe"
 }
