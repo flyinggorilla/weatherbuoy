@@ -1,4 +1,4 @@
-// #define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -153,6 +153,12 @@ void Maximet::MaximetTask()
 
     VelocityVector shortAvgCSpeedVector;
     VelocityVectorMovingAverage longAvgCSpeedVector(mMaximetConfig.iAvgLong);
+
+    #define GUST_CALCULATION_SECONDS 10 // WMO GUST default is 3 seconds, but since the buoys are moving so much lets take 10s
+    VelocityVectorMovingAverage gustAvgCSpeedVector(GUST_CALCULATION_SECONDS);
+    VelocityVector gustCSpeedVector;
+    float gustMaxCSpeed = 0;
+    float gustMaxCDir = 0;
 
     ESP_LOGI(tag, "Maximet task started and ready to receive data.");
     mbStopped = false;
@@ -580,6 +586,18 @@ while(data.line[dlpos]) {
                     shortAvgCSpeedVector.add(data.cspeed, data.cdir);
                     ESP_LOGD(tag, "data.speed: %0.2f data.dir: %d, data.compassh: %d, data.cspeed: %0.2f data.cdir: %d, data.cgspeed: %0.2f data.cgdir: %d, avgspeed: %0.2f avggdir: %d, data.avgcspeed: %0.2f data.avgcdir: %d",
                              data.speed, data.dir, data.compassh, data.cspeed, data.cdir, data.cgspeed, data.cgdir, maximetAvgSpeed, maximetAvgDir, data.avgcspeed, data.avgcdir);
+
+
+                    // run 10s moving average of 1s measurements; take maximum of average, which needs to be reset all "short" intervals
+                    gustCSpeedVector.clear();
+                    gustCSpeedVector.add(data.cspeed, data.cdir);
+                    gustAvgCSpeedVector.add(gustCSpeedVector);
+                    float gustCSpeed = gustAvgCSpeedVector.getSpeed();
+                    if (gustCSpeed > gustMaxCSpeed) {
+                        gustMaxCSpeed = gustCSpeed;
+                        gustMaxCDir = gustAvgCSpeedVector.getDir();
+                    }
+
                 }
 
 
@@ -612,18 +630,23 @@ while(data.line[dlpos]) {
                 {
                     if (is1HzOutput)
                     {
-                        //ESP_LOGW(tag, "Last records data.cspeed: %0.2f data.cdir: %d", data.cspeed, data.cdir);
+                        ESP_LOGW(tag, "Last records data.cspeed: %0.2f data.cdir: %d", data.cspeed, data.cdir);
                         data.cspeed = shortAvgCSpeedVector.getSpeed();
                         data.cdir = shortAvgCSpeedVector.getDir();
                         longAvgCSpeedVector.add(shortAvgCSpeedVector);
                         data.xavgcspeed = longAvgCSpeedVector.getSpeed();
                         data.xavgcdir = longAvgCSpeedVector.getDir();
                         shortAvgCSpeedVector.clear();
+
+                        data.cgspeed = gustMaxCSpeed;
+                        data.cgdir = gustMaxCDir;
+                        gustMaxCSpeed = 0;
+                        gustMaxCDir = 0;
                         //ESP_LOGW(tag, "Averaged data.cspeed: %0.2f data.cdir: %d", data.cspeed, data.cdir);
 
                         //############### TEMPORARY FIX FOR GPS ISSUE ###############################
                         #pragma message ("Temporary fix for GPS issue")
-                        if ((model == Model::GMX501GPS) && !data.gpsfix) 
+                        if ((model == Model::GMX501GPS || model == Model::GMX200GPS) && !data.gpsfix) 
                         {
                             data.avgcdir = data.xavgcdir;
                             data.avgcspeed = data.xavgcspeed;

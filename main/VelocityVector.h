@@ -46,4 +46,5 @@ private:
     VelocityVector mVelocityVectorAvg;
 };
 
+
 #endif

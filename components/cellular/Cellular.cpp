@@ -515,8 +515,9 @@ bool Cellular::ModemConfigure()
         ESP_LOGW(tag, "Could not set preferred network to %i: %s", miPreferredNetwork, response.c_str());
     }
 
-    int maxWaitForNetworkRegistration = CELLULAR_MAX_WAIT_NETWORK_REGISTRATION_SECONDS;
-    while (maxWaitForNetworkRegistration--)
+    
+    int startTimeSeconds = esp_timer_get_time() / 1000000; 
+    while (true)
     {
         if (Command("AT+CREG?", "OK", &response, "Network Registration Information States "))
         { // +CREG: 0,2 // +CREG: 1,5
@@ -530,8 +531,17 @@ bool Cellular::ModemConfigure()
         // 4 – unknown
         // 5 – registered, roaming
 
-        ESP_LOGI(tag, "Waiting for network %d", maxWaitForNetworkRegistration);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
+        int timeCurrentSeconds = esp_timer_get_time() / 1000000; // seconds
+        int waitTimeSeconds = timeCurrentSeconds - startTimeSeconds;
+        if (waitTimeSeconds > 10) {
+            ESP_LOGW(tag, "Waiting for network already for %d seconds", waitTimeSeconds);
+        }
+
+        if (waitTimeSeconds > CELLULAR_MAX_WAIT_NETWORK_REGISTRATION_SECONDS) {
+            ESP_LOGE(tag, "Registering with network failed after waiting for %d seconds", waitTimeSeconds);
+            return false;
+        }
     }
 
     msNetworkmode = "";
