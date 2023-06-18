@@ -181,13 +181,13 @@ bool Wifi::Reconnect()
 	} else {
 		ESP_LOGE(tag, "esp_wifi_start() failed");
 	} */
-	/*if (ESP_OK == esp_wifi_disconnect()) 
+	if (ESP_OK == esp_wifi_disconnect()) 
 	{
 		ESP_LOGI(tag, "Disconnecting Wifi to prepare a Restart: esp_wifi_disconnect()");
 	} else {
 		ESP_LOGE(tag, "esp_wifi_disconnect() failed");
 	} 
-	vTaskDelay(1000 / portTICK_PERIOD_MS); */
+	//vTaskDelay(1000 / portTICK_PERIOD_MS); 
 	mbConnected = false;
 	esp_err_t connect = esp_wifi_connect();
 	if (ESP_OK == connect)

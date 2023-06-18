@@ -521,7 +521,7 @@ void MaximetSimulator::SendDataPoint()
     String sendLine;
     sendLine.printf("%c%s%c%02X", STX, line.c_str(), ETX, checksum);
     // ESP_LOG_BUFFER_HEXDUMP(tag, line.c_str(), line.length(), ESP_LOG_INFO);
-    ESP_LOGI(tag, "%s", sendLine.c_str());
+    ESP_LOGD(tag, "%s", sendLine.c_str());
     SendLine(sendLine);
 }
 
