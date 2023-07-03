@@ -127,6 +127,9 @@ public:
     // exits configuration mode
     void WriteFinish();
 
+    // set default values for maximet configuration
+    void WriteSetDef();    
+
 
 private:
     // main loop run by the task

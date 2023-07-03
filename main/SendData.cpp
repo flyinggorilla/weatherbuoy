@@ -780,6 +780,14 @@ bool SendData::PerformHttpPost()
                 updateConfig = true;
             };
 
+            value = ReadMessageValue("set-maximetdefaults:");
+            if (value.length())
+            {
+                mrMaximet.Stop();
+                mrMaximet.WriteSetDef();
+                updateConfig = true;
+            };
+
             mbRestart = false;
             if (command.equals("restart") || command.equals("config") || command.equals("update"))
             {

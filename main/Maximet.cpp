@@ -778,6 +778,7 @@ bool Maximet::MaximetConfig()
         ESP_LOGE(tag, "No Maximet detected!");
         return false;
     }
+
     // LAT = +47.944191
     // LONG = +013.584622
     // WriteLat(47.944191);
@@ -1172,6 +1173,17 @@ void Maximet::WriteLong(float lon)
 {
     WriteConfig("LONG", String(lon, 6));
     ReadLong();
+};
+
+// setdef
+void Maximet::WriteSetDef()
+{
+    EnterCommandLine();
+    String cmd("SETDEF\r\n");
+    mpSerial->Write(cmd);
+    String line;
+    mpSerial->ReadMultiLine(line);
+    ESP_LOGW(tag, "Maximet set to defaults");
 };
 
 void Maximet::WriteFinish()
