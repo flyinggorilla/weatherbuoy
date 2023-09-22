@@ -863,6 +863,7 @@ bool Maximet::MaximetConfig()
             WriteHastn(3);
             WriteLat(47.875249176262976);  // mid of attersee
             WriteLong(13.548413577850653); // mid of attersee
+            WriteAvgLong(5); // set default AVGLONG to 5 minutes
         }
 
         if (!mMaximetConfig.sUserinfo.equals(GetModelName(mMaximetConfig.model)))
