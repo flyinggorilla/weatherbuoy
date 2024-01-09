@@ -1,4 +1,4 @@
-#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "sdkconfig.h"
 #include "Cellular.h"
 #include "EspString.h"
@@ -29,14 +29,24 @@ static const char tag[] = "Cellular";
 #error No need to perform gratituitous ARP sends every 60 seconds for modem connection (#undefined CONFIG_LWIP_DHCP_DOES_ARP_CHECK).
 #endif
 
-//#if DHCP_DOES_ARP_CHECK == 1
-//#warning Config LWIP IP Reassembly must be enabled for proper TCP/IP communication over the Modem connection (CONFIG_LWIP_IP4_REASSEMBLY=y).
-//#endif
+#ifdef CONFIG_LWIP_PPP_ENABLE_IPV6
+#error Avoid receiving an IPv6 IP address via PPP
+#endif
 
-//#if IP_REASSEMBLY == 0
-//#error Config LWIP IP Reassembly must be enabled for proper TCP/IP communication over the Modem connection (CONFIG_LWIP_IP4_REASSEMBLY=y).
-//#endif
+#define CELLULAR_MAX_WAIT_NETWORK_REGISTRATION_SECONDS 120 // wait for modem to register with mobile network
+#define CELLULAR_MAX_WAIT_GETIPADDRESS_SECONDS 120
 
+
+// renew PPP network interface in case an error happens.
+// #define RENEW_PPP_ON_NETIF_ERROR
+
+// #if DHCP_DOES_ARP_CHECK == 1
+// #warning Config LWIP IP Reassembly must be enabled for proper TCP/IP communication over the Modem connection (CONFIG_LWIP_IP4_REASSEMBLY=y).
+// #endif
+
+// #if IP_REASSEMBLY == 0
+// #error Config LWIP IP Reassembly must be enabled for proper TCP/IP communication over the Modem connection (CONFIG_LWIP_IP4_REASSEMBLY=y).
+// #endif
 
 // ------------------------------------------
 // change device in Menuconfig->Cellular
@@ -57,7 +67,7 @@ static const char tag[] = "Cellular";
 #elif CONFIG_LILYGO_TTGO_TPCIE_SIM7600
 // LILYGO® TTGO T-PCIE SIM7600
 #define CELLULAR_GPIO_PWKEY GPIO_NUM_4
-//#define CELLULAR_GPIO_RST GPIO_NUM_5
+// #define CELLULAR_GPIO_RST GPIO_NUM_5
 #define CELLULAR_GPIO_POWER GPIO_NUM_25 // Lilygo T-PCIE SIM7600
 #define CELLULAR_GPIO_TX GPIO_NUM_27
 #define CELLULAR_GPIO_RX GPIO_NUM_26
@@ -94,6 +104,12 @@ std::wstring utf8ToWstring(const std::string &str)
 }
 #endif
 
+void fReceiverTask(void *pvParameter)
+{
+    ((Cellular *)pvParameter)->ReceiverTask();
+    vTaskDelete(NULL);
+}
+
 void cellularEventHandler(void *ctx, esp_event_base_t base, int32_t id, void *event_data)
 {
     return ((Cellular *)ctx)->OnEvent(base, id, event_data);
@@ -106,8 +122,20 @@ Cellular::Cellular()
     mxPppPhaseDead = xSemaphoreCreateBinary();
 }
 
-bool Cellular::InitModem()
+bool Cellular::Init(String apn, String user, String pass, String preferredOperator, int preferredNetwork)
 {
+
+    msApn = apn;
+    msUser = user;
+    msPass = pass;
+    msPreferredOperator = preferredOperator;
+    miPreferredNetwork = preferredNetwork;
+
+    gpio_set_direction(CELLULAR_GPIO_PWKEY, GPIO_MODE_OUTPUT);
+    gpio_set_direction(CELLULAR_GPIO_POWER, GPIO_MODE_OUTPUT);
+    gpio_set_direction(CELLULAR_GPIO_STATUS, GPIO_MODE_INPUT);
+    gpio_set_direction(CELLULAR_GPIO_DTR, GPIO_MODE_OUTPUT);
+
     uart_config_t uart_config = {
         .baud_rate = CELLULAR_DEFAULT_BAUD_RATE, // default baud rate, use AT+IPR command to set higher speeds 460800 is max of CONFIG_LILYGO_TTGO_TCALL14_SIM800
         .data_bits = UART_DATA_8_BITS,
@@ -128,11 +156,33 @@ bool Cellular::InitModem()
     muiBufferLen = 0;
     mpBuffer = (uint8_t *)malloc(muiBufferSize + 16);
 
-    if (!PowerOn())
+    ESP_LOGD(tag, "Initializing network");
+    InitNetwork();
+
+    ESP_LOGD(tag, "Starting receiver task");
+    xTaskCreate(&fReceiverTask, "ModemReceiver", 8192, this, ESP_TASKD_EVENT_PRIO, NULL);
+    // #define ESP_TASK_TIMER_PRIO           (ESP_TASK_PRIO_MAX - 3)
+    // #define ESP_TASKD_EVENT_PRIO          (ESP_TASK_PRIO_MAX - 5)
+    // #define ESP_TASK_TCPIP_PRIO           (ESP_TASK_PRIO_MAX - 7)
+    // #define ESP_TASK_MAIN_PRIO            (ESP_TASK_PRIO_MIN + 1)
+
+    return true;
+}
+
+bool Cellular::PowerUp()
+{
+    if (!ModemPowerOnSequence())
         return false;
 
-    InitNetwork();
+    if (!ModemConfigure())
+        return false;
+
     return true;
+}
+
+bool Cellular::PowerDown()
+{
+    return ModemPowerOffSequence();
 }
 
 Cellular::~Cellular()
@@ -200,12 +250,6 @@ esp_err_t esp_cellular_post_attach_start(esp_netif_t *esp_netif, void *args)
     return ESP_OK;
 }
 
-void fReceiverTask(void *pvParameter)
-{
-    ((Cellular *)pvParameter)->ReceiverTask();
-    vTaskDelete(NULL);
-}
-
 const char *PppPhaseText(int pppPhase)
 {
     switch (pppPhase)
@@ -240,34 +284,17 @@ const char *PppPhaseText(int pppPhase)
     return "unknown";
 }
 
-bool Cellular::PowerOn(void)
+bool Cellular::ModemPowerOnSequence(void)
 {
-#ifdef CONFIG_LILYGO_TTGO_TCALL14_SIM800
-    gpio_set_direction(CELLULAR_GPIO_PWKEY, GPIO_MODE_OUTPUT);
-    gpio_set_direction(CELLULAR_GPIO_POWER, GPIO_MODE_OUTPUT);
-
-    ESP_LOGI(tag, "initializing modem...");
-    gpio_set_level(CELLULAR_GPIO_PWKEY, 1);
-    // gpio_set_level(CELLULAR_GPIO_RST, 0);
-    gpio_set_level(CELLULAR_GPIO_POWER, 0);
-    vTaskDelay(500 / portTICK_PERIOD_MS);
-    gpio_set_level(CELLULAR_GPIO_POWER, 1);
-    vTaskDelay(500 / portTICK_PERIOD_MS);
-    gpio_set_level(CELLULAR_GPIO_PWKEY, 0);
-    vTaskDelay(1000 / portTICK_PERIOD_MS); // Power-Key must be down for at least 1 second
-    gpio_set_level(CELLULAR_GPIO_PWKEY, 1);
-
-    // wait at least 5 seconds for CONFIG_LILYGO_TTGO_TCALL14_SIM800 to get ready
-    vTaskDelay(5000 / portTICK_PERIOD_MS);
-    ESP_LOGI(tag, "modem turned on.");
-    return true;
-#endif
-
-#ifdef CONFIG_LILYGO_TTGO_TPCIE_SIM7600
-    gpio_set_direction(CELLULAR_GPIO_PWKEY, GPIO_MODE_OUTPUT);
-    gpio_set_direction(CELLULAR_GPIO_POWER, GPIO_MODE_OUTPUT);
-    gpio_set_direction(CELLULAR_GPIO_STATUS, GPIO_MODE_INPUT);
-    gpio_set_direction(CELLULAR_GPIO_DTR, GPIO_MODE_OUTPUT);
+    // switch to default baud rate
+    if (ESP_OK == uart_set_baudrate(muiUartNo, CELLULAR_DEFAULT_BAUD_RATE))
+    {
+        ESP_LOGI(tag, "Switched to %d baud", CELLULAR_DEFAULT_BAUD_RATE);
+    }
+    else
+    {
+        ESP_LOGE(tag, "Error switching to %d baud", CELLULAR_DEFAULT_BAUD_RATE);
+    }
 
     ESP_LOGI(tag, "initializing LILYGO T-PCIE SIM7600 modem...");
 
@@ -292,6 +319,7 @@ bool Cellular::PowerOn(void)
         if (gpio_get_level(CELLULAR_GPIO_STATUS))
         {
             ESP_LOGI(tag, "Modem turned on.");
+            mPowerMode = POWER_ON;
             break;
         }
         if (!maxModemUartReadyTime)
@@ -318,35 +346,54 @@ bool Cellular::PowerOn(void)
         if (line.contains("RDY"))
         {
             ESP_LOGI(tag, "Modem ready.");
+            mbCommandMode = true;
             return true;
         }
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         ESP_LOGD(tag, "still waiting for modem to get ready.... %d", maxModemReadyTime);
     }
 
-#endif
-
     ESP_LOGE(tag, "Could not turn on modem.");
     return false;
 }
 
-void Cellular::Start(String apn, String user, String pass, String preferredOperator, int preferredNetwork)
+bool Cellular::ModemPowerOffSequence(void)
 {
-    msApn = apn;
-    msUser = user;
-    msPass = pass;
-    msPreferredOperator = preferredOperator;
-    miPreferredNetwork = preferredNetwork;
+    ESP_LOGI(tag, "Powering down SIM7600 modem...");
+    PppNetifStop();
 
+    // DTR : set high, to enter sleep mode
+    gpio_set_level(CELLULAR_GPIO_DTR, 0);
+
+    // POWER_PIN : This pin controls the power supply of the SIM7600
+    gpio_set_level(CELLULAR_GPIO_POWER, 0);
+    gpio_set_level(CELLULAR_GPIO_PWKEY, 0); // must be minimum 2.5s low to power down
+
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+
+    // wait at least 26 seconds for SIM7600 bit....
+    int maxModemPowerDownTime = 30; // seconds
+    while (maxModemPowerDownTime--)
+    {
+        if (!gpio_get_level(CELLULAR_GPIO_STATUS))
+        {
+            ESP_LOGI(tag, "Modem turned off.");
+            mPowerMode = POWER_OFF;
+            return true;
+        }
+
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        ESP_LOGD(tag, "still powering down modem.... %d", maxModemPowerDownTime);
+    }
+
+    ESP_LOGE(tag, "Could not turn of modem!");
+    return false;
+}
+
+bool Cellular::ModemConfigure()
+{
     String response;
     String command;
-
-    ESP_LOGD(tag, "Starting receiver task....");
-    xTaskCreate(&fReceiverTask, "ModemReceiver", 8192, this, ESP_TASKD_EVENT_PRIO, NULL);
-    // #define ESP_TASK_TIMER_PRIO           (ESP_TASK_PRIO_MAX - 3)
-    // #define ESP_TASKD_EVENT_PRIO          (ESP_TASK_PRIO_MAX - 5)
-    // #define ESP_TASK_TCPIP_PRIO           (ESP_TASK_PRIO_MAX - 7)
-    // #define ESP_TASK_MAIN_PRIO            (ESP_TASK_PRIO_MIN + 1)
 
     if (!Command("AT", "OK", nullptr, "ATtention"))
     {
@@ -354,7 +401,7 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
     };
 
     if (!Command("ATE0", "OK", nullptr, "Echo off"))
-    {   // CONFIG_LILYGO_TTGO_TPCIE_SIM7600
+    { // CONFIG_LILYGO_TTGO_TPCIE_SIM7600
         ESP_LOGE(tag, "Could not turn off echo.");
     };
 
@@ -414,8 +461,8 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
         }
     }
 
-    // this should enable NITZ network time and timezone update. 
-    //if (Command("AT+CTZU=1", "OK", &response, "Enable Automatic time and time zone update"))
+    // this should enable NITZ network time and timezone update.
+    // if (Command("AT+CTZU=1", "OK", &response, "Enable Automatic time and time zone update"))
     //{
     //    ESP_LOGW(tag, "Disable automatic time and time zone update. %s", response.c_str());
     //}
@@ -468,8 +515,9 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
         ESP_LOGW(tag, "Could not set preferred network to %i: %s", miPreferredNetwork, response.c_str());
     }
 
-    int maxWaitForNetworkRegistration = 120;
-    while (maxWaitForNetworkRegistration--)
+    
+    int startTimeSeconds = esp_timer_get_time() / 1000000; 
+    while (true)
     {
         if (Command("AT+CREG?", "OK", &response, "Network Registration Information States "))
         { // +CREG: 0,2 // +CREG: 1,5
@@ -483,8 +531,17 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
         // 4 – unknown
         // 5 – registered, roaming
 
-        ESP_LOGI(tag, "Waiting for network %d", maxWaitForNetworkRegistration);
         vTaskDelay(1000 / portTICK_PERIOD_MS);
+        int timeCurrentSeconds = esp_timer_get_time() / 1000000; // seconds
+        int waitTimeSeconds = timeCurrentSeconds - startTimeSeconds;
+        if (waitTimeSeconds > 10) {
+            ESP_LOGW(tag, "Waiting for network already for %d seconds", waitTimeSeconds);
+        }
+
+        if (waitTimeSeconds > CELLULAR_MAX_WAIT_NETWORK_REGISTRATION_SECONDS) {
+            ESP_LOGE(tag, "Registering with network failed after waiting for %d seconds", waitTimeSeconds);
+            return false;
+        }
     }
 
     msNetworkmode = "";
@@ -553,17 +610,22 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
     }
 #endif
 
-    if (Command("AT+CSQ", "OK", &response, "Signal Quality Report"))
-    { // +CSQ: 13,0
-        String sq;
-        sq = response.substring(6, response.indexOf(","));
-        miSignalQuality = sq.toInt();
-        ESP_LOGI(tag, "Signal Quality: %i, (%s)", miSignalQuality, sq.c_str());
+    // retrieve Signal quality only when it hasnt been set yet. 
+    // In other cases it is better to retrieve signal quality at end of data transfer
+    if (miSignalQuality < 0) {
+        if (Command("AT+CSQ", "OK", &response, "Signal Quality Report"))
+        { // +CSQ: 13,0
+            String sq;
+            sq = response.substring(6, response.indexOf(","));
+            miSignalQuality = sq.toInt();
+            ESP_LOGI(tag, "Signal Quality: %i, (%s)", miSignalQuality, sq.c_str());
+        }
+        else
+        {
+            miSignalQuality = -1;
+        }        
     }
-    else
-    {
-        miSignalQuality = -1;
-    }
+
 
     Command("AT+CNUM", "OK", &response, "Subscriber Number"); // +CNUM: "","+43681207*****",145,0,4
     msSubscriber = "";
@@ -581,7 +643,6 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
         ESP_LOGI(tag, "Enabled modem to sleep via UART DTR.");
     }
 
-
     /*
     if (Command("AT+CCLK?", "OK", &response, "Query modem system time/date"))
     {
@@ -594,6 +655,8 @@ void Cellular::Start(String apn, String user, String pass, String preferredOpera
         ESP_LOGW(tag, "Network time/date: %s", response.c_str());
     }
     */
+
+    return true;
 }
 
 void Cellular::ReadSMS()
@@ -700,7 +763,9 @@ void Cellular::ReceiverTask()
         }
         else
         {
-            ESP_LOGD(tag, "ReceiverTask(%s) ReadIntoBuffer return false", mbCommandMode ? "CMD" : "DATA");
+            PppNetifStop();
+            ESP_LOGD(tag, "ReceiverTask(%s) %is timeout ReadIntoBuffer returned false. Stopped PPP network interface.",
+                     mbCommandMode ? "CMD" : "DATA", (int)(UART_INPUT_TIMEOUT_PPP * portTICK_PERIOD_MS / 1000));
         }
     }
 }
@@ -708,7 +773,7 @@ void Cellular::ReceiverTask()
 bool Cellular::InitNetwork()
 {
     ESP_ERROR_CHECK_WITHOUT_ABORT(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    ESP_ERROR_CHECK_WITHOUT_ABORT(esp_event_loop_create_default());
     ESP_ERROR_CHECK(esp_event_handler_instance_register(IP_EVENT, ESP_EVENT_ANY_ID, cellularEventHandler, this, nullptr));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, cellularEventHandler, this, nullptr));
 
@@ -803,7 +868,7 @@ void Cellular::ResetSerialBuffers()
 {
     ESP_LOGD(tag, "ResetInputbuffers(Mode=%s)", mbCommandMode ? "CMD" : "DATA");
     uart_flush_input(muiUartNo);
-    uart_wait_tx_done(muiUartNo, 1000/portTICK_PERIOD_MS);
+    uart_wait_tx_done(muiUartNo, 1000 / portTICK_PERIOD_MS);
     muiBufferLen = 0;
     muiBufferPos = 0;
 }
@@ -819,7 +884,7 @@ bool Cellular::ReadIntoBuffer(TickType_t timeout)
     // Waiting for UART event.
     if (pdTRUE != xQueueReceive(mhUartEventQueueHandle, (void *)&event, timeout))
     {
-        ESP_LOGD(tag, "ReadIntoBuffer timeout at xQueueReceive. Mode=%s", mbCommandMode ? "CMD" : "DATA");
+        ESP_LOGW(tag, "ReadIntoBuffer timeout at xQueueReceive. Mode=%s", mbCommandMode ? "CMD" : "DATA");
         return false;
     }
 
@@ -843,7 +908,7 @@ bool Cellular::ReadIntoBuffer(TickType_t timeout)
         if (len)
         {
             mullReceivedTotal += len;
-            ESP_LOGD(tag, "UART %s received: %d", mbCommandMode ? "RESPONSE" : "DATA", len);
+            ESP_LOGV(tag, "UART %s received: %d", mbCommandMode ? "RESPONSE" : "DATA", len);
             ESP_LOG_BUFFER_HEXDUMP(tag, mpBuffer, len, ESP_LOG_VERBOSE);
         }
         return true;
@@ -887,12 +952,14 @@ bool Cellular::ReadIntoBuffer(TickType_t timeout)
     return true;
 }
 
-bool Cellular::SwitchToLowPowerMode()
+bool Cellular::SwitchToSleepMode()
 {
     if (!SwitchToCommandMode())
     {
         return false;
     }
+
+    QuerySignalStatus();
 
     String response;
     if (Command("AT+CFUN=0", "OK", &response, "Set modem to minimum functionality."))
@@ -906,7 +973,8 @@ bool Cellular::SwitchToLowPowerMode()
     vTaskDelay(100 / portTICK_PERIOD_MS);
     ESP_LOGI(tag, "Switched to power saving mode via DTR.");
     gpio_set_level(CELLULAR_GPIO_DTR, 1);
-    mbPowerSaverActive = true;
+    // mbPowerSaverActive = true;
+    mPowerMode = POWER_SLEEP;
     vTaskDelay(100 / portTICK_PERIOD_MS);
     return true;
 
@@ -916,14 +984,23 @@ bool Cellular::SwitchToLowPowerMode()
 
 bool Cellular::SwitchToFullPowerMode()
 {
-
-    if (!mbPowerSaverActive)
+    if (mPowerMode == POWER_OFF)
     {
+        if (!PowerUp())
+            return false;
+    }
+    else if (mPowerMode == POWER_SLEEP)
+    {
+        gpio_set_level(CELLULAR_GPIO_DTR, 0);
+        // simcom documentation: "Anytime host want send data to module, it must be pull down DTR then wait minimum 20ms" --> Command() waits 100ms anyway
+    }
+    else
+    {
+        // power is already on
         return true;
     }
 
-    gpio_set_level(CELLULAR_GPIO_DTR, 0);
-    // simcom documentation: "Anytime host want send data to module, it must be pull down DTR then wait minimum 20ms" --> Command() waits 100ms anyway
+    // if (!mbPowerSaverActive)
 
     // .Wakeup Module
     // SIM7100/SIM7500/SIM7600/SIM7800 module can exit from sleep mode automatically when the following
@@ -964,7 +1041,8 @@ bool Cellular::SwitchToFullPowerMode()
     if (Command("AT+CFUN=1", "OK", &response, "Set modem to full power mode."))
     { // mode 4 would shut down RF entirely to "flight-mode"; mode 0 still keeps SMS receiption intact
         ESP_LOGI(tag, "Switched to full power mode.");
-        mbPowerSaverActive = false;
+        // mbPowerSaverActive = false;
+        mPowerMode = POWER_ON;
     }
     else
     {
@@ -974,7 +1052,7 @@ bool Cellular::SwitchToFullPowerMode()
 
     ESP_LOGD(tag, "Switching back to full power....");
 
-    timeLimit = esp_timer_get_time() / 1000000 + 180; // wait max 180 seconds
+    timeLimit = esp_timer_get_time() / 1000000 + CELLULAR_MAX_WAIT_NETWORK_REGISTRATION_SECONDS ; 
     timeLast = 0;
     while (true)
     {
@@ -985,8 +1063,9 @@ bool Cellular::SwitchToFullPowerMode()
         }
         else
         {
-            ESP_LOGE(tag, "Could not register on on network. Switching off power.");
-            mbPowerSaverActive = true;
+            ESP_LOGE(tag, "Could not register on on network. Put modem into Sleep mode.");
+            // mbPowerSaverActive = true;
+            mPowerMode = POWER_SLEEP;
             gpio_set_level(CELLULAR_GPIO_DTR, 1);
             return false;
         }
@@ -1015,8 +1094,6 @@ bool Cellular::SwitchToFullPowerMode()
     }
 
     ESP_LOGI(tag, "Switching to full power mode completed.");
-
-    QuerySignalStatus();
 
     return true;
 }
@@ -1060,14 +1137,6 @@ void Cellular::QuerySignalStatus()
         }
     }
     ESP_LOGI(tag, "Network mode: %s", msNetworkmode.c_str());
-
-    Command("AT+COPS?", "OK", &response, "Operator Selection"); // +COPS: 0,0,"A1" // CONFIG_LILYGO_TTGO_TCALL14_SIM800
-                                                                // +COPS: 0,0,"yesss!",2 // SIM7600
-    if (response.startsWith("+COPS: "))
-    {
-        msOperator = response.substring(response.indexOf(",\"") + 2, response.lastIndexOf("\""));
-    }
-    ESP_LOGI(tag, "Operator: %s", msOperator.c_str());
 
     if (Command("AT+CSQ", "OK", &response, "Signal Quality Report"))
     { // +CSQ: 13,0
@@ -1152,15 +1221,18 @@ bool Cellular::SwitchToPppMode()
         {
             ESP_LOGE(tag, "SEVERE, could not start network interface.");
             PppNetifStop();
+#ifdef RENEW_PPP_ON_NETIF_ERROR
+            PppNetifCreate();
+#else
             ESP_LOGW(tag, "IGNORING RENEW PPP");
-            /// PppNetifCreate();
+#endif
             return false;
         };
 
         // WAIT FOR IP ADDRESS
-        // (IP Lost timer defaults to 120 seconds, so wait 60 additional seconds)
-        ESP_LOGI(tag, "Waiting up to 180 seconds for getting IP address");
-        if (xSemaphoreTake(mxPppConnected, 180 * 1000 / portTICK_PERIOD_MS) == pdTRUE)
+        // (IP Lost timer defaults to 120 seconds, so wait 60 additional seconds??)
+        ESP_LOGI(tag, "Waiting up to %i seconds for getting IP address", CELLULAR_MAX_WAIT_GETIPADDRESS_SECONDS);
+        if (xSemaphoreTake(mxPppConnected, CELLULAR_MAX_WAIT_GETIPADDRESS_SECONDS * 1000 / portTICK_PERIOD_MS) == pdTRUE)
         {
             // note that esp_netif_action_ calls should all happen in THIS thread, and not in the event handler
             esp_netif_action_connected(mpEspNetif, 0, 0, nullptr);
@@ -1169,8 +1241,11 @@ bool Cellular::SwitchToPppMode()
 
         ESP_LOGE(tag, "Stopped Netif because IP address could not be obtained");
         PppNetifStop();
+#ifdef RENEW_PPP_ON_NETIF_ERROR
+        PppNetifCreate();
+#else
         ESP_LOGW(tag, "IGNORING RENEW PPP");
-        // PppNetifCreate();
+#endif
         return false;
     }
 
@@ -1233,7 +1308,7 @@ int Cellular::ModemWriteData(const char *data, int len)
     int iWriteLen = uart_write_bytes(muiUartNo, data, len);
     if (iWriteLen == len)
     {
-        ESP_LOGD(tag, "UART DATA bytes sent %d", len);
+        ESP_LOGV(tag, "UART DATA bytes sent %d", len);
         ESP_LOG_BUFFER_HEXDUMP(tag, data, len, ESP_LOG_VERBOSE);
         // ESP_LOGI(tag, "ModemWriteData(): %d bytes", len);
         mullSentTotal += len;
@@ -1293,8 +1368,9 @@ bool Cellular::ModemReadResponse(String &sResponse, const char *expectedLastLine
         }
         else if (sLine.startsWith("+PPPD: DISCONNECTED")) // Sent by ESP-IDF PPP Layer, without OK
         {
+            // unsolicited response, ensure to read next line
             ESP_LOGI(tag, "PPP Daemon disconnected.");
-            return false;
+            continue;
         }
         else if (sLine.startsWith("ERROR") || sLine.startsWith("NO CARRIER") || sLine.startsWith("+CME ERROR") || sLine.startsWith("+CMS ERROR"))
         {

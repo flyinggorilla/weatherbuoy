@@ -10,7 +10,7 @@
                                                "PASL", "PSTN", "RH", "AH", "TEMP", "SOLARRAD", "XTILT", "YTILT", "ZORIENT", "STATUS", "WINDSTAT",
                                                "GPSLOCATION", "GPSSTATUS", "TIME", "CHECK"}; */
 
-#define SERIAL_BUFFER_SIZE (2048)
+#define SERIAL_BUFFER_SIZE (1024)
 #define SERIAL_BAUD_RATE (19200)
 
 static const char MAXIMET_REPORT_GMX200GPS[] = "USERINF,GPSLOCATION,GPSSPEED,GPSHEADING,CSPEED,CGSPEED,AVGCSPEED,SPEED,GSPEED,AVGSPEED,DIR,GDIR,AVGDIR,CDIR,CGDIR,AVGCDIR,COMPASSH,XTILT,YTILT,ZORIENT,STATUS,WINDSTAT,GPSSTATUS,TIME,CHECK";
@@ -126,6 +126,9 @@ public:
     // call after finished with Write* commands
     // exits configuration mode
     void WriteFinish();
+
+    // set default values for maximet configuration
+    void WriteSetDef();    
 
 
 private:

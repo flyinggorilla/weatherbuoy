@@ -158,8 +158,16 @@ void MaximetSimulator::MaximetSimulatorTask()
             continue;
         }
 
+        if (msInputLine.contains("%%%%"))
+        {
+            // ID:2669 "MAXIMET GMX501-3B-0011" 2.00.23 [Q] PV=4
+            String response;
+            response.printf("ID:0007 \"MAXIMETSIMULATOR %s\" 2.00.23 [Q] PV=4",  Maximet::GetModelName(mMaximetModel));
+            SendLine(response);
+        }
+
         // enter commandline mode
-        if (msInputLine.startsWith("*"))
+        if (msInputLine.contains("*"))
         {
             ESP_LOGI(tag, "Requested commandline mode with *.");
             if (mbCommandline)
@@ -185,7 +193,9 @@ void MaximetSimulator::MaximetSimulatorTask()
         {
             SendLine("");
             mbCommandline = false;
+            continue;
         }
+
         if (msInputLine.equalsIgnoreCase("CONFIG"))
         {
             SendLine("NOT IMPLEMENTED");
@@ -511,7 +521,7 @@ void MaximetSimulator::SendDataPoint()
     String sendLine;
     sendLine.printf("%c%s%c%02X", STX, line.c_str(), ETX, checksum);
     // ESP_LOG_BUFFER_HEXDUMP(tag, line.c_str(), line.length(), ESP_LOG_INFO);
-    ESP_LOGI(tag, "%s", sendLine.c_str());
+    ESP_LOGD(tag, "%s", sendLine.c_str());
     SendLine(sendLine);
 }
 

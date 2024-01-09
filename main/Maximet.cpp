@@ -1,4 +1,4 @@
-//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -11,6 +11,7 @@
 #include "Serial.h"
 #include "EspString.h"
 #include "VelocityVector.h"
+#include "RtcVariables.h"
 
 //====================================================================================
 // Maximet Notes:
@@ -19,8 +20,6 @@
 // AVGCDIR only calculated when GPS available
 
 static const char tag[] = "Maximet";
-#define SERIAL_BUFFER_SIZE (1024)
-#define SERIAL_BAUD_RATE (19200)
 
 void fMaximetTask(void *pvParameter)
 {
@@ -155,6 +154,12 @@ void Maximet::MaximetTask()
     VelocityVector shortAvgCSpeedVector;
     VelocityVectorMovingAverage longAvgCSpeedVector(mMaximetConfig.iAvgLong);
 
+    #define GUST_CALCULATION_SECONDS 10 // WMO GUST default is 3 seconds, but since the buoys are moving so much lets take 10s
+    VelocityVectorMovingAverage gustAvgCSpeedVector(GUST_CALCULATION_SECONDS);
+    VelocityVector gustCSpeedVector;
+    float gustMaxCSpeed = 0;
+    float gustMaxCDir = 0;
+
     ESP_LOGI(tag, "Maximet task started and ready to receive data.");
     mbStopped = false;
     while (mbRun)
@@ -186,8 +191,8 @@ void Maximet::MaximetTask()
             switch (parsingState)
             {
             case START:
-                if (c > 0x80 || c < 0) {
-                    // skip non-ascii char
+                if (c > 0x80) {
+                    // skip non-ascii char ... note that char is treated as unsigned by default (see CHAR_MIN)
                     break;
                 }
                 if (c == STX)
@@ -581,6 +586,18 @@ while(data.line[dlpos]) {
                     shortAvgCSpeedVector.add(data.cspeed, data.cdir);
                     ESP_LOGD(tag, "data.speed: %0.2f data.dir: %d, data.compassh: %d, data.cspeed: %0.2f data.cdir: %d, data.cgspeed: %0.2f data.cgdir: %d, avgspeed: %0.2f avggdir: %d, data.avgcspeed: %0.2f data.avgcdir: %d",
                              data.speed, data.dir, data.compassh, data.cspeed, data.cdir, data.cgspeed, data.cgdir, maximetAvgSpeed, maximetAvgDir, data.avgcspeed, data.avgcdir);
+
+
+                    // run 10s moving average of 1s measurements; take maximum of average, which needs to be reset all "short" intervals
+                    gustCSpeedVector.clear();
+                    gustCSpeedVector.add(data.cspeed, data.cdir);
+                    gustAvgCSpeedVector.add(gustCSpeedVector);
+                    float gustCSpeed = gustAvgCSpeedVector.getSpeed();
+                    if (gustCSpeed > gustMaxCSpeed) {
+                        gustMaxCSpeed = gustCSpeed;
+                        gustMaxCDir = gustAvgCSpeedVector.getDir();
+                    }
+
                 }
 
 
@@ -613,18 +630,23 @@ while(data.line[dlpos]) {
                 {
                     if (is1HzOutput)
                     {
-                        //ESP_LOGW(tag, "Last records data.cspeed: %0.2f data.cdir: %d", data.cspeed, data.cdir);
+                        ESP_LOGW(tag, "Last records data.cspeed: %0.2f data.cdir: %d", data.cspeed, data.cdir);
                         data.cspeed = shortAvgCSpeedVector.getSpeed();
                         data.cdir = shortAvgCSpeedVector.getDir();
                         longAvgCSpeedVector.add(shortAvgCSpeedVector);
                         data.xavgcspeed = longAvgCSpeedVector.getSpeed();
                         data.xavgcdir = longAvgCSpeedVector.getDir();
                         shortAvgCSpeedVector.clear();
+
+                        data.cgspeed = gustMaxCSpeed;
+                        data.cgdir = gustMaxCDir;
+                        gustMaxCSpeed = 0;
+                        gustMaxCDir = 0;
                         //ESP_LOGW(tag, "Averaged data.cspeed: %0.2f data.cdir: %d", data.cspeed, data.cdir);
 
                         //############### TEMPORARY FIX FOR GPS ISSUE ###############################
                         #pragma message ("Temporary fix for GPS issue")
-                        if ((model == Model::GMX501GPS) && !data.gpsfix) 
+                        if ((model == Model::GMX501GPS || model == Model::GMX200GPS) && !data.gpsfix) 
                         {
                             data.avgcdir = data.xavgcdir;
                             data.avgcspeed = data.xavgcspeed;
@@ -740,6 +762,7 @@ void Maximet::Stop()
         if (secondsToStop > 60 * 3)
         {
             ESP_LOGE(tag, "could not stop Maximet task, rebooting");
+            RtcVariables::SetExtendedResetReason(RtcVariables::EXTENDED_RESETREASON_ERROR);
             esp_restart();
         }
     }
@@ -755,6 +778,7 @@ bool Maximet::MaximetConfig()
         ESP_LOGE(tag, "No Maximet detected!");
         return false;
     }
+
     // LAT = +47.944191
     // LONG = +013.584622
     // WriteLat(47.944191);
@@ -839,6 +863,7 @@ bool Maximet::MaximetConfig()
             WriteHastn(3);
             WriteLat(47.875249176262976);  // mid of attersee
             WriteLong(13.548413577850653); // mid of attersee
+            WriteAvgLong(5); // set default AVGLONG to 5 minutes
         }
 
         if (!mMaximetConfig.sUserinfo.equals(GetModelName(mMaximetConfig.model)))
@@ -863,7 +888,9 @@ bool Maximet::EnterCommandLine()
     }
 
 
-    String cmd("\r\n*\r\necho off\r\n");
+    // sending % twice will print Maximet model info and serial number: "ID:2669 "MAXIMET GMX501-3B-0011" 2.00.23 [Q] PV=4" 
+    // sending * will enter commandline mode: "SETUP MODE"
+    String cmd("\r\nEXIT\r\n%%%%*\r\nECHO OFF\r\n");
     String line;
 
     // Note, Maximet boots for approx 26 seconds from cold-start, make sure to give it enough time to enter command line mode
@@ -873,12 +900,26 @@ bool Maximet::EnterCommandLine()
     while (attempts--)
     {
         mpSerial->Write(cmd);
+        ESP_LOGD(tag, "writing: %s", cmd.c_str());
+
         if (mpSerial->ReadLine(line, COMMANDLINE_TIMEOUT_MS))
         {
             ESP_LOGD(tag, "Switch Maximet to commandline...  ReadLine: %s", line.c_str());
         } 
         else {
             ESP_LOGW(tag, "Timeout switching Maximet to commandline... ");
+        }
+
+        if (line.charAt(0) == STX) {
+            ESP_LOGD(tag, "skipping data line");
+            mpSerial->ReadLine(line, COMMANDLINE_TIMEOUT_MS);
+        }
+        
+        if (line.startsWith("ID:"))
+        {
+            ESP_LOGI(tag, "%s", line.c_str());
+            mpSerial->ReadLine(line, COMMANDLINE_TIMEOUT_MS);
+
         }
         if (line.startsWith("SETUP MODE"))
         {
@@ -890,7 +931,7 @@ bool Maximet::EnterCommandLine()
             ESP_LOGI(tag, "Already in commandline mode.");
             return mbCommandline = true;
         }
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
+        vTaskDelay(1200 / portTICK_PERIOD_MS);
         ESP_LOGD(tag, "Remaining attempts switching Maximet to commandline: %i", attempts);
     }
 
@@ -1133,6 +1174,17 @@ void Maximet::WriteLong(float lon)
 {
     WriteConfig("LONG", String(lon, 6));
     ReadLong();
+};
+
+// setdef
+void Maximet::WriteSetDef()
+{
+    EnterCommandLine();
+    String cmd("SETDEF\r\n");
+    mpSerial->Write(cmd);
+    String line;
+    mpSerial->ReadMultiLine(line);
+    ESP_LOGW(tag, "Maximet set to defaults");
 };
 
 void Maximet::WriteFinish()

@@ -1,4 +1,4 @@
-#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+// #define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
 #include "sdkconfig.h"
 #include "esp_system.h"
 #include "esp_log.h"
@@ -17,6 +17,7 @@
 #include "esp_ota_ops.h"
 #include "NmeaDisplay.h"
 #include "Alarm.h"
+#include "RtcVariables.h"
 
 static const char tag[] = "WeatherBuoy";
 
@@ -73,12 +74,16 @@ static const char tag[] = "WeatherBuoy";
 #define CONFIG_WATCHDOG_SECONDS 60 * 65   // 65min - if hourly send including retries fail,then lets restart
 #define CONFIG_SOLARRADIATIONMIN_DAYTIME 2 // >2W/m2 solar radiation to declare DAYTIME
 
+
+
 Esp32WeatherBuoy::Esp32WeatherBuoy()
 {
 }
 Esp32WeatherBuoy::~Esp32WeatherBuoy()
 {
 }
+
+
 
 extern "C"
 {
@@ -100,35 +105,10 @@ void TestATCommands(Cellular &cellular);
 void TestVelocityVector();
 
 
-/****
-// these variables survive soft-restarts; dont initialize
-__NOINIT_ATTR unsigned int cellularInit;
-__NOINIT_ATTR unsigned int cellularRestarts;
-__NOINIT_ATTR unsigned int cellularRestartReason;
-__NOINIT_ATTR unsigned int cellularNetifRecreates;
-__NOINIT_ATTR unsigned int cellularNetifPppConnects;
-#define CELLULAR_RESTART_NONE 0
-#define CELLULAR_RESTART_NETIFATTACHFAILED 1
-#define CELLULAR_RESTART_ENTERCMDFAILED 2
-#define CELLULAR_RESTART_TURNONMODEMFAILED 3
-#define CELLULAR_RESTART_NONE 4
-***/
 
 void Esp32WeatherBuoy::Start()
 {
-    /***
-    // reset diagnostics variables, if not soft-restart
-    if (esp_reset_reason() != ESP_RST_SW || cellularInit != 0)
-    {
-        ESP_LOGI(tag, "Resetting diagnostics variables");
-        cellularInit = 0;
-        cellularNetifPppConnects = 0;
-        cellularRestarts = 0;
-        cellularNetifRecreates = 0;
-        cellularRestartReason = 0;
-    }
-    ***/
-
+    RtcVariables::Init();
 
 #if LOG_LOCAL_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG || CONFIG_LOG_DEFAULT_LEVEL >= LOG_DEFAULT_LEVEL_DEBUG
     esp_log_level_set("Cellular", ESP_LOG_DEBUG);
@@ -195,7 +175,6 @@ void Esp32WeatherBuoy::Start()
         unsigned int voltage = max471Meter.Voltage();
         unsigned int current = max471Meter.Current();
         float boardtemp = tempSensors.GetBoardTemp();
-        float watertemp = tempSensors.GetWaterTemp();
         mpDisplay->SetSystemInfo(voltage, current, boardtemp);
     }
 
@@ -212,12 +191,11 @@ void Esp32WeatherBuoy::Start()
     //ESP_LOGE(tag, "remove http client logging!");
 
     //ESP_LOGE(tag, "remove simulator check!");
-    //if (!mConfig.miSimulator && mCellular.InitModem())
+    //if (!mConfig.miSimulator && mCellular.Init())
 
     // detect available Simcom 7600E Modem, such as on Lillygo PCI board
-    if (mCellular.InitModem())
+    if (mCellular.Init(mConfig.msCellularApn, mConfig.msCellularUser, mConfig.msCellularPass, mConfig.msCellularOperator, mConfig.miCellularNetwork) && mCellular.PowerUp())
     {
-        mCellular.Start(mConfig.msCellularApn, mConfig.msCellularUser, mConfig.msCellularPass, mConfig.msCellularOperator, mConfig.miCellularNetwork);
         mOnlineMode = MODE_CELLULAR;
 
         // mCellular.ReadSMS(); // use only during firmware setup to receive a SIM based code
@@ -283,6 +261,7 @@ void Esp32WeatherBuoy::HandleAlarm(Alarm *pAlarm)
     if (!mCellular.SwitchToFullPowerMode())
     {
         ESP_LOGE(tag, "SEVERE, Switching to full power mode failed. Restarting.");
+        RtcVariables::SetExtendedResetReason(RtcVariables::EXTENDED_RESETREASON_MODEMFULLPOWERFAILED);
         esp_restart();
         return;
     }
@@ -398,7 +377,8 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
 
         if (mOnlineMode == MODE_CELLULAR)
         {
-            int attempts = 5;
+            const int MAX_ATTEMPTS = 5;
+            int attempts = MAX_ATTEMPTS;
             bool prepared = false;
             do
             {
@@ -406,6 +386,10 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
                 if (!mCellular.SwitchToFullPowerMode())
                 {
                     ESP_LOGE(tag, "SEVERE, Switching to full power mode failed. Remaining attempts: %i", attempts);
+                    if (attempts < MAX_ATTEMPTS) {
+                        RtcVariables::IncModemRestarts();
+                        mCellular.PowerDown();
+                    }
                     continue;
                 }
 
@@ -413,6 +397,10 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
                 if (!mCellular.SwitchToPppMode())
                 {
                     ESP_LOGE(tag, "SEVERE, Failed to switch to PPP mode. Remaining attempts: %i", attempts);
+                    if (attempts < MAX_ATTEMPTS) {
+                        RtcVariables::IncModemRestarts();
+                        mCellular.PowerDown();
+                    }
                     continue;
                 };
 
@@ -431,24 +419,33 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
                         break;
                     } else {
                         ESP_LOGE(tag, "HTTP Post request failed. Retrying HTTP request. Remaining attempts: %i", httpAttempts);
+                        vTaskDelay(1000/portTICK_PERIOD_MS); // wait one second
                     }
                 } while (--httpAttempts);
 
                 if (httpPostSucceeded)
                 {
                     ESP_LOGI(tag, "Posting data succeeded. Switching to low power mode...");
-                    mCellular.SwitchToLowPowerMode();
+                    mCellular.SwitchToSleepMode();
+
                     int duration = (unsigned int)(esp_timer_get_time() / 1000000) - uptimeSeconds;
                     ESP_LOGI(tag, "Total data send duration %is.", duration);
                     break;
                 }
                 else
                 {
-                    ESP_LOGE(tag, "Failed to perform HTTP Post. Shutting down modem. Remaining attempts: %i", attempts);
-                    mCellular.SwitchToLowPowerMode();
+                    ESP_LOGE(tag, "Failed to perform HTTP Post. Power cycling modem. Remaining attempts: %i", attempts);
+                    RtcVariables::IncModemRestarts();
+                    mCellular.PowerDown();
                 }
 
             } while (--attempts);
+
+            if (attempts == 0) {
+                RtcVariables::SetExtendedResetReason(RtcVariables::EXTENDED_RESETREASON_CONNECTIONRETRIES);
+                ESP_LOGE(tag, "SEVERE, Too many attempts to connect to server failed. Restarting.");
+                esp_restart();
+            }
         }
 
         // display runs on power, so no worries about power management
@@ -461,7 +458,7 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
         // Power Managment
         // -----------------------------------------------------------
         // determine nighttime by low solar radiation
-        ESP_LOGI(tag, "Solarradiation: %d W/m²  Voltage: %.02fV", maximet.SolarRadiation(), voltage / 1000.0);
+        ESP_LOGI(tag, "Solarradiation: %d W/m2  Voltage: %.02fV", maximet.SolarRadiation(), voltage / 1000.0);
         if (maximet.SolarRadiation() > CONFIG_SOLARRADIATIONMIN_DAYTIME && voltage > 13100)
         {
             secondsToSleep = mConfig.miIntervalDay; // s;
@@ -473,7 +470,7 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
             ESP_LOGI(tag, "Sending data at nighttime interval every %d minutes", secondsToSleep / 60);
         }
         else
-        { // got into low battery mode if voltage is below 12.5V
+        { // got into low battery mode if voltage is below 12.75V
             secondsToSleep = mConfig.miIntervalLowbattery;
             ESP_LOGI(tag, "Sending data in low-battery mode every %d minutes", secondsToSleep / 60);
         }
