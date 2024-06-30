@@ -131,6 +131,10 @@ bool Cellular::Init(String apn, String user, String pass, String preferredOperat
     msPreferredOperator = preferredOperator;
     miPreferredNetwork = preferredNetwork;
 
+    gpio_reset_pin(CELLULAR_GPIO_PWKEY);
+    gpio_reset_pin(CELLULAR_GPIO_POWER);
+    gpio_reset_pin(CELLULAR_GPIO_STATUS);
+    gpio_reset_pin(CELLULAR_GPIO_DTR);
     gpio_set_direction(CELLULAR_GPIO_PWKEY, GPIO_MODE_OUTPUT);
     gpio_set_direction(CELLULAR_GPIO_POWER, GPIO_MODE_OUTPUT);
     gpio_set_direction(CELLULAR_GPIO_STATUS, GPIO_MODE_INPUT);

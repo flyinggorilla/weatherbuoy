@@ -60,6 +60,9 @@ void TemperatureSensors::Init(int oneWireGpioNum) {
             }
         } else {
             ESP_LOGE(tag, "Please unplug the external water temperature sensor and restart to detect the board temperature sensor.");
+            // random assignment
+            waterTempSensorNum = 0;
+            boardTempSensorNum = 1;
         }
     } 
     
