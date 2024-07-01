@@ -21,7 +21,7 @@ class SendData {
 public:
 	SendData(Config &config, DataQueue &dataQueue, Cellular &cellular, Watchdog &watchdog, Maximet &maximet);
 	virtual ~SendData();
-    bool PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics, OnlineMode onlineMode);
+    bool PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics, OnlineMode onlineMode, String &tempSensorRomCodes);
     bool PerformHttpPost();
     bool isRestart() { return mbRestart; };
 private:

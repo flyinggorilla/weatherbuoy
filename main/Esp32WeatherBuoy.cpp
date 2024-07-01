@@ -312,7 +312,9 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
     ESP_LOGI(tag, "Running: %s, Maximet: %s", 
             mpDisplay ? "Racing Committee Boat with Garmin GNX130 NMEA200 Display" : "Weatherbuoy", 
             maximet.GetConfig().sUserinfo.c_str());
-  
+
+    String tempSensorRomCodes = tempSensors.GetRomCodes();
+
     bool bDiagnostics;
     bool bDiagnosticsAtStartup = true;
     unsigned int lastSendTimestamp = 0;
@@ -407,7 +409,7 @@ void Esp32WeatherBuoy::Run(TemperatureSensors &tempSensors, DataQueue &dataQueue
                 if (!prepared)
                 {
                     // read maximet data queue and create a HTTP POST message
-                    sendData.PrepareHttpPost(voltage, current, boardtemp, watertemp, bDiagnostics, mOnlineMode);
+                    sendData.PrepareHttpPost(voltage, current, boardtemp, watertemp, bDiagnostics, mOnlineMode, tempSensorRomCodes);
                     prepared = true;
                 }
 
@@ -490,11 +492,11 @@ void Esp32WeatherBuoy::RunSimulator(TemperatureSensors &tempSensors, DataQueue &
     simulator.Start(model, maximetRxPin, maximetTxPin);
 
     Data data;
+    String tempSensorRomCodes = tempSensors.GetRomCodes();
 
     unsigned int maximetDataIntervalSeconds = 60;
     unsigned int httpPostDataIntervalSeconds = 30;
     unsigned int lastSendTimestamp = 0;
-
     while (true)
     {
         tempSensors.Read(); // note, this causes approx 700ms delay
@@ -502,13 +504,14 @@ void Esp32WeatherBuoy::RunSimulator(TemperatureSensors &tempSensors, DataQueue &
         float boardtemp = tempSensors.GetBoardTemp();
         float watertemp = tempSensors.GetWaterTemp();
 
+
         simulator.SetTemperature(watertemp);
 
         unsigned int uptimeSeconds = (unsigned int)(esp_timer_get_time() / 1000000); // seconds since start
         if (uptimeSeconds - lastSendTimestamp >= httpPostDataIntervalSeconds)
         {
             lastSendTimestamp = uptimeSeconds;
-            sendData.PrepareHttpPost(5000, 70, boardtemp, watertemp, true, mOnlineMode);
+            sendData.PrepareHttpPost(5000, 70, boardtemp, watertemp, true, mOnlineMode, tempSensorRomCodes);
 
             int sendViaWifiTries = 10;
             while (sendViaWifiTries--)

@@ -223,11 +223,12 @@ void PostDataAddString(String &rPostData, const char *key, String &val, bool com
         rPostData += ",";
     rPostData += "\"";
     rPostData += key;
-    rPostData += "\":";
+    rPostData += "\":\"";
     rPostData += val;
+    rPostData += "\"";
 }
 
-bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics, OnlineMode onlineMode)
+bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurrent, float boardTemperature, float waterTemperature, bool bSendDiagnostics, OnlineMode onlineMode, String &tempSensorRomCodes)
 {
     bSendDiagnostics = bSendDiagnostics || mbSendDiagnostics;
 
@@ -406,6 +407,7 @@ bool SendData::PrepareHttpPost(unsigned int powerVoltage, unsigned int powerCurr
             mPostData += String(mrConfig.mdAlarmLongitude, 6);
             mPostData += "}";
         }
+        PostDataAddString(mPostData, "romcodes", tempSensorRomCodes);
         if (mrConfig.miSimulator)
         {
             mPostData += ", \"simulator\": \"GMX";
@@ -787,6 +789,14 @@ bool SendData::PerformHttpPost()
                 mrMaximet.WriteSetDef();
                 updateConfig = true;
             };
+
+            value = ReadMessageValue("set-romcode:");
+            if (value.length())
+            {
+                mrConfig.msBoardTempSensorId = value;
+                updateConfig = true;
+            };
+
 
             mbRestart = false;
             if (command.equals("restart") || command.equals("config") || command.equals("update"))

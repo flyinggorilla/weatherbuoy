@@ -15,6 +15,7 @@ class TemperatureSensors {
 
         float GetWaterTemp() { return mfWaterTemp; };
         float GetBoardTemp() { return mfBoardTemp; };
+        String GetRomCodes() { return mRomCodes; };
 
         void Init(int oneWireGpioNum);
         void Read();
@@ -28,6 +29,7 @@ class TemperatureSensors {
 
         float mfWaterTemp = 0;
         float mfBoardTemp = 0;
+        String mRomCodes;
 
 };
 

@@ -13,7 +13,8 @@ const static char tag[] = "TemperatureSensors";
 TemperatureSensors::TemperatureSensors(Config &config) : mrConfig(config)  {
 }
 
-void TemperatureSensors::Init(int oneWireGpioNum) {
+void TemperatureSensors::Init(int oneWireGpioNum)
+{
 
     // Create a 1-Wire bus, using the RMT timeslot driver
     mpOwb = owb_rmt_initialize(&mRmtDriverInfo, (gpio_num_t)oneWireGpioNum, RMT_CHANNEL_1, RMT_CHANNEL_0);
@@ -31,6 +32,7 @@ void TemperatureSensors::Init(int oneWireGpioNum) {
         owb_string_from_rom_code(search_state.rom_code, romCodes[num_devices], sizeof(romCodes[0]));
         device_rom_codes[num_devices] = search_state.rom_code;
         ESP_LOGI(tag, "Temperature sensor #%d detected: %s", num_devices, romCodes[num_devices]);
+        mRomCodes.printf("%s%i:%s", num_devices ? ", " : "", num_devices+1, romCodes[num_devices]);
         ++num_devices;
         owb_search_next(mpOwb, &search_state, &found);
     }
@@ -38,6 +40,7 @@ void TemperatureSensors::Init(int oneWireGpioNum) {
     int boardTempSensorNum = -1;
     int waterTempSensorNum = -1;
 
+    mRomCodes.printf("; cfg:%s", mrConfig.msBoardTempSensorId.c_str());
 
     // Store the ROM code of the temperature sensore when exactly one sensor is present. This single sensor is treated as board sensor.
     // Every additional sensor found later is then optional.
@@ -53,6 +56,7 @@ void TemperatureSensors::Init(int oneWireGpioNum) {
         if (mrConfig.msBoardTempSensorId.length()) {
             for (int i = 0; i < num_devices; i++) {
                 if (mrConfig.msBoardTempSensorId == romCodes[i]) {
+                    ESP_LOGI(tag, "Selected board temperature sensor ROM code %s as ID %i", mrConfig.msBoardTempSensorId.c_str(), i);
                     boardTempSensorNum = i;
                 } else {
                     waterTempSensorNum = i;
