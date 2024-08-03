@@ -6,7 +6,7 @@
         "*.tcc": "cpp"
     },
     "idf.adapterTargetName": "esp32",
-    "idf.portWin": "COM15",
+    "idf.portWin": "COM9",
     "git.ignoredRepositories": [
         "c:\\users\\bernd\\esp\\esp-idf"
     ],
