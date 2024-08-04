@@ -1,4 +1,4 @@
-//#define LOG_LOCAL_LEVEL ESP_LOG_DEBUG
+#define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 #include "sdkconfig.h"
 #include "Cellular.h"
 #include "EspString.h"
@@ -347,7 +347,7 @@ bool Cellular::ModemPowerOnSequence(void)
         if (ModemReadLine(line, UART_INPUT_TIMEOUT_CMDNORMAL))
             ESP_LOGD(tag, "ModemReadLine: '%s'", line.c_str());
 
-        if (line.contains("RDY"))
+        if (line.contains("RDY") || line.contains("ATREADY"))
         {
             ESP_LOGI(tag, "Modem ready.");
             mbCommandMode = true;
@@ -410,11 +410,24 @@ bool Cellular::ModemConfigure()
     };
 
     Command("AT+CGMR", "OK", &response, "Display Firmware info"); // +CGMR: LE11B04SIM7600M21-A\r\nOK"
+                                                                  // +CGMR: A011B09A7670M7\r\nOK
     if (response.startsWith("+CGMR: "))
     {
+        const char * modemModel = "unknown";
         int end = response.indexOf("\r\n");
         msHardware = response.substring(7, end);
-        ESP_LOGI(tag, "Modem firmware: %s", msHardware.c_str());
+        if (response.contains("SIM7600"))
+        {
+            mModemModel = MODEM7600;
+            modemModel = "SIM7600";
+        }
+        else if (response.contains("A7670"))
+        {
+            mModemModel = MODEM7670;
+            modemModel = "A7670";
+        }
+
+        ESP_LOGI(tag, "Modem firmware: %s, Model: %s", msHardware.c_str(), modemModel);
     }
     else
     {
@@ -479,7 +492,11 @@ bool Cellular::ModemConfigure()
         {
             vTaskDelay(1000 / portTICK_PERIOD_MS);
             // this command may run longer to find all the operators
-            if (Command("AT+COPS=?", "OK", &response, "List operators", 200, UART_INPUT_TIMEOUT_CMDLONG))
+            const char* ret = "OK";
+            // if (mModemModel == MODEM7670) {
+            //     ret = "PB DONE";
+            // }
+            if (Command("AT+COPS=?", ret, &response, "List operators", 200, UART_INPUT_TIMEOUT_CMDLONG))
             {
                 ESP_LOGI(tag, "Operators: %s", response.c_str());
                 break;
@@ -495,6 +512,11 @@ bool Cellular::ModemConfigure()
         }
     }
 
+if (mModemModel == MODEM7670) {
+    msPreferredOperator = "yesss!";
+}
+
+
     // Setting the preferred Operator is super important. e.g. for Yesss.at use "A1" as operator.
     command = "AT+COPS=0,0,\"";
     command += msPreferredOperator;
@@ -506,6 +528,12 @@ bool Cellular::ModemConfigure()
     else
     {
         ESP_LOGW(tag, "Could not set preferred operator to '%s': %s", msPreferredOperator.c_str(), response.c_str());
+    }
+
+    if (mModemModel == MODEM7670)
+    {
+        miPreferredNetwork = 2;
+        ESP_LOGW(tag, "For A7670, setting preferred network to %i", miPreferredNetwork);
     }
 
     command = "AT+CNMP=";
@@ -595,7 +623,13 @@ bool Cellular::ModemConfigure()
     ESP_LOGI(tag, "Operator: %s", msOperator.c_str());
 
     // set PDP context 1 to providers APN
-    command = "AT+CGDCONT=1,\"IP\",\"";
+    if (mModemModel == MODEM7600)
+    {
+        command = "AT+CGDCONT=1,\"IP\",\"";
+    } else {
+        command = "AT+CGDCONT=1,\"PPP\",\"";
+    }
+
     command += msApn;
     command += "\"";
     if (Command(command.c_str(), "OK", &response, "Define PDP Context"))
@@ -630,6 +664,17 @@ bool Cellular::ModemConfigure()
         }        
     }
 
+    // Command("AT+CGDATA=?", "OK", &response, "Query Data Connection Service Type"); // +CGDATA: (0-1)
+    // ESP_LOGI(tag, "Data Connection Service Type: %s", response.c_str());
+
+    Command("AT+CGDCONT=?", "OK", &response, "Query Define PDP context"); 
+    ESP_LOGI(tag, "PDP context: %s", response.c_str());
+
+    
+   
+    Command("AT+CGDSCONT=?", "OK", &response, "Query Secondary Define PDP context"); 
+    ESP_LOGI(tag, "Secondary PDP context: %s", response.c_str());
+
 
     Command("AT+CNUM", "OK", &response, "Subscriber Number"); // +CNUM: "","+43681207*****",145,0,4
     msSubscriber = "";
@@ -639,8 +684,11 @@ bool Cellular::ModemConfigure()
     }
     ESP_LOGI(tag, "Subscriber: %s", msSubscriber.c_str());
 
-    Command("AT+CGNSSMODE=0,1", "OK", &response, "Disable GPS mode");
-    ESP_LOGI(tag, "Disable GPS mode: %s", response.c_str());
+    if (mModemModel == MODEM7600)
+    {
+        Command("AT+CGNSSMODE=0,1", "OK", &response, "Disable GPS mode");
+        ESP_LOGI(tag, "Disable GPS mode: %s", response.c_str());
+    }
 
     if (Command("AT+CSCLK=1", "OK", &response, "Enable sleep via UART DTR."))
     { // mode 4 would shut down RF entirely to "flight-mode"; mode 0 still keeps SMS receiption intact
@@ -1218,7 +1266,29 @@ bool Cellular::SwitchToPppMode()
     ESP_LOGI(tag, "SwitchToPppMode() establishing modem PPP connection.");
 
     String response;
-    if (Command("AT+CGDATA=\"PPP\",1", "CONNECT", &response, "Connect for data connection."))
+    String command;
+    // if (mModemModel == MODEM7600)
+    // {
+        command = "AT+CGDCONT=1,\"IP\",\"";
+    // } else {
+    //     command = "AT+CGDCONT=1,\"PPP\",\"";
+    // }
+    command += msApn;
+    command += "\"";    
+    Command(command.c_str(), "OK", &response, "Define PDP context"); 
+    Command("AT+CGDCONT=?", "OK", &response, "Query Define PDP context"); 
+    ESP_LOGW(tag, "PDP context: %s", response.c_str());
+
+
+    const char *cmd = "";
+    // if (mModemModel == MODEM7600)
+    // {
+        cmd = "AT+CGDATA=\"PPP\",1";
+    // } else {
+    //     cmd = "AT+CGDATA=\"\",1";
+    // }
+
+    if (Command(cmd, "CONNECT", &response, "Connect for data connection."))
     {
         ESP_LOGI(tag, "Modem CONNECTED. Ready for PPP.");
         if (!PppNetifStart())

@@ -28,6 +28,12 @@ enum PowerMode {
     POWER_ON
 };
 
+enum ModemModel {
+    MODEMNONE,
+    MODEM7600,
+    MODEM7670
+};
+
 class Cellular {
 public:
     Cellular();
@@ -144,6 +150,8 @@ private:
     //bool mbPowerSaverActive = false;
     PowerMode mPowerMode = POWER_OFF;
     int miPppPhase = NETIF_PPP_PHASE_DEAD;
+
+    ModemModel mModemModel = ModemModel::MODEMNONE;
 
     SemaphoreHandle_t mxPppConnected;
     SemaphoreHandle_t mxPppPhaseDead;
