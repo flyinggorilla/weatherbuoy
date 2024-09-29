@@ -4,7 +4,7 @@
     "private": true,
     "main": "testreceiver.js",
     "engines": {
-        "node": "18.x.x"
+        "node": "20.x.x"
     },
     "scripts": {
         "start": "node testreceiver.js"
